@@ -12,6 +12,7 @@ import Schools from "./pages/Schools";
 import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
+import Tables from "./pages/Tables";
 
 const queryClient = new QueryClient();
 
@@ -65,6 +66,14 @@ const AppRoutes = () => (
       element={
         <PrivateRoute>
           <Settings />
+        </PrivateRoute>
+      }
+    />
+    <Route
+      path="/tables"
+      element={
+        <PrivateRoute>
+          <Tables />
         </PrivateRoute>
       }
     />
