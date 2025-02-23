@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/sidebar";
 import { LayoutDashboard, Users, School, BookOpen, Settings } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { Link } from "react-router-dom";
 
 export function AppSidebar() {
   const { user } = useAuth();
@@ -33,10 +34,10 @@ export function AppSidebar() {
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <a href={item.href} className="flex items-center gap-2">
+                    <Link to={item.href} className="flex items-center gap-2">
                       <item.icon className="w-4 h-4" />
                       <span>{item.title}</span>
-                    </a>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}

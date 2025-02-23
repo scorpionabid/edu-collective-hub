@@ -8,6 +8,9 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { useAuth } from "./contexts/AuthContext";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import Users from "./pages/Users";
+import Schools from "./pages/Schools";
+import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +33,30 @@ const AppRoutes = () => (
       element={
         <PrivateRoute>
           <Dashboard />
+        </PrivateRoute>
+      }
+    />
+    <Route
+      path="/users"
+      element={
+        <PrivateRoute>
+          <Users />
+        </PrivateRoute>
+      }
+    />
+    <Route
+      path="/schools"
+      element={
+        <PrivateRoute>
+          <Schools />
+        </PrivateRoute>
+      }
+    />
+    <Route
+      path="/reports"
+      element={
+        <PrivateRoute>
+          <Reports />
         </PrivateRoute>
       }
     />
