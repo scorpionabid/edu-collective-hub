@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,6 +13,7 @@ import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
 import Tables from "./pages/Tables";
+import Regions from "./pages/Regions";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +43,14 @@ const AppRoutes = () => (
       element={
         <PrivateRoute>
           <Users />
+        </PrivateRoute>
+      }
+    />
+    <Route
+      path="/regions"
+      element={
+        <PrivateRoute>
+          <Regions />
         </PrivateRoute>
       }
     />
