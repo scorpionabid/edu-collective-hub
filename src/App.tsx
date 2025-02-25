@@ -29,80 +29,80 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const AppRoutes = () => (
-  <TooltipProvider>
-    <Routes>
-      <Route path="/" element={<Login />} />
-      <Route
-        path="/dashboard"
-        element={
-          <PrivateRoute>
-            <Dashboard />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/users"
-        element={
-          <PrivateRoute>
-            <Users />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/regions"
-        element={
-          <PrivateRoute>
-            <Regions />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/schools"
-        element={
-          <PrivateRoute>
-            <Schools />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/reports"
-        element={
-          <PrivateRoute>
-            <Reports />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/settings"
-        element={
-          <PrivateRoute>
-            <Settings />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/tables"
-        element={
-          <PrivateRoute>
-            <Tables />
-          </PrivateRoute>
-        }
-      />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
-  </TooltipProvider>
+  <Routes>
+    <Route path="/" element={<Login />} />
+    <Route
+      path="/dashboard"
+      element={
+        <PrivateRoute>
+          <Dashboard />
+        </PrivateRoute>
+      }
+    />
+    <Route
+      path="/users"
+      element={
+        <PrivateRoute>
+          <Users />
+        </PrivateRoute>
+      }
+    />
+    <Route
+      path="/regions"
+      element={
+        <PrivateRoute>
+          <Regions />
+        </PrivateRoute>
+      }
+    />
+    <Route
+      path="/schools"
+      element={
+        <PrivateRoute>
+          <Schools />
+        </PrivateRoute>
+      }
+    />
+    <Route
+      path="/reports"
+      element={
+        <PrivateRoute>
+          <Reports />
+        </PrivateRoute>
+      }
+    />
+    <Route
+      path="/settings"
+      element={
+        <PrivateRoute>
+          <Settings />
+        </PrivateRoute>
+      }
+    />
+    <Route
+      path="/tables"
+      element={
+        <PrivateRoute>
+          <Tables />
+        </PrivateRoute>
+      }
+    />
+    <Route path="*" element={<NotFound />} />
+  </Routes>
 );
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <BrowserRouter>
+  <BrowserRouter>
+    <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Toaster />
-        <Sonner />
-        <AppRoutes />
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <AppRoutes />
+        </TooltipProvider>
       </AuthProvider>
-    </BrowserRouter>
-  </QueryClientProvider>
+    </QueryClientProvider>
+  </BrowserRouter>
 );
 
 export default App;
