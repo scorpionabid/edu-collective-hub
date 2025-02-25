@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -28,79 +29,79 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const AppRoutes = () => (
-  <Routes>
-    <Route path="/" element={<Login />} />
-    <Route
-      path="/dashboard"
-      element={
-        <PrivateRoute>
-          <Dashboard />
-        </PrivateRoute>
-      }
-    />
-    <Route
-      path="/users"
-      element={
-        <PrivateRoute>
-          <Users />
-        </PrivateRoute>
-      }
-    />
-    <Route
-      path="/regions"
-      element={
-        <PrivateRoute>
-          <Regions />
-        </PrivateRoute>
-      }
-    />
-    <Route
-      path="/schools"
-      element={
-        <PrivateRoute>
-          <Schools />
-        </PrivateRoute>
-      }
-    />
-    <Route
-      path="/reports"
-      element={
-        <PrivateRoute>
-          <Reports />
-        </PrivateRoute>
-      }
-    />
-    <Route
-      path="/settings"
-      element={
-        <PrivateRoute>
-          <Settings />
-        </PrivateRoute>
-      }
-    />
-    <Route
-      path="/tables"
-      element={
-        <PrivateRoute>
-          <Tables />
-        </PrivateRoute>
-      }
-    />
-    <Route path="*" element={<NotFound />} />
-  </Routes>
+  <TooltipProvider>
+    <Routes>
+      <Route path="/" element={<Login />} />
+      <Route
+        path="/dashboard"
+        element={
+          <PrivateRoute>
+            <Dashboard />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/users"
+        element={
+          <PrivateRoute>
+            <Users />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/regions"
+        element={
+          <PrivateRoute>
+            <Regions />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/schools"
+        element={
+          <PrivateRoute>
+            <Schools />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/reports"
+        element={
+          <PrivateRoute>
+            <Reports />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <PrivateRoute>
+            <Settings />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/tables"
+        element={
+          <PrivateRoute>
+            <Tables />
+          </PrivateRoute>
+        }
+      />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  </TooltipProvider>
 );
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <AppRoutes />
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <Toaster />
+        <Sonner />
+        <AppRoutes />
+      </AuthProvider>
+    </BrowserRouter>
   </QueryClientProvider>
 );
 
