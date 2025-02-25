@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { useAuth } from "./contexts/AuthContext";
-import { TooltipProvider } from "@radix-ui/react-tooltip";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Users from "./pages/Users";
@@ -92,8 +92,8 @@ const AppRoutes = () => (
 );
 
 const App = () => (
-  <TooltipProvider>
-    <QueryClientProvider client={queryClient}>
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
       <BrowserRouter>
         <AuthProvider>
           <Toaster />
@@ -101,8 +101,8 @@ const App = () => (
           <AppRoutes />
         </AuthProvider>
       </BrowserRouter>
-    </QueryClientProvider>
-  </TooltipProvider>
+    </TooltipProvider>
+  </QueryClientProvider>
 );
 
 export default App;
