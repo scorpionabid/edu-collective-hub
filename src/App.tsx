@@ -1,5 +1,4 @@
 
-import { StrictMode } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -93,19 +92,17 @@ const AppRoutes = () => (
 );
 
 const App = () => (
-  <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+  <QueryClientProvider client={queryClient}>
+    <BrowserRouter>
+      <AuthProvider>
         <TooltipProvider>
-          <AuthProvider>
-            <Toaster />
-            <Sonner />
-            <AppRoutes />
-          </AuthProvider>
+          <Toaster />
+          <Sonner />
+          <AppRoutes />
         </TooltipProvider>
-      </BrowserRouter>
-    </QueryClientProvider>
-  </StrictMode>
+      </AuthProvider>
+    </BrowserRouter>
+  </QueryClientProvider>
 );
 
 export default App;
