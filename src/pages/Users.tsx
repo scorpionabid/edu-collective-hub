@@ -4,14 +4,12 @@ import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users as UsersIcon, UserPlus, Pencil, Trash2 } from "lucide-react";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { UserPlus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { AdminForm } from "@/components/users/AdminForm";
+import { AdminList } from "@/components/users/AdminList";
 
 type AdminType = 'regionadmin' | 'sectoradmin' | 'schooladmin';
 
@@ -159,31 +157,6 @@ const Users = () => {
     }
   };
 
-  const getEntityOptions = () => {
-    switch (newAdmin.type) {
-      case "regionadmin":
-        return regions.map(region => (
-          <SelectItem key={region.id} value={String(region.id)}>
-            {region.name}
-          </SelectItem>
-        ));
-      case "sectoradmin":
-        return sectors.map(sector => (
-          <SelectItem key={sector.id} value={String(sector.id)}>
-            {sector.name}
-          </SelectItem>
-        ));
-      case "schooladmin":
-        return schools.map(school => (
-          <SelectItem key={school.id} value={String(school.id)}>
-            {school.name}
-          </SelectItem>
-        ));
-      default:
-        return [];
-    }
-  };
-
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
@@ -209,185 +182,25 @@ const Users = () => {
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                      <DialogTitle>Add New Administrator</DialogTitle>
-                    </DialogHeader>
-                    <div className="grid grid-cols-2 gap-4 py-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="firstName">First Name</Label>
-                        <Input
-                          id="firstName"
-                          value={newAdmin.firstName}
-                          onChange={(e) => setNewAdmin({ ...newAdmin, firstName: e.target.value })}
-                          placeholder="Enter first name"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="lastName">Last Name</Label>
-                        <Input
-                          id="lastName"
-                          value={newAdmin.lastName}
-                          onChange={(e) => setNewAdmin({ ...newAdmin, lastName: e.target.value })}
-                          placeholder="Enter last name"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          value={newAdmin.email}
-                          onChange={(e) => setNewAdmin({ ...newAdmin, email: e.target.value })}
-                          placeholder="Enter email"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="utisCode">UTIS Code</Label>
-                        <Input
-                          id="utisCode"
-                          value={newAdmin.utisCode}
-                          onChange={(e) => setNewAdmin({ ...newAdmin, utisCode: e.target.value })}
-                          placeholder="Enter UTIS code"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="password">Password</Label>
-                        <Input
-                          id="password"
-                          type="password"
-                          value={newAdmin.password}
-                          onChange={(e) => setNewAdmin({ ...newAdmin, password: e.target.value })}
-                          placeholder="Enter password"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="phone">Phone Number</Label>
-                        <Input
-                          id="phone"
-                          value={newAdmin.phone}
-                          onChange={(e) => setNewAdmin({ ...newAdmin, phone: e.target.value })}
-                          placeholder="Enter phone number"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="type">Administrator Type</Label>
-                        <Select
-                          value={newAdmin.type}
-                          onValueChange={(value: AdminType) => {
-                            setNewAdmin({ ...newAdmin, type: value, entityId: "" });
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="regionadmin">Region Admin</SelectItem>
-                            <SelectItem value="sectoradmin">Sector Admin</SelectItem>
-                            <SelectItem value="schooladmin">School Admin</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="entity">Select {newAdmin.type.replace('admin', '')}</Label>
-                        <Select
-                          value={newAdmin.entityId}
-                          onValueChange={(value) => setNewAdmin({ ...newAdmin, entityId: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder={`Select ${newAdmin.type.replace('admin', '')}`} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {getEntityOptions()}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <Button className="col-span-2" onClick={handleAddAdmin}>
-                        Add Administrator
-                      </Button>
-                    </div>
+                    <AdminForm
+                      admin={newAdmin}
+                      onAdminChange={setNewAdmin}
+                      onSubmit={handleAddAdmin}
+                      submitLabel="Add Administrator"
+                      regions={regions}
+                      sectors={sectors}
+                      schools={schools}
+                    />
                   </DialogContent>
                 </Dialog>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>UTIS Code</TableHead>
-                      <TableHead>Phone</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Entity</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {admins.map((admin) => (
-                      <TableRow key={admin.id}>
-                        <TableCell>{admin.firstName} {admin.lastName}</TableCell>
-                        <TableCell>{admin.email}</TableCell>
-                        <TableCell>{admin.utisCode}</TableCell>
-                        <TableCell>{admin.phone}</TableCell>
-                        <TableCell>{admin.type.replace('admin', ' Admin')}</TableCell>
-                        <TableCell>{admin.entityName}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Dialog>
-                              <DialogTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setEditingAdmin(admin)}
-                                >
-                                  <Pencil className="w-4 h-4" />
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent>
-                                <DialogHeader>
-                                  <DialogTitle>Edit Administrator</DialogTitle>
-                                </DialogHeader>
-                                {/* Add edit form here similar to add form */}
-                              </DialogContent>
-                            </Dialog>
-                            <Dialog>
-                              <DialogTrigger asChild>
-                                <Button
-                                  variant="destructive"
-                                  size="sm"
-                                  onClick={() => setDeletingAdmin(admin)}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent>
-                                <DialogHeader>
-                                  <DialogTitle>Delete Administrator</DialogTitle>
-                                  <DialogDescription>
-                                    Are you sure you want to delete this administrator? This action cannot be undone.
-                                  </DialogDescription>
-                                </DialogHeader>
-                                <div className="flex justify-end gap-2">
-                                  <Button
-                                    variant="outline"
-                                    onClick={() => setDeletingAdmin(null)}
-                                  >
-                                    Cancel
-                                  </Button>
-                                  <Button
-                                    variant="destructive"
-                                    onClick={handleDeleteAdmin}
-                                  >
-                                    Delete
-                                  </Button>
-                                </div>
-                              </DialogContent>
-                            </Dialog>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                <AdminList
+                  admins={admins}
+                  onEdit={setEditingAdmin}
+                  onDelete={handleDeleteAdmin}
+                  setDeletingAdmin={setDeletingAdmin}
+                />
               </CardContent>
             </Card>
           </main>
