@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 type AdminType = 'regionadmin' | 'sectoradmin' | 'schooladmin';
 
@@ -23,6 +23,8 @@ interface AdminFormProps {
   onAdminChange: (admin: NewAdmin) => void;
   onSubmit: () => void;
   submitLabel: string;
+  entityName?: string;
+  entityType?: AdminType;
   regions: Array<{ id: number; name: string; }>;
   sectors: Array<{ id: number; name: string; regionId: number; }>;
   schools: Array<{ id: number; name: string; sectorId: number; }>;
@@ -33,11 +35,21 @@ export const AdminForm = ({
   onAdminChange,
   onSubmit,
   submitLabel,
+  entityName,
+  entityType,
   regions,
   sectors,
   schools
 }: AdminFormProps) => {
   const getEntityOptions = () => {
+    if (entityType && entityName) {
+      return [(
+        <SelectItem key={admin.entityId} value={admin.entityId}>
+          {entityName}
+        </SelectItem>
+      )];
+    }
+
     switch (admin.type) {
       case "regionadmin":
         return regions.map(region => (
@@ -66,24 +78,29 @@ export const AdminForm = ({
     <>
       <DialogHeader>
         <DialogTitle>{submitLabel}</DialogTitle>
+        {entityType && entityName && (
+          <DialogDescription>
+            {entityName} üçün {entityType === 'regionadmin' ? 'region' : entityType === 'sectoradmin' ? 'sektor' : 'məktəb'} administratoru yaradın
+          </DialogDescription>
+        )}
       </DialogHeader>
       <div className="grid grid-cols-2 gap-4 py-4">
         <div className="space-y-2">
-          <Label htmlFor="firstName">First Name</Label>
+          <Label htmlFor="firstName">Ad</Label>
           <Input
             id="firstName"
             value={admin.firstName}
             onChange={(e) => onAdminChange({ ...admin, firstName: e.target.value })}
-            placeholder="Enter first name"
+            placeholder="Adı daxil edin"
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="lastName">Last Name</Label>
+          <Label htmlFor="lastName">Soyad</Label>
           <Input
             id="lastName"
             value={admin.lastName}
             onChange={(e) => onAdminChange({ ...admin, lastName: e.target.value })}
-            placeholder="Enter last name"
+            placeholder="Soyadı daxil edin"
           />
         </div>
         <div className="space-y-2">
@@ -93,63 +110,65 @@ export const AdminForm = ({
             type="email"
             value={admin.email}
             onChange={(e) => onAdminChange({ ...admin, email: e.target.value })}
-            placeholder="Enter email"
+            placeholder="Email daxil edin"
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="utisCode">UTIS Code</Label>
+          <Label htmlFor="utisCode">UTIS Kodu</Label>
           <Input
             id="utisCode"
             value={admin.utisCode}
             onChange={(e) => onAdminChange({ ...admin, utisCode: e.target.value })}
-            placeholder="Enter UTIS code"
+            placeholder="UTIS kodunu daxil edin"
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password">Şifrə</Label>
           <Input
             id="password"
             type="password"
             value={admin.password}
             onChange={(e) => onAdminChange({ ...admin, password: e.target.value })}
-            placeholder="Enter password"
+            placeholder="Şifrəni daxil edin"
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="phone">Phone Number</Label>
+          <Label htmlFor="phone">Telefon</Label>
           <Input
             id="phone"
             value={admin.phone}
             onChange={(e) => onAdminChange({ ...admin, phone: e.target.value })}
-            placeholder="Enter phone number"
+            placeholder="Telefon nömrəsini daxil edin"
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="type">Administrator Type</Label>
+          <Label htmlFor="type">Administrator növü</Label>
           <Select
             value={admin.type}
             onValueChange={(value: AdminType) => {
               onAdminChange({ ...admin, type: value, entityId: "" });
             }}
+            disabled={!!entityType}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select type" />
+              <SelectValue placeholder="Növü seçin" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="regionadmin">Region Admin</SelectItem>
-              <SelectItem value="sectoradmin">Sector Admin</SelectItem>
-              <SelectItem value="schooladmin">School Admin</SelectItem>
+              <SelectItem value="regionadmin">Region Administratoru</SelectItem>
+              <SelectItem value="sectoradmin">Sektor Administratoru</SelectItem>
+              <SelectItem value="schooladmin">Məktəb Administratoru</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="entity">Select {admin.type.replace('admin', '')}</Label>
+          <Label htmlFor="entity">Təyin ediləcək {admin.type === 'regionadmin' ? 'region' : admin.type === 'sectoradmin' ? 'sektor' : 'məktəb'}</Label>
           <Select
             value={admin.entityId}
             onValueChange={(value) => onAdminChange({ ...admin, entityId: value })}
+            disabled={!!entityType}
           >
             <SelectTrigger>
-              <SelectValue placeholder={`Select ${admin.type.replace('admin', '')}`} />
+              <SelectValue placeholder={`${admin.type === 'regionadmin' ? 'Region' : admin.type === 'sectoradmin' ? 'Sektor' : 'Məktəb'} seçin`} />
             </SelectTrigger>
             <SelectContent>
               {getEntityOptions()}
