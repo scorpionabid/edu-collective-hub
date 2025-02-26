@@ -15,6 +15,7 @@ import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
 import Tables from "./pages/Tables";
 import Regions from "./pages/Regions";
+import Sectors from "./pages/Sectors";
 
 const queryClient = new QueryClient();
 
@@ -52,6 +53,14 @@ const AppRoutes = () => (
       element={
         <PrivateRoute>
           <Regions />
+        </PrivateRoute>
+      }
+    />
+    <Route
+      path="/sectors"
+      element={
+        <PrivateRoute>
+          <Sectors />
         </PrivateRoute>
       }
     />

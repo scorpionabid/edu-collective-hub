@@ -9,100 +9,60 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PlusCircle, Pencil, Trash2 } from "lucide-react";
+import { PlusCircle, Pencil, Trash2, BuildingIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+
+interface Sector {
+  id: number;
+  name: string;
+  code: string;
+  regionId: number;
+  schoolsCount: number;
+}
 
 interface Region {
   id: number;
   name: string;
 }
 
-interface Sector {
-  id: number;
-  name: string;
-  email: string;
-  phone: string;
-  regionId: number;
-  regionName: string;
-  adminName: string | null;
-}
-
-interface NewSector {
-  name: string;
-  email: string;
-  phone: string;
-  regionId: string;
-}
-
 const Sectors = () => {
   const { user } = useAuth();
   const [sectors, setSectors] = useState<Sector[]>([]);
-  const [newSector, setNewSector] = useState<NewSector>({
-    name: "",
-    email: "",
-    phone: "",
-    regionId: "",
-  });
+  const [regions, setRegions] = useState<Region[]>([
+    { id: 1, name: "Bakı" },
+    { id: 2, name: "Sumqayıt" },
+    { id: 3, name: "Gəncə" },
+  ]);
+  const [selectedRegion, setSelectedRegion] = useState<number | null>(null);
+  const [newSector, setNewSector] = useState({ name: "", code: "" });
   const [editingSector, setEditingSector] = useState<Sector | null>(null);
   const [deletingSector, setDeletingSector] = useState<Sector | null>(null);
 
-  // Mock regions data
-  const regions: Region[] = [
-    { id: 1, name: "Region 1" },
-    { id: 2, name: "Region 2" },
-  ];
-
   const handleAddSector = () => {
-    if (validateSectorData(newSector)) {
-      const region = regions.find(r => r.id === parseInt(newSector.regionId));
+    if (newSector.name.trim() && newSector.code.trim() && selectedRegion) {
       setSectors([
         ...sectors,
         {
           id: Date.now(),
-          ...newSector,
-          regionId: parseInt(newSector.regionId),
-          regionName: region?.name || "",
-          adminName: null,
-        },
+          name: newSector.name,
+          code: newSector.code,
+          regionId: selectedRegion,
+          schoolsCount: 0
+        }
       ]);
-      setNewSector({
-        name: "",
-        email: "",
-        phone: "",
-        regionId: "",
-      });
-      toast.success("Sector added successfully");
+      setNewSector({ name: "", code: "" });
+      toast.success("Sektor uğurla əlavə edildi");
     }
-  };
-
-  const validateSectorData = (data: NewSector): boolean => {
-    if (!data.name.trim()) {
-      toast.error("Name is required");
-      return false;
-    }
-    if (!data.email.trim() || !data.email.includes("@")) {
-      toast.error("Valid email is required");
-      return false;
-    }
-    if (!data.phone.trim()) {
-      toast.error("Phone number is required");
-      return false;
-    }
-    if (!data.regionId) {
-      toast.error("Please select a region");
-      return false;
-    }
-    return true;
   };
 
   const handleUpdateSector = () => {
-    if (editingSector) {
-      setSectors(sectors.map(sector => 
+    if (editingSector && editingSector.name.trim()) {
+      setSectors(sectors.map(sector =>
         sector.id === editingSector.id ? editingSector : sector
       ));
       setEditingSector(null);
-      toast.success("Sector updated successfully");
+      toast.success("Sektor uğurla yeniləndi");
     }
   };
 
@@ -110,9 +70,13 @@ const Sectors = () => {
     if (deletingSector) {
       setSectors(sectors.filter(sector => sector.id !== deletingSector.id));
       setDeletingSector(null);
-      toast.success("Sector deleted successfully");
+      toast.success("Sektor uğurla silindi");
     }
   };
+
+  const filteredSectors = selectedRegion
+    ? sectors.filter(sector => sector.regionId === selectedRegion)
+    : sectors;
 
   return (
     <SidebarProvider>
@@ -123,97 +87,82 @@ const Sectors = () => {
             <div className="px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
               <div className="flex items-center gap-4">
                 <SidebarTrigger />
-                <h1 className="text-xl font-semibold">Sectors</h1>
+                <h1 className="text-xl font-semibold">Sektorlar</h1>
               </div>
             </div>
           </header>
           <main className="p-6">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Sector Management</CardTitle>
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <PlusCircle className="w-4 h-4 mr-2" />
-                      Add Sector
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Add New Sector</DialogTitle>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="region">Region</Label>
-                        <Select
-                          value={newSector.regionId}
-                          onValueChange={(value) => setNewSector({ ...newSector, regionId: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select Region" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {regions.map(region => (
-                              <SelectItem key={region.id} value={String(region.id)}>
-                                {region.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                <CardTitle>Sektorların idarə edilməsi</CardTitle>
+                <div className="flex items-center gap-4">
+                  <Select
+                    value={selectedRegion?.toString()}
+                    onValueChange={(value) => setSelectedRegion(Number(value))}
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Region seçin" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {regions.map((region) => (
+                        <SelectItem key={region.id} value={region.id.toString()}>
+                          {region.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <PlusCircle className="w-4 h-4 mr-2" />
+                        Sektor əlavə et
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Yeni sektor əlavə et</DialogTitle>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="sector-name">Sektorun adı</Label>
+                          <Input
+                            id="sector-name"
+                            value={newSector.name}
+                            onChange={(e) => setNewSector({ ...newSector, name: e.target.value })}
+                            placeholder="Sektorun adını daxil edin"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="sector-code">Sektorun kodu</Label>
+                          <Input
+                            id="sector-code"
+                            value={newSector.code}
+                            onChange={(e) => setNewSector({ ...newSector, code: e.target.value })}
+                            placeholder="Sektorun kodunu daxil edin"
+                          />
+                        </div>
+                        <Button onClick={handleAddSector}>Əlavə et</Button>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="name">Sector Name</Label>
-                        <Input
-                          id="name"
-                          value={newSector.name}
-                          onChange={(e) => setNewSector({ ...newSector, name: e.target.value })}
-                          placeholder="Enter sector name"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          value={newSector.email}
-                          onChange={(e) => setNewSector({ ...newSector, email: e.target.value })}
-                          placeholder="Enter email"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="phone">Phone Number</Label>
-                        <Input
-                          id="phone"
-                          value={newSector.phone}
-                          onChange={(e) => setNewSector({ ...newSector, phone: e.target.value })}
-                          placeholder="Enter phone number"
-                        />
-                      </div>
-                      <Button onClick={handleAddSector}>Add Sector</Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Phone</TableHead>
-                      <TableHead>Region</TableHead>
-                      <TableHead>Administrator</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead>Sektorun adı</TableHead>
+                      <TableHead>Kod</TableHead>
+                      <TableHead>Məktəblər</TableHead>
+                      <TableHead>Əməliyyatlar</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sectors.map((sector) => (
+                    {filteredSectors.map((sector) => (
                       <TableRow key={sector.id}>
                         <TableCell>{sector.name}</TableCell>
-                        <TableCell>{sector.email}</TableCell>
-                        <TableCell>{sector.phone}</TableCell>
-                        <TableCell>{sector.regionName}</TableCell>
-                        <TableCell>{sector.adminName || "No admin assigned"}</TableCell>
+                        <TableCell>{sector.code}</TableCell>
+                        <TableCell>{sector.schoolsCount} məktəb</TableCell>
                         <TableCell>
                           <div className="flex gap-2">
                             <Dialog>
@@ -228,77 +177,42 @@ const Sectors = () => {
                               </DialogTrigger>
                               <DialogContent>
                                 <DialogHeader>
-                                  <DialogTitle>Edit Sector</DialogTitle>
+                                  <DialogTitle>Sektoru redaktə et</DialogTitle>
                                 </DialogHeader>
-                                <div className="grid gap-4 py-4">
+                                <div className="space-y-4">
                                   <div className="space-y-2">
-                                    <Label htmlFor="edit-region">Region</Label>
-                                    <Select
-                                      value={String(editingSector?.regionId)}
-                                      onValueChange={(value) => 
-                                        setEditingSector(prev => prev ? {
-                                          ...prev,
-                                          regionId: parseInt(value),
-                                          regionName: regions.find(r => r.id === parseInt(value))?.name || ""
-                                        } : null)
-                                      }
+                                    <Label htmlFor="edit-sector-name">Sektorun adı</Label>
+                                    <Input
+                                      id="edit-sector-name"
+                                      value={editingSector?.name || ""}
+                                      onChange={(e) => setEditingSector(editingSector ? {
+                                        ...editingSector,
+                                        name: e.target.value
+                                      } : null)}
+                                    />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label htmlFor="edit-sector-code">Sektorun kodu</Label>
+                                    <Input
+                                      id="edit-sector-code"
+                                      value={editingSector?.code || ""}
+                                      onChange={(e) => setEditingSector(editingSector ? {
+                                        ...editingSector,
+                                        code: e.target.value
+                                      } : null)}
+                                    />
+                                  </div>
+                                  <div className="flex justify-end gap-2">
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => setEditingSector(null)}
                                     >
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Select Region" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {regions.map(region => (
-                                          <SelectItem key={region.id} value={String(region.id)}>
-                                            {region.name}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
+                                      Ləğv et
+                                    </Button>
+                                    <Button onClick={handleUpdateSector}>
+                                      Yadda saxla
+                                    </Button>
                                   </div>
-                                  <div className="space-y-2">
-                                    <Label htmlFor="edit-name">Sector Name</Label>
-                                    <Input
-                                      id="edit-name"
-                                      value={editingSector?.name}
-                                      onChange={(e) => 
-                                        setEditingSector(prev => prev ? {
-                                          ...prev,
-                                          name: e.target.value
-                                        } : null)
-                                      }
-                                      placeholder="Enter sector name"
-                                    />
-                                  </div>
-                                  <div className="space-y-2">
-                                    <Label htmlFor="edit-email">Email</Label>
-                                    <Input
-                                      id="edit-email"
-                                      type="email"
-                                      value={editingSector?.email}
-                                      onChange={(e) => 
-                                        setEditingSector(prev => prev ? {
-                                          ...prev,
-                                          email: e.target.value
-                                        } : null)
-                                      }
-                                      placeholder="Enter email"
-                                    />
-                                  </div>
-                                  <div className="space-y-2">
-                                    <Label htmlFor="edit-phone">Phone Number</Label>
-                                    <Input
-                                      id="edit-phone"
-                                      value={editingSector?.phone}
-                                      onChange={(e) => 
-                                        setEditingSector(prev => prev ? {
-                                          ...prev,
-                                          phone: e.target.value
-                                        } : null)
-                                      }
-                                      placeholder="Enter phone number"
-                                    />
-                                  </div>
-                                  <Button onClick={handleUpdateSector}>Update Sector</Button>
                                 </div>
                               </DialogContent>
                             </Dialog>
@@ -314,9 +228,9 @@ const Sectors = () => {
                               </DialogTrigger>
                               <DialogContent>
                                 <DialogHeader>
-                                  <DialogTitle>Delete Sector</DialogTitle>
+                                  <DialogTitle>Sektoru sil</DialogTitle>
                                   <DialogDescription>
-                                    Are you sure you want to delete this sector? This action cannot be undone.
+                                    Bu sektoru silmək istədiyinizə əminsiniz? Bu əməliyyat geri qaytarıla bilməz.
                                   </DialogDescription>
                                 </DialogHeader>
                                 <div className="flex justify-end gap-2">
@@ -324,13 +238,13 @@ const Sectors = () => {
                                     variant="outline"
                                     onClick={() => setDeletingSector(null)}
                                   >
-                                    Cancel
+                                    Ləğv et
                                   </Button>
                                   <Button
                                     variant="destructive"
                                     onClick={handleDeleteSector}
                                   >
-                                    Delete
+                                    Sil
                                   </Button>
                                 </div>
                               </DialogContent>
