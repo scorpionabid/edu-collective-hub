@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PlusCircle, X } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface Column {
   name: string;
@@ -13,11 +13,18 @@ interface Column {
 
 interface ColumnFormProps {
   onSubmit: (column: Column) => void;
+  editingColumn?: Column | null;
 }
 
-export const ColumnForm = ({ onSubmit }: ColumnFormProps) => {
+export const ColumnForm = ({ onSubmit, editingColumn }: ColumnFormProps) => {
   const [column, setColumn] = useState<Column>({ name: "", type: "text" });
   const [newOption, setNewOption] = useState("");
+
+  useEffect(() => {
+    if (editingColumn) {
+      setColumn(editingColumn);
+    }
+  }, [editingColumn]);
 
   const handleSubmit = () => {
     if (column.name.trim()) {
@@ -71,6 +78,7 @@ export const ColumnForm = ({ onSubmit }: ColumnFormProps) => {
             className="w-full border rounded-md p-2"
             value={column.type}
             onChange={(e) => handleTypeChange(e.target.value)}
+            disabled={!!editingColumn}
           >
             <option value="text">Mətn</option>
             <option value="number">Rəqəm</option>
@@ -126,7 +134,7 @@ export const ColumnForm = ({ onSubmit }: ColumnFormProps) => {
       )}
 
       <Button onClick={handleSubmit} className="w-full">
-        Sütun əlavə et
+        {editingColumn ? "Sütunu yenilə" : "Sütun əlavə et"}
       </Button>
     </div>
   );

@@ -4,11 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Pencil, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { ColumnForm } from "./ColumnForm";
 
 interface Column {
   id: number;
   name: string;
   type: string;
+  options?: string[];
 }
 
 interface ColumnListProps {
@@ -34,63 +36,50 @@ export const ColumnList = ({
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Column Name</TableHead>
-          <TableHead>Type</TableHead>
-          <TableHead>Actions</TableHead>
+          <TableHead>Sütun adı</TableHead>
+          <TableHead>Tip</TableHead>
+          <TableHead>Seçimlər</TableHead>
+          <TableHead>Əməliyyatlar</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {columns.map((column) => (
           <TableRow key={column.id}>
+            <TableCell>{column.name}</TableCell>
+            <TableCell>{column.type}</TableCell>
             <TableCell>
-              {editingColumn?.id === column.id ? (
-                <Input
-                  value={editingColumn.name}
-                  onChange={(e) =>
-                    setEditingColumn({
-                      ...editingColumn,
-                      name: e.target.value,
-                    })
-                  }
-                />
-              ) : (
-                column.name
-              )}
-            </TableCell>
-            <TableCell>
-              {editingColumn?.id === column.id ? (
-                <select
-                  className="w-full border rounded-md p-2"
-                  value={editingColumn.type}
-                  onChange={(e) =>
-                    setEditingColumn({
-                      ...editingColumn,
-                      type: e.target.value,
-                    })
-                  }
-                >
-                  <option value="text">Text</option>
-                  <option value="number">Number</option>
-                  <option value="date">Date</option>
-                  <option value="select">Select</option>
-                </select>
-              ) : (
-                column.type
+              {column.type === 'select' && column.options && (
+                <div className="flex flex-wrap gap-1">
+                  {column.options.map((option, index) => (
+                    <span key={index} className="bg-secondary px-2 py-1 rounded-full text-xs">
+                      {option}
+                    </span>
+                  ))}
+                </div>
               )}
             </TableCell>
             <TableCell>
               <div className="flex gap-2">
-                {editingColumn?.id === column.id ? (
-                  <Button onClick={onUpdateColumn}>Save</Button>
-                ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onEditColumn(column)}
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </Button>
-                )}
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onEditColumn(column)}
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Sütunu düzəlt</DialogTitle>
+                    </DialogHeader>
+                    <ColumnForm
+                      onSubmit={() => onUpdateColumn()}
+                      editingColumn={column}
+                    />
+                  </DialogContent>
+                </Dialog>
                 <Dialog>
                   <DialogTrigger asChild>
                     <Button
@@ -103,9 +92,9 @@ export const ColumnList = ({
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
-                      <DialogTitle>Delete Column</DialogTitle>
+                      <DialogTitle>Sütunu sil</DialogTitle>
                       <DialogDescription>
-                        Are you sure you want to delete this column? This action cannot be undone.
+                        Bu sütunu silmək istədiyinizə əminsiniz? Bu əməliyyat geri qaytarıla bilməz.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="flex justify-end gap-2">
@@ -113,13 +102,13 @@ export const ColumnList = ({
                         variant="outline"
                         onClick={() => setDeletingColumn(null)}
                       >
-                        Cancel
+                        Ləğv et
                       </Button>
                       <Button
                         variant="destructive"
                         onClick={onDeleteColumn}
                       >
-                        Delete
+                        Sil
                       </Button>
                     </div>
                   </DialogContent>
