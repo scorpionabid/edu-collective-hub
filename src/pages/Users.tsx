@@ -5,7 +5,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { UserPlus } from "lucide-react";
+import { UserPlus, FileInput, Download, UploadCloud } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { AdminForm } from "@/components/users/AdminForm";
@@ -14,6 +14,8 @@ import { RegionList } from "@/components/users/RegionList";
 import { SectorList } from "@/components/users/SectorList";
 import { SchoolList } from "@/components/users/SchoolList";
 import { AdminType, AdminUser, NewAdmin, Entity } from "@/components/users/types";
+import { ImportDialog } from "@/components/users/ImportDialog";
+import { ImportedSchool, ImportedAdmin } from "@/utils/excelImport";
 
 const Users = () => {
   const { user } = useAuth();
@@ -31,25 +33,29 @@ const Users = () => {
   const [editingAdmin, setEditingAdmin] = useState<AdminUser | null>(null);
   const [deletingAdmin, setDeletingAdmin] = useState<AdminUser | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<{ type: AdminType; entity: Entity } | null>(null);
+  
+  // Import functionality states
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importType, setImportType] = useState<'schools' | 'admins'>('schools');
 
   // Mock data for regions, sectors, and schools
-  const regions: Entity[] = [
+  const [regions, setRegions] = useState<Entity[]>([
     { id: 1, name: "Bakı" },
     { id: 2, name: "Sumqayıt" },
     { id: 3, name: "Gəncə" },
-  ];
+  ]);
 
-  const sectors: Entity[] = [
+  const [sectors, setSectors] = useState<Entity[]>([
     { id: 1, name: "Sektor 1", adminId: 1, adminName: "Admin 1" },
     { id: 2, name: "Sektor 2" },
     { id: 3, name: "Sektor 3" },
-  ];
+  ]);
 
-  const schools: Entity[] = [
+  const [schools, setSchools] = useState<Entity[]>([
     { id: 1, name: "Məktəb 1" },
     { id: 2, name: "Məktəb 2", adminId: 2, adminName: "Admin 2" },
     { id: 3, name: "Məktəb 3" },
-  ];
+  ]);
 
   const handleAddAdmin = () => {
     if (validateAdminData(newAdmin)) {
@@ -151,6 +157,78 @@ const Users = () => {
       toast.success("Administrator uğurla silindi");
     }
   };
+  
+  // Handle imported schools
+  const handleImportedSchools = (importedSchools: ImportedSchool[]) => {
+    const newSchools: Entity[] = importedSchools.map((school, index) => ({
+      id: schools.length + index + 1,
+      name: school.name
+    }));
+    
+    setSchools([...schools, ...newSchools]);
+  };
+  
+  // Handle imported admins
+  const handleImportedAdmins = (importedAdmins: ImportedAdmin[]) => {
+    const newAdminUsers: AdminUser[] = [];
+    
+    importedAdmins.forEach((admin) => {
+      let entityId = 0;
+      let entityType: AdminType = 'schooladmin';
+      
+      // Determine admin type and find corresponding entity
+      if (admin.type.includes('region')) {
+        entityType = 'regionadmin';
+        const region = regions.find(r => r.name === admin.entityName);
+        if (region) entityId = region.id;
+      } else if (admin.type.includes('sector')) {
+        entityType = 'sectoradmin';
+        const sector = sectors.find(s => s.name === admin.entityName);
+        if (sector) entityId = sector.id;
+      } else {
+        entityType = 'schooladmin';
+        const school = schools.find(s => s.name === admin.entityName);
+        if (school) entityId = school.id;
+      }
+      
+      if (entityId) {
+        const newAdmin: AdminUser = {
+          id: Date.now() + newAdminUsers.length,
+          firstName: admin.firstName,
+          lastName: admin.lastName,
+          email: admin.email,
+          utisCode: admin.utisCode,
+          phone: admin.phone,
+          type: entityType,
+          entityId,
+          entityName: admin.entityName
+        };
+        
+        newAdminUsers.push(newAdmin);
+      }
+    });
+    
+    if (newAdminUsers.length > 0) {
+      setAdmins([...admins, ...newAdminUsers]);
+    } else {
+      toast.error("Uyğun entity tapılmadı. Əvvəlcə məktəb/sektor/region əlavə etməlisiniz.");
+    }
+  };
+  
+  // Handle import based on type
+  const handleImport = (data: ImportedSchool[] | ImportedAdmin[]) => {
+    if (importType === 'schools') {
+      handleImportedSchools(data as ImportedSchool[]);
+    } else {
+      handleImportedAdmins(data as ImportedAdmin[]);
+    }
+  };
+  
+  // Open import dialog with specific type
+  const openImportDialog = (type: 'schools' | 'admins') => {
+    setImportType(type);
+    setImportDialogOpen(true);
+  };
 
   return (
     <SidebarProvider>
@@ -162,6 +240,16 @@ const Users = () => {
               <div className="flex items-center gap-4">
                 <SidebarTrigger />
                 <h1 className="text-xl font-semibold">İstifadəçilər</h1>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => openImportDialog('schools')}>
+                  <UploadCloud className="w-4 h-4 mr-2" />
+                  Məktəb import et
+                </Button>
+                <Button variant="outline" onClick={() => openImportDialog('admins')}>
+                  <UploadCloud className="w-4 h-4 mr-2" />
+                  Admin import et
+                </Button>
               </div>
             </div>
           </header>
@@ -255,6 +343,14 @@ const Users = () => {
           </main>
         </div>
       </div>
+      
+      {/* Import Dialog */}
+      <ImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        type={importType}
+        onImport={handleImport}
+      />
     </SidebarProvider>
   );
 };
