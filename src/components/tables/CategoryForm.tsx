@@ -26,11 +26,9 @@ export const CategoryForm = ({ onSubmit }: CategoryFormProps) => {
   const [name, setName] = useState("");
   const [selectedRegion, setSelectedRegion] = useState<string>("");
   const [selectedSector, setSelectedSector] = useState<string>("");
-  const [selectedSchool, setSelectedSchool] = useState<string>("");
   const [viewLevel, setViewLevel] = useState<"region" | "sector" | "school">("region");
   
-  // Mock data for regions, sectors, and schools
-  // In a real app, these would come from an API or context
+  // Mock data for regions and sectors
   const [regions, setRegions] = useState<Entity[]>([
     { id: "1", name: "Bakı" },
     { id: "2", name: "Sumqayıt" },
@@ -42,18 +40,9 @@ export const CategoryForm = ({ onSubmit }: CategoryFormProps) => {
     { id: "2", name: "Sektor 2", },
     { id: "3", name: "Sektor 3", },
   ]);
-
-  const [schools, setSchools] = useState<Entity[]>([
-    { id: "1", name: "Məktəb 1" },
-    { id: "2", name: "Məktəb 2" },
-    { id: "3", name: "Məktəb 3" },
-  ]);
   
   // Filtered sectors based on selected region
   const [filteredSectors, setFilteredSectors] = useState<Entity[]>([]);
-  
-  // Filtered schools based on selected sector
-  const [filteredSchools, setFilteredSchools] = useState<Entity[]>([]);
   
   // Update filtered sectors when region changes
   useEffect(() => {
@@ -62,39 +51,24 @@ export const CategoryForm = ({ onSubmit }: CategoryFormProps) => {
       // For this example, we'll just show all sectors
       setFilteredSectors(sectors);
       setSelectedSector("");
-      setSelectedSchool("");
-      setFilteredSchools([]);
     } else {
       setFilteredSectors([]);
     }
   }, [selectedRegion, sectors]);
-  
-  // Update filtered schools when sector changes
-  useEffect(() => {
-    if (selectedSector) {
-      // In a real app, you would filter schools that belong to the selected sector
-      // For this example, we'll just show all schools
-      setFilteredSchools(schools);
-      setSelectedSchool("");
-    } else {
-      setFilteredSchools([]);
-    }
-  }, [selectedSector, schools]);
 
   const handleSubmit = () => {
     if (name.trim()) {
       const categoryData = {
         name,
-        regionId: viewLevel === "region" ? selectedRegion : undefined,
+        regionId: selectedRegion,
         sectorId: viewLevel === "sector" ? selectedSector : undefined,
-        schoolId: viewLevel === "school" ? selectedSchool : undefined
+        schoolId: viewLevel === "school" ? selectedRegion : undefined // Use regionId for school level visibility
       };
       
       onSubmit(categoryData);
       setName("");
       setSelectedRegion("");
       setSelectedSector("");
-      setSelectedSchool("");
       setViewLevel("region");
     }
   };
@@ -119,7 +93,10 @@ export const CategoryForm = ({ onSubmit }: CategoryFormProps) => {
           <Label htmlFor="view-level">Visibility Level</Label>
           <Select
             value={viewLevel}
-            onValueChange={(value: "region" | "sector" | "school") => setViewLevel(value)}
+            onValueChange={(value: "region" | "sector" | "school") => {
+              setViewLevel(value);
+              setSelectedSector("");
+            }}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select visibility level" />
@@ -151,7 +128,7 @@ export const CategoryForm = ({ onSubmit }: CategoryFormProps) => {
           </Select>
         </div>
         
-        {viewLevel !== "region" && selectedRegion && (
+        {viewLevel === "sector" && selectedRegion && (
           <div className="space-y-2">
             <Label htmlFor="sector">Sector</Label>
             <Select
@@ -166,28 +143,6 @@ export const CategoryForm = ({ onSubmit }: CategoryFormProps) => {
                 {filteredSectors.map((sector) => (
                   <SelectItem key={sector.id} value={sector.id}>
                     {sector.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-        
-        {viewLevel === "school" && selectedSector && (
-          <div className="space-y-2">
-            <Label htmlFor="school">School</Label>
-            <Select
-              value={selectedSchool}
-              onValueChange={setSelectedSchool}
-              disabled={!selectedSector}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select school" />
-              </SelectTrigger>
-              <SelectContent>
-                {filteredSchools.map((school) => (
-                  <SelectItem key={school.id} value={school.id}>
-                    {school.name}
                   </SelectItem>
                 ))}
               </SelectContent>
