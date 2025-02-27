@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { PlusCircle, Table as TableIcon, Pencil, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { CategoryForm } from "@/components/tables/CategoryForm";
 import { ColumnForm } from "@/components/tables/ColumnForm";
@@ -22,6 +22,9 @@ interface Column {
 interface Category {
   id: number;
   name: string;
+  regionId?: string;
+  sectorId?: string;
+  schoolId?: string;
   columns: Column[];
 }
 
@@ -33,12 +36,58 @@ const Tables = () => {
   const [editingColumn, setEditingColumn] = useState<Column | null>(null);
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
   const [deletingColumn, setDeletingColumn] = useState<Column | null>(null);
+  const [filteredCategories, setFilteredCategories] = useState<Category[]>([]);
 
-  const handleAddCategory = (name: string) => {
-    setCategories([
-      ...categories,
-      { id: Date.now(), name, columns: [] }
-    ]);
+  // Filter categories based on user role and assigned entities
+  useEffect(() => {
+    if (!user) {
+      setFilteredCategories([]);
+      return;
+    }
+
+    // In a real app, this would check the actual user role and assigned entities
+    // For this example, we'll just show all categories
+    // This is where you'd implement the visibility rules
+    
+    const filtered = categories.filter(category => {
+      if (user.role === 'superadmin') {
+        return true; // Superadmin sees everything
+      } else if (user.role === 'regionadmin' && user.regionId) {
+        // Region admin can see categories for their region
+        return category.regionId === user.regionId ||
+               !category.regionId && !category.sectorId && !category.schoolId;
+      } else if (user.role === 'sectoradmin' && user.sectorId) {
+        // Sector admin can see categories for their sector or their region with no sector/school specified
+        return category.sectorId === user.sectorId ||
+               (category.regionId === user.regionId && !category.sectorId && !category.schoolId);
+      } else if (user.role === 'schooladmin' && user.schoolId) {
+        // School admin can see categories for their school or their sector/region with no school specified
+        return category.schoolId === user.schoolId ||
+               (category.sectorId === user.sectorId && !category.schoolId) ||
+               (category.regionId === user.regionId && !category.sectorId && !category.schoolId);
+      }
+      return false;
+    });
+
+    setFilteredCategories(filtered);
+  }, [categories, user]);
+
+  const handleAddCategory = (data: { 
+    name: string; 
+    regionId?: string; 
+    sectorId?: string; 
+    schoolId?: string; 
+  }) => {
+    const newCategory: Category = {
+      id: Date.now(),
+      name: data.name,
+      regionId: data.regionId,
+      sectorId: data.sectorId,
+      schoolId: data.schoolId,
+      columns: []
+    };
+    
+    setCategories([...categories, newCategory]);
     toast.success("Category added successfully");
   };
 
@@ -115,6 +164,19 @@ const Tables = () => {
     }
   };
 
+  // Helper function to get visibility text
+  const getCategoryVisibilityText = (category: Category) => {
+    if (category.schoolId) {
+      return "School Level";
+    } else if (category.sectorId) {
+      return "Sector Level";
+    } else if (category.regionId) {
+      return "Region Level";
+    } else {
+      return "All Levels";
+    }
+  };
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
@@ -150,14 +212,16 @@ const Tables = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Category Name</TableHead>
+                        <TableHead>Visibility</TableHead>
                         <TableHead>Columns</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {categories.map((category) => (
+                      {filteredCategories.map((category) => (
                         <TableRow key={category.id}>
                           <TableCell>{category.name}</TableCell>
+                          <TableCell>{getCategoryVisibilityText(category)}</TableCell>
                           <TableCell>{category.columns.length} columns</TableCell>
                           <TableCell>
                             <div className="flex gap-2">
