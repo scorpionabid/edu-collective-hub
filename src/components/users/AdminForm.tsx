@@ -4,19 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-
-type AdminType = 'regionadmin' | 'sectoradmin' | 'schooladmin';
-
-interface NewAdmin {
-  firstName: string;
-  lastName: string;
-  email: string;
-  utisCode: string;
-  password: string;
-  phone: string;
-  type: AdminType;
-  entityId: string;
-}
+import { AdminType, NewAdmin, Entity } from "./types";
 
 interface AdminFormProps {
   admin: NewAdmin;
@@ -25,9 +13,9 @@ interface AdminFormProps {
   submitLabel: string;
   entityName?: string;
   entityType?: AdminType;
-  regions: Array<{ id: number; name: string; }>;
-  sectors: Array<{ id: number; name: string; regionId: number; }>;
-  schools: Array<{ id: number; name: string; sectorId: number; }>;
+  regions: Entity[];
+  sectors: Entity[];
+  schools: Entity[];
 }
 
 export const AdminForm = ({

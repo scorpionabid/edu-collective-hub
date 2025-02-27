@@ -5,44 +5,15 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { UserPlus, Info, Shield } from "lucide-react";
+import { UserPlus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { AdminForm } from "@/components/users/AdminForm";
 import { AdminList } from "@/components/users/AdminList";
-
-type AdminType = 'regionadmin' | 'sectoradmin' | 'schooladmin';
-
-interface AdminUser {
-  id: number;
-  firstName: string;
-  lastName: string;
-  email: string;
-  utisCode: string;
-  phone: string;
-  type: AdminType;
-  entityId: number;
-  entityName: string;
-}
-
-interface NewAdmin {
-  firstName: string;
-  lastName: string;
-  email: string;
-  utisCode: string;
-  password: string;
-  phone: string;
-  type: AdminType;
-  entityId: string;
-}
-
-interface Entity {
-  id: number;
-  name: string;
-  adminId?: number;
-  adminName?: string;
-}
+import { RegionList } from "@/components/users/RegionList";
+import { SectorList } from "@/components/users/SectorList";
+import { SchoolList } from "@/components/users/SchoolList";
+import { AdminType, AdminUser, NewAdmin, Entity } from "@/components/users/types";
 
 const Users = () => {
   const { user } = useAuth();
@@ -200,63 +171,16 @@ const Users = () => {
                 <CardTitle>Regionlar</CardTitle>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Region</TableHead>
-                      <TableHead>Admin</TableHead>
-                      <TableHead className="w-[100px]">Əməliyyatlar</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {regions.map((region) => (
-                      <TableRow key={region.id}>
-                        <TableCell className="font-medium">{region.name}</TableCell>
-                        <TableCell>{region.adminName || "Təyin edilməyib"}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            {!region.adminId && (
-                              <Dialog>
-                                <DialogTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setSelectedEntity({
-                                      type: "regionadmin",
-                                      entity: region
-                                    })}
-                                  >
-                                    <Shield className="w-4 h-4" />
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                  <AdminForm
-                                    admin={{
-                                      ...newAdmin,
-                                      type: "regionadmin",
-                                      entityId: region.id.toString()
-                                    }}
-                                    onAdminChange={setNewAdmin}
-                                    onSubmit={handleAddAdmin}
-                                    submitLabel="Admin təyin et"
-                                    entityType="regionadmin"
-                                    entityName={region.name}
-                                    regions={regions}
-                                    sectors={sectors}
-                                    schools={schools}
-                                  />
-                                </DialogContent>
-                              </Dialog>
-                            )}
-                            <Button variant="ghost" size="sm">
-                              <Info className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                <RegionList
+                  regions={regions}
+                  newAdmin={newAdmin}
+                  setNewAdmin={setNewAdmin}
+                  handleAddAdmin={handleAddAdmin}
+                  setSelectedEntity={setSelectedEntity}
+                  allRegions={regions}
+                  sectors={sectors}
+                  schools={schools}
+                />
               </CardContent>
             </Card>
 
@@ -265,63 +189,16 @@ const Users = () => {
                 <CardTitle>Sektorlar</CardTitle>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Sektor</TableHead>
-                      <TableHead>Admin</TableHead>
-                      <TableHead className="w-[100px]">Əməliyyatlar</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sectors.map((sector) => (
-                      <TableRow key={sector.id}>
-                        <TableCell className="font-medium">{sector.name}</TableCell>
-                        <TableCell>{sector.adminName || "Təyin edilməyib"}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            {!sector.adminId && (
-                              <Dialog>
-                                <DialogTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setSelectedEntity({
-                                      type: "sectoradmin",
-                                      entity: sector
-                                    })}
-                                  >
-                                    <Shield className="w-4 h-4" />
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                  <AdminForm
-                                    admin={{
-                                      ...newAdmin,
-                                      type: "sectoradmin",
-                                      entityId: sector.id.toString()
-                                    }}
-                                    onAdminChange={setNewAdmin}
-                                    onSubmit={handleAddAdmin}
-                                    submitLabel="Admin təyin et"
-                                    entityType="sectoradmin"
-                                    entityName={sector.name}
-                                    regions={regions}
-                                    sectors={sectors}
-                                    schools={schools}
-                                  />
-                                </DialogContent>
-                              </Dialog>
-                            )}
-                            <Button variant="ghost" size="sm">
-                              <Info className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                <SectorList
+                  sectors={sectors}
+                  newAdmin={newAdmin}
+                  setNewAdmin={setNewAdmin}
+                  handleAddAdmin={handleAddAdmin}
+                  setSelectedEntity={setSelectedEntity}
+                  regions={regions}
+                  allSectors={sectors}
+                  schools={schools}
+                />
               </CardContent>
             </Card>
 
@@ -330,63 +207,16 @@ const Users = () => {
                 <CardTitle>Məktəblər</CardTitle>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Məktəb</TableHead>
-                      <TableHead>Admin</TableHead>
-                      <TableHead className="w-[100px]">Əməliyyatlar</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {schools.map((school) => (
-                      <TableRow key={school.id}>
-                        <TableCell className="font-medium">{school.name}</TableCell>
-                        <TableCell>{school.adminName || "Təyin edilməyib"}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            {!school.adminId && (
-                              <Dialog>
-                                <DialogTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setSelectedEntity({
-                                      type: "schooladmin",
-                                      entity: school
-                                    })}
-                                  >
-                                    <Shield className="w-4 h-4" />
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                  <AdminForm
-                                    admin={{
-                                      ...newAdmin,
-                                      type: "schooladmin",
-                                      entityId: school.id.toString()
-                                    }}
-                                    onAdminChange={setNewAdmin}
-                                    onSubmit={handleAddAdmin}
-                                    submitLabel="Admin təyin et"
-                                    entityType="schooladmin"
-                                    entityName={school.name}
-                                    regions={regions}
-                                    sectors={sectors}
-                                    schools={schools}
-                                  />
-                                </DialogContent>
-                              </Dialog>
-                            )}
-                            <Button variant="ghost" size="sm">
-                              <Info className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                <SchoolList
+                  schools={schools}
+                  newAdmin={newAdmin}
+                  setNewAdmin={setNewAdmin}
+                  handleAddAdmin={handleAddAdmin}
+                  setSelectedEntity={setSelectedEntity}
+                  regions={regions}
+                  sectors={sectors}
+                  allSchools={schools}
+                />
               </CardContent>
             </Card>
 

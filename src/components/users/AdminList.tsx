@@ -3,20 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Pencil, Trash2 } from "lucide-react";
-
-type AdminType = 'regionadmin' | 'sectoradmin' | 'schooladmin';
-
-interface AdminUser {
-  id: number;
-  firstName: string;
-  lastName: string;
-  email: string;
-  utisCode: string;
-  phone: string;
-  type: AdminType;
-  entityId: number;
-  entityName: string;
-}
+import { AdminUser } from "./types";
 
 interface AdminListProps {
   admins: AdminUser[];
