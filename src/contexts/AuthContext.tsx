@@ -21,6 +21,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
+  resetPassword: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -75,6 +76,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       description: "Logged out successfully",
     });
   };
+  
+  const resetPassword = async (email: string) => {
+    try {
+      // Simulate API call to send password reset email
+      // This would be replaced with an actual API call in a real application
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      toast({
+        title: "Success",
+        description: `Password reset link has been sent to ${email}`,
+      });
+      return Promise.resolve();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send password reset email",
+        variant: "destructive",
+      });
+      return Promise.reject(error);
+    }
+  };
 
   return (
     <AuthContext.Provider
@@ -84,6 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         logout,
         isAuthenticated: !!user,
+        resetPassword,
       }}
     >
       {children}
