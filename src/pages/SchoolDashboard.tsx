@@ -420,7 +420,7 @@ const SchoolDashboard = () => {
             <CardTitle className="flex items-center gap-2">
               {category.name}
               {isApproved && (
-                <Badge variant="success" className="ml-2 bg-green-500">
+                <Badge variant="outline" className="ml-2 bg-green-500 text-white border-0">
                   <CheckCircle className="h-3 w-3 mr-1" /> Təsdiq edilmişdir
                 </Badge>
               )}
