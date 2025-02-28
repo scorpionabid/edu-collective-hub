@@ -18,7 +18,10 @@ import {
   Table,
   MapPin,
   Building,
-  LogOut
+  LogOut,
+  FileText,
+  Database,
+  Grid
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "react-router-dom";
@@ -63,8 +66,11 @@ export function AppSidebar() {
     else if (user?.role === 'sectoradmin') {
       return [
         { title: "Dashboard", icon: LayoutDashboard, href: "/sector-dashboard" },
-        { title: "Schools", icon: School, href: "/sector-tables" },
+        { title: "Schools", icon: School, href: "/sector-schools" },
         { title: "School Admins", icon: Users, href: "/sector-users" },
+        { title: "Tables", icon: Table, href: "/sector-tables" }, // Standard table view
+        { title: "Categories", icon: Database, href: "/sector-categories" }, // Added view for categories
+        { title: "Form View", icon: FileText, href: "/sector-forms" }, // Added view for form view
         { title: "Reports", icon: BookOpen, href: "/reports" },
         ...defaultItems
       ];
