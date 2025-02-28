@@ -21,7 +21,8 @@ import {
   LogOut,
   FileText,
   Database,
-  Grid
+  Grid,
+  User
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "react-router-dom";
@@ -80,8 +81,9 @@ export function AppSidebar() {
     else if (user?.role === 'schooladmin') {
       return [
         { title: "Dashboard", icon: LayoutDashboard, href: "/school-dashboard" },
-        { title: "Tables", icon: Table, href: "/school-tables" },
-        { title: "Reports", icon: BookOpen, href: "/reports" },
+        { title: "Data Entry", icon: FileText, href: "/school-dashboard" }, // Same as dashboard for simplicity
+        { title: "Import Data", icon: Database, href: "/school-import" },
+        { title: "Profile", icon: User, href: "/school-profile" },
         ...defaultItems
       ];
     }

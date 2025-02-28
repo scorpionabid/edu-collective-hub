@@ -17,6 +17,9 @@ import SectorTables from "@/pages/SectorTables";
 import SectorUsers from "@/pages/SectorUsers";
 import SectorCategories from "@/pages/SectorCategories";
 import SectorForms from "@/pages/SectorForms";
+import SchoolDashboard from "@/pages/SchoolDashboard";
+import SchoolProfile from "@/pages/SchoolProfile";
+import SchoolImport from "@/pages/SchoolImport";
 import { AuthProvider } from "@/contexts/AuthContext";
 
 function App() {
@@ -41,6 +44,11 @@ function App() {
           <Route path="/sector-users" element={<SectorUsers />} />
           <Route path="/sector-categories" element={<SectorCategories />} />
           <Route path="/sector-forms" element={<SectorForms />} />
+          
+          {/* School admin routes */}
+          <Route path="/school-dashboard" element={<SchoolDashboard />} />
+          <Route path="/school-profile" element={<SchoolProfile />} />
+          <Route path="/school-import" element={<SchoolImport />} />
           
           <Route path="*" element={<NotFound />} />
         </Routes>
