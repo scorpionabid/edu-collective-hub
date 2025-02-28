@@ -44,20 +44,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     try {
       // Simulate API call - Replace with actual authentication
-      const mockUser: User = {
-        id: '1',
-        name: 'Admin User',
-        email: email,
-        role: 'superadmin',
-      };
+      // For demonstration, we'll set different user roles based on email
+      let mockUser: User;
+      
+      if (email.includes('super')) {
+        mockUser = {
+          id: '1',
+          name: 'Super Admin',
+          email: email,
+          role: 'superadmin',
+        };
+      } else if (email.includes('region')) {
+        mockUser = {
+          id: '2',
+          name: 'Region Admin',
+          email: email,
+          role: 'regionadmin',
+          regionId: '1', // Assume first region
+        };
+      } else if (email.includes('sector')) {
+        mockUser = {
+          id: '3',
+          name: 'Sector Admin',
+          email: email,
+          role: 'sectoradmin',
+          regionId: '1',
+          sectorId: '1', // Assume first sector
+        };
+      } else {
+        mockUser = {
+          id: '4',
+          name: 'School Admin',
+          email: email,
+          role: 'schooladmin',
+          regionId: '1',
+          sectorId: '1',
+          schoolId: '1', // Assume first school
+        };
+      }
 
       setUser(mockUser);
       localStorage.setItem('user', JSON.stringify(mockUser));
+      
       toast({
         title: "Success",
         description: "Logged in successfully",
       });
-      navigate('/dashboard');
+      
+      // Redirect based on user role
+      if (mockUser.role === 'superadmin') {
+        navigate('/dashboard');
+      } else if (mockUser.role === 'regionadmin') {
+        navigate('/region-dashboard');
+      } else if (mockUser.role === 'sectoradmin') {
+        navigate('/sector-dashboard');
+      } else if (mockUser.role === 'schooladmin') {
+        navigate('/school-dashboard');
+      }
     } catch (error) {
       toast({
         title: "Error",

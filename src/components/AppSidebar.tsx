@@ -17,36 +17,82 @@ import {
   Settings, 
   Table,
   MapPin,
-  Building
+  Building,
+  LogOut
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "react-router-dom";
 
 export function AppSidebar() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
-  const menuItems = [
-    { title: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
-    { title: "Users", icon: Users, href: "/users", role: "superadmin" },
-    { title: "Regions", icon: MapPin, href: "/regions", role: "superadmin" },
-    { title: "Sectors", icon: Building, href: "/sectors", role: ["superadmin", "regionadmin"] },
-    { title: "Schools", icon: School, href: "/schools", role: ["superadmin", "regionadmin", "sectoradmin"] },
-    { title: "Reports", icon: BookOpen, href: "/reports" },
-    { title: "Tables", icon: Table, href: "/tables", role: "superadmin" },
-    { title: "Settings", icon: Settings, href: "/settings" },
-  ].filter((item) => {
-    if (!item.role) return true;
-    if (Array.isArray(item.role)) {
-      return item.role.includes(user?.role || '');
+  // Menu items based on user role
+  const getMenuItems = () => {
+    // Default menu items for all users
+    const defaultItems = [
+      { title: "Settings", icon: Settings, href: "/settings" },
+    ];
+
+    // Super admin menu items
+    if (user?.role === 'superadmin') {
+      return [
+        { title: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
+        { title: "Users", icon: Users, href: "/users" },
+        { title: "Regions", icon: MapPin, href: "/regions" },
+        { title: "Sectors", icon: Building, href: "/sectors" },
+        { title: "Schools", icon: School, href: "/schools" },
+        { title: "Reports", icon: BookOpen, href: "/reports" },
+        { title: "Tables", icon: Table, href: "/tables" },
+        ...defaultItems
+      ];
     }
-    return item.role === user?.role;
-  });
+    
+    // Region admin menu items
+    else if (user?.role === 'regionadmin') {
+      return [
+        { title: "Dashboard", icon: LayoutDashboard, href: "/region-dashboard" },
+        { title: "Sectors", icon: Building, href: "/sectors" },
+        { title: "Schools", icon: School, href: "/schools" },
+        { title: "Reports", icon: BookOpen, href: "/reports" },
+        { title: "Tables", icon: Table, href: "/region-tables" },
+        ...defaultItems
+      ];
+    }
+    
+    // Sector admin menu items
+    else if (user?.role === 'sectoradmin') {
+      return [
+        { title: "Dashboard", icon: LayoutDashboard, href: "/sector-dashboard" },
+        { title: "Schools", icon: School, href: "/sector-tables" },
+        { title: "School Admins", icon: Users, href: "/sector-users" },
+        { title: "Reports", icon: BookOpen, href: "/reports" },
+        ...defaultItems
+      ];
+    }
+    
+    // School admin menu items
+    else if (user?.role === 'schooladmin') {
+      return [
+        { title: "Dashboard", icon: LayoutDashboard, href: "/school-dashboard" },
+        { title: "Tables", icon: Table, href: "/school-tables" },
+        { title: "Reports", icon: BookOpen, href: "/reports" },
+        ...defaultItems
+      ];
+    }
+    
+    // Fallback for unknown roles
+    return defaultItems;
+  };
+
+  const menuItems = getMenuItems();
 
   return (
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Menu</SidebarGroupLabel>
+          <SidebarGroupLabel>
+            {user ? `${user.name} (${user.role})` : 'Menu'}
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
@@ -59,6 +105,12 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={logout} className="flex items-center gap-2 w-full">
+                  <LogOut className="w-4 h-4" />
+                  <span>Log Out</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

@@ -16,6 +16,9 @@ import Settings from "./pages/Settings";
 import Tables from "./pages/Tables";
 import Regions from "./pages/Regions";
 import Sectors from "./pages/Sectors";
+import SectorDashboard from "./pages/SectorDashboard";
+import SectorTables from "./pages/SectorTables";
+import SectorUsers from "./pages/SectorUsers";
 
 const queryClient = new QueryClient();
 
@@ -93,6 +96,31 @@ const AppRoutes = () => (
       element={
         <PrivateRoute>
           <Tables />
+        </PrivateRoute>
+      }
+    />
+    {/* Sector Admin Routes */}
+    <Route
+      path="/sector-dashboard"
+      element={
+        <PrivateRoute>
+          <SectorDashboard />
+        </PrivateRoute>
+      }
+    />
+    <Route
+      path="/sector-tables"
+      element={
+        <PrivateRoute>
+          <SectorTables />
+        </PrivateRoute>
+      }
+    />
+    <Route
+      path="/sector-users"
+      element={
+        <PrivateRoute>
+          <SectorUsers />
         </PrivateRoute>
       }
     />
