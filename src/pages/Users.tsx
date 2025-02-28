@@ -5,7 +5,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { UserPlus, FileInput, Download, UploadCloud } from "lucide-react";
+import { UserPlus, FileInput, Download, UploadCloud, FileDown } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { AdminForm } from "@/components/users/AdminForm";
@@ -16,6 +16,7 @@ import { SchoolList } from "@/components/users/SchoolList";
 import { AdminType, AdminUser, NewAdmin, Entity } from "@/components/users/types";
 import { ImportDialog } from "@/components/users/ImportDialog";
 import { ImportedSchool, ImportedAdmin } from "@/utils/excelImport";
+import { exportListToExcel } from "@/utils/excelExport";
 
 const Users = () => {
   const { user } = useAuth();
@@ -158,6 +159,57 @@ const Users = () => {
     }
   };
   
+  // Export admins to Excel
+  const handleExportAdmins = () => {
+    // Format admin data for export
+    const exportData = admins.map(admin => ({
+      'Ad': admin.firstName,
+      'Soyad': admin.lastName,
+      'Email': admin.email,
+      'UTIS Kodu': admin.utisCode,
+      'Telefon': admin.phone,
+      'Tip': admin.type === 'regionadmin' ? 'Region Admini' : 
+             admin.type === 'sectoradmin' ? 'Sektor Admini' : 'Məktəb Admini',
+      'Qurum': admin.entityName
+    }));
+    
+    exportListToExcel(exportData, 'Administratorlar');
+    toast.success('Administratorlar uğurla export edildi');
+  };
+  
+  // Export regions to Excel
+  const handleExportRegions = () => {
+    const exportData = regions.map(region => ({
+      'Region': region.name,
+      'Admin': region.adminName || 'Təyin edilməyib'
+    }));
+    
+    exportListToExcel(exportData, 'Regionlar');
+    toast.success('Regionlar uğurla export edildi');
+  };
+  
+  // Export sectors to Excel
+  const handleExportSectors = () => {
+    const exportData = sectors.map(sector => ({
+      'Sektor': sector.name,
+      'Admin': sector.adminName || 'Təyin edilməyib'
+    }));
+    
+    exportListToExcel(exportData, 'Sektorlar');
+    toast.success('Sektorlar uğurla export edildi');
+  };
+  
+  // Export schools to Excel
+  const handleExportSchools = () => {
+    const exportData = schools.map(school => ({
+      'Məktəb': school.name,
+      'Admin': school.adminName || 'Təyin edilməyib'
+    }));
+    
+    exportListToExcel(exportData, 'Məktəblər');
+    toast.success('Məktəblər uğurla export edildi');
+  };
+  
   // Handle imported schools
   const handleImportedSchools = (importedSchools: ImportedSchool[]) => {
     const newSchools: Entity[] = importedSchools.map((school, index) => ({
@@ -257,6 +309,10 @@ const Users = () => {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Regionlar</CardTitle>
+                <Button variant="outline" onClick={handleExportRegions}>
+                  <FileDown className="w-4 h-4 mr-2" />
+                  Export et
+                </Button>
               </CardHeader>
               <CardContent>
                 <RegionList
@@ -275,6 +331,10 @@ const Users = () => {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Sektorlar</CardTitle>
+                <Button variant="outline" onClick={handleExportSectors}>
+                  <FileDown className="w-4 h-4 mr-2" />
+                  Export et
+                </Button>
               </CardHeader>
               <CardContent>
                 <SectorList
@@ -293,6 +353,10 @@ const Users = () => {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Məktəblər</CardTitle>
+                <Button variant="outline" onClick={handleExportSchools}>
+                  <FileDown className="w-4 h-4 mr-2" />
+                  Export et
+                </Button>
               </CardHeader>
               <CardContent>
                 <SchoolList
@@ -311,25 +375,31 @@ const Users = () => {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>İstifadəçilərin idarə edilməsi</CardTitle>
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <UserPlus className="w-4 h-4 mr-2" />
-                      Administrator əlavə et
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
-                    <AdminForm
-                      admin={newAdmin}
-                      onAdminChange={setNewAdmin}
-                      onSubmit={handleAddAdmin}
-                      submitLabel="Administrator əlavə et"
-                      regions={regions}
-                      sectors={sectors}
-                      schools={schools}
-                    />
-                  </DialogContent>
-                </Dialog>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={handleExportAdmins}>
+                    <FileDown className="w-4 h-4 mr-2" />
+                    Export et
+                  </Button>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Administrator əlavə et
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl">
+                      <AdminForm
+                        admin={newAdmin}
+                        onAdminChange={setNewAdmin}
+                        onSubmit={handleAddAdmin}
+                        submitLabel="Administrator əlavə et"
+                        regions={regions}
+                        sectors={sectors}
+                        schools={schools}
+                      />
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </CardHeader>
               <CardContent>
                 <AdminList

@@ -7,10 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Edit2, Save } from "lucide-react";
+import { Edit2, Save, FileDown } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+import { exportToExcel, convertToExcelData } from "@/utils/excelExport";
 
 interface SchoolData {
   id: string;
@@ -185,6 +186,79 @@ const SectorTables = () => {
     category.regionId === user?.regionId || category.sectorId === user?.sectorId
   );
 
+  // Excel export funksionallığı
+  const handleExportToExcel = () => {
+    try {
+      // Bütün sütunları əldə edirik
+      const allColumns = categories.flatMap(category => 
+        category.columns.map(column => ({
+          ...column,
+          categoryId: category.id
+        }))
+      );
+      
+      // Məlumatları Excel formatına çeviririk
+      const excelData = convertToExcelData(
+        tableData, 
+        categories,
+        allColumns,
+        schools
+      );
+      
+      // Excel faylını yaradıb yükləyirik
+      exportToExcel(excelData, "Məktəb məlumatları");
+      
+      toast.success("Məlumat uğurla export edildi");
+    } catch (error) {
+      console.error("Excel export error:", error);
+      toast.error("Export zamanı xəta baş verdi");
+    }
+  };
+
+  // Seçilmiş məktəb üçün Excel export funksionallığı
+  const handleExportSchoolToExcel = () => {
+    if (!selectedSchool) {
+      toast.error("Əvvəlcə məktəb seçin");
+      return;
+    }
+    
+    try {
+      // Bütün sütunları əldə edirik
+      const allColumns = categories.flatMap(category => 
+        category.columns.map(column => ({
+          ...column,
+          categoryId: category.id
+        }))
+      );
+      
+      // Yalnız seçilmiş məktəbin məlumatlarını filtrlə
+      const filteredData = tableData.filter(data => data.schoolId === selectedSchool);
+      
+      // Seçilmiş məktəbi tapmaq
+      const selectedSchoolData = schools.find(school => school.id === selectedSchool);
+      if (!selectedSchoolData) {
+        toast.error("Məktəb tapılmadı");
+        return;
+      }
+      
+      // Məlumatları Excel formatına çeviririk
+      const excelData = convertToExcelData(
+        filteredData, 
+        categories,
+        allColumns,
+        [selectedSchoolData]
+      );
+      
+      // Excel faylını yaradıb yükləyirik
+      exportToExcel(excelData, `${selectedSchoolData.name} məlumatları`);
+      
+      toast.success("Məlumat uğurla export edildi");
+    } catch (error) {
+      console.error("Excel export error:", error);
+      toast.error("Export zamanı xəta baş verdi");
+    }
+  };
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
@@ -196,12 +270,18 @@ const SectorTables = () => {
                 <SidebarTrigger />
                 <h1 className="text-xl font-semibold">Cədvəllər</h1>
               </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={handleExportToExcel}>
+                  <FileDown className="w-4 h-4 mr-2" />
+                  Bütün məlumatları export et
+                </Button>
+              </div>
             </div>
           </header>
 
           <main className="p-6">
             <Card className="mb-6">
-              <CardContent className="pt-6">
+              <CardContent className="pt-6 flex items-end justify-between">
                 <div className="max-w-sm">
                   <Label htmlFor="school-select">Məktəb Seçin</Label>
                   <Select
@@ -220,6 +300,12 @@ const SectorTables = () => {
                     </SelectContent>
                   </Select>
                 </div>
+                {selectedSchool && (
+                  <Button variant="outline" onClick={handleExportSchoolToExcel}>
+                    <FileDown className="w-4 h-4 mr-2" />
+                    Seçilmiş məktəbi export et
+                  </Button>
+                )}
               </CardContent>
             </Card>
 
