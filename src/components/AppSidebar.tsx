@@ -24,10 +24,11 @@ import {
   User
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 export function AppSidebar() {
   const { user, logout } = useAuth();
+  const location = useLocation();
 
   // Menu items based on user role
   const getMenuItems = () => {
@@ -105,7 +106,10 @@ export function AppSidebar() {
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <Link to={item.href} className="flex items-center gap-2">
+                    <Link 
+                      to={item.href} 
+                      className={`flex items-center gap-2 ${location.pathname === item.href ? 'bg-accent' : ''}`}
+                    >
                       <item.icon className="w-4 h-4" />
                       <span>{item.title}</span>
                     </Link>

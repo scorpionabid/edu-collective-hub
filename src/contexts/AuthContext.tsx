@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } else {
       // If not logged in and not on login page, redirect to login
-      if (location.pathname !== '/login' && location.pathname !== '/') {
+      if (location.pathname !== '/login' && location.pathname !== '/reset-password') {
         navigate('/login');
       }
     }
