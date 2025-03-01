@@ -21,7 +21,6 @@ import {
   LogOut,
   FileText,
   Database,
-  Grid,
   User
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -67,11 +66,11 @@ export function AppSidebar() {
     else if (user?.role === 'sectoradmin') {
       return [
         { title: "Dashboard", icon: LayoutDashboard, href: "/sector-dashboard" },
-        { title: "Schools", icon: School, href: "/sector-schools" },
+        { title: "Schools", icon: School, href: "/schools" },
         { title: "School Admins", icon: Users, href: "/sector-users" },
-        { title: "Tables", icon: Table, href: "/sector-tables" }, // Standard table view
-        { title: "Categories", icon: Database, href: "/sector-categories" }, // Added view for categories
-        { title: "Form View", icon: FileText, href: "/sector-forms" }, // Added view for form view
+        { title: "Tables", icon: Table, href: "/sector-tables" }, 
+        { title: "Categories", icon: Database, href: "/sector-categories" }, 
+        { title: "Form View", icon: FileText, href: "/sector-forms" },
         { title: "Reports", icon: BookOpen, href: "/reports" },
         ...defaultItems
       ];
@@ -81,7 +80,7 @@ export function AppSidebar() {
     else if (user?.role === 'schooladmin') {
       return [
         { title: "Dashboard", icon: LayoutDashboard, href: "/school-dashboard" },
-        { title: "Data Entry", icon: FileText, href: "/school-dashboard" }, // Same as dashboard for simplicity
+        { title: "Data Entry", icon: FileText, href: "/school-dashboard" }, 
         { title: "Import Data", icon: Database, href: "/school-import" },
         { title: "Profile", icon: User, href: "/school-profile" },
         ...defaultItems

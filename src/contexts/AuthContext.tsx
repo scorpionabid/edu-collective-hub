@@ -38,24 +38,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (storedUser) {
       setUser(JSON.parse(storedUser));
       
-      // If we're on the login page and already logged in, redirect to appropriate dashboard
+      // If we're on the login page or root and already logged in, redirect to appropriate dashboard
       if (location.pathname === '/login' || location.pathname === '/') {
         const role = JSON.parse(storedUser).role;
         redirectBasedOnRole(role);
       }
+    } else {
+      // If not logged in and not on login page, redirect to login
+      if (location.pathname !== '/login' && location.pathname !== '/') {
+        navigate('/login');
+      }
     }
     setLoading(false);
-  }, [location.pathname, navigate]);
+  }, [location.pathname]);
 
   const redirectBasedOnRole = (role: UserRole) => {
-    if (role === 'superadmin') {
-      navigate('/dashboard');
-    } else if (role === 'regionadmin') {
-      navigate('/region-dashboard');
-    } else if (role === 'sectoradmin') {
-      navigate('/sector-dashboard');
-    } else if (role === 'schooladmin') {
-      navigate('/school-dashboard');
+    switch (role) {
+      case 'superadmin':
+        navigate('/dashboard');
+        break;
+      case 'regionadmin':
+        navigate('/region-dashboard');
+        break;
+      case 'sectoradmin':
+        navigate('/sector-dashboard');
+        break;
+      case 'schooladmin':
+        navigate('/school-dashboard');
+        break;
+      default:
+        navigate('/login');
     }
   };
 

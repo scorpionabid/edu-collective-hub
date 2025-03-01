@@ -1,6 +1,7 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,11 +13,34 @@ import { AlertCircle } from "lucide-react";
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const { login } = useAuth();
+  const { login, user } = useAuth();
   const [resetEmail, setResetEmail] = useState("");
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const navigate = useNavigate();
+  
+  // If user is already logged in, redirect to appropriate dashboard
+  useEffect(() => {
+    if (user) {
+      switch (user.role) {
+        case 'superadmin':
+          navigate('/dashboard');
+          break;
+        case 'regionadmin':
+          navigate('/region-dashboard');
+          break;
+        case 'sectoradmin':
+          navigate('/sector-dashboard');
+          break;
+        case 'schooladmin':
+          navigate('/school-dashboard');
+          break;
+        default:
+          break;
+      }
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,6 +82,9 @@ const Login = () => {
       setResetEmailSent(false);
     }, 300);
   };
+
+  // If already logged in, don't render login form (handled by useEffect above)
+  if (user) return null;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
