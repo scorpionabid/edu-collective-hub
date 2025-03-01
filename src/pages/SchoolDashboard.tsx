@@ -22,9 +22,9 @@ import { toast } from "sonner";
 
 const SchoolDashboard = () => {
   const { user } = useAuth();
-  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const { categories, isLoading: categoriesLoading } = useCategories();
-  const { columns, isLoading: columnsLoading } = useColumns(selectedCategory || 0);
+  const { columns, isLoading: columnsLoading } = useColumns(selectedCategory || "");
   const { 
     formData, 
     isLoading: formDataLoading, 
@@ -47,7 +47,9 @@ const SchoolDashboard = () => {
       
       await submitForm.mutateAsync({
         ...data,
-        schoolId: user.schoolId
+        schoolId: user.schoolId,
+        categoryId: selectedCategory || "",
+        status: "submitted"
       });
       
       toast.success("Form submitted successfully");
@@ -58,12 +60,12 @@ const SchoolDashboard = () => {
   };
 
   // Find if the current category has already been submitted
-  const findSubmittedData = (categoryId: number) => {
+  const findSubmittedData = (categoryId: string) => {
     return formData.find(item => item.categoryId === categoryId);
   };
 
   // Check if a form has been approved
-  const isApproved = (categoryId: number) => {
+  const isApproved = (categoryId: string) => {
     const data = findSubmittedData(categoryId);
     return data && data.status === 'approved';
   };
@@ -167,7 +169,7 @@ const SchoolDashboard = () => {
 
             <Tabs 
               defaultValue={categories[0]?.id.toString()} 
-              onValueChange={(value) => setSelectedCategory(parseInt(value))}
+              onValueChange={(value) => setSelectedCategory(value)}
               className="space-y-6"
             >
               <TabsList className="grid" style={{ gridTemplateColumns: `repeat(${Math.min(categories.length, 4)}, minmax(0, 1fr))` }}>

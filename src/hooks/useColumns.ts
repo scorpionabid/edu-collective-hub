@@ -2,7 +2,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, Column } from "@/lib/api";
 
-export function useColumns(categoryId: number) {
+export function useColumns(categoryId: string) {
   const queryClient = useQueryClient();
   
   const columnsQuery = useQuery({
@@ -12,7 +12,7 @@ export function useColumns(categoryId: number) {
   });
   
   const createColumn = useMutation({
-    mutationFn: (column: Omit<Column, 'id'> & { categoryId: number }) => 
+    mutationFn: (column: Omit<Column, 'id'> & { categoryId: string }) => 
       api.columns.create(column),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['columns', categoryId] });
@@ -20,7 +20,7 @@ export function useColumns(categoryId: number) {
   });
   
   const updateColumn = useMutation({
-    mutationFn: ({ id, column }: { id: number; column: Partial<Column> }) => 
+    mutationFn: ({ id, column }: { id: string; column: Partial<Column> }) => 
       api.columns.update(id, column),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['columns', categoryId] });

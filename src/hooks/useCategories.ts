@@ -18,7 +18,7 @@ export function useCategories() {
   });
   
   const updateCategory = useMutation({
-    mutationFn: ({ id, category }: { id: number; category: Partial<Category> }) => 
+    mutationFn: ({ id, category }: { id: string; category: Partial<Category> }) => 
       api.categories.update(id, category),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['categories'] });
