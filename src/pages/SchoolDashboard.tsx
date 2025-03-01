@@ -19,6 +19,7 @@ import { useCategories } from "@/hooks/useCategories";
 import { useColumns } from "@/hooks/useColumns";
 import { useFormData } from "@/hooks/useFormData";
 import { toast } from "sonner";
+import { FormData } from "@/lib/api";
 
 const SchoolDashboard = () => {
   const { user } = useAuth();
@@ -60,7 +61,7 @@ const SchoolDashboard = () => {
   };
 
   // Find if the current category has already been submitted
-  const findSubmittedData = (categoryId: string) => {
+  const findSubmittedData = (categoryId: string): FormData | undefined => {
     return formData.find(item => item.categoryId === categoryId);
   };
 

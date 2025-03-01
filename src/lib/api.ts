@@ -154,7 +154,7 @@ export const api = {
   columns: {
     getAll: async (categoryId: string) => {
       console.log(`Fetching columns for category ${categoryId} (mock data)`);
-      const mockColumns = {
+      const mockColumns: Record<string, Column[]> = {
         "1": [
           { id: "101", name: "Məktəbin adı", type: "text", categoryId: "1" },
           { id: "102", name: "Məktəbin ünvanı", type: "text", categoryId: "1" },
@@ -178,7 +178,7 @@ export const api = {
         ]
       };
       
-      return mockColumns[categoryId as keyof typeof mockColumns] || [];
+      return mockColumns[categoryId] || [];
     },
     
     create: async (column: Omit<Column, 'id'> & { categoryId: string }) => {
@@ -204,7 +204,7 @@ export const api = {
     getAll: async (schoolId?: string) => {
       console.log(`Fetching form data for school ${schoolId} (mock data)`);
       // Mock data to simulate form submissions
-      const mockFormData = [
+      const mockFormData: FormData[] = [
         {
           id: "fd1",
           categoryId: "1",
@@ -261,7 +261,7 @@ export const api = {
       toast.success('Form approved successfully');
       return { 
         id, 
-        status: 'approved', 
+        status: 'approved' as const, 
         approvedAt: new Date().toISOString(), 
         approvedBy 
       };
@@ -270,7 +270,7 @@ export const api = {
     reject: async (id: string) => {
       console.log(`Rejecting form data ${id} (mock)`);
       toast.success('Form rejected');
-      return { id, status: 'rejected' };
+      return { id, status: 'rejected' as const };
     }
   },
   
