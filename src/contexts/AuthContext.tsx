@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     setLoading(false);
-  }, [location.pathname]);
+  }, [location.pathname, navigate]);
 
   const redirectBasedOnRole = (role: UserRole) => {
     if (role === 'superadmin') {
