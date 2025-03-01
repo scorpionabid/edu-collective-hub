@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useToast } from '@/hooks/use-toast';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { toast } from 'sonner';
 
 type UserRole = 'superadmin' | 'regionadmin' | 'sectoradmin' | 'schooladmin';
 
@@ -30,16 +30,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const location = useLocation();
 
   useEffect(() => {
     // Check if user is logged in
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       setUser(JSON.parse(storedUser));
+      
+      // If we're on the login page and already logged in, redirect to appropriate dashboard
+      if (location.pathname === '/login' || location.pathname === '/') {
+        const role = JSON.parse(storedUser).role;
+        redirectBasedOnRole(role);
+      }
     }
     setLoading(false);
-  }, []);
+  }, [location.pathname]);
+
+  const redirectBasedOnRole = (role: UserRole) => {
+    if (role === 'superadmin') {
+      navigate('/dashboard');
+    } else if (role === 'regionadmin') {
+      navigate('/region-dashboard');
+    } else if (role === 'sectoradmin') {
+      navigate('/sector-dashboard');
+    } else if (role === 'schooladmin') {
+      navigate('/school-dashboard');
+    }
+  };
 
   const login = async (email: string, password: string) => {
     try {
@@ -86,57 +104,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(mockUser);
       localStorage.setItem('user', JSON.stringify(mockUser));
       
-      toast({
-        title: "Success",
-        description: "Logged in successfully",
-      });
+      toast.success("Uğurla daxil oldunuz");
       
       // Redirect based on user role
-      if (mockUser.role === 'superadmin') {
-        navigate('/dashboard');
-      } else if (mockUser.role === 'regionadmin') {
-        navigate('/region-dashboard');
-      } else if (mockUser.role === 'sectoradmin') {
-        navigate('/sector-dashboard');
-      } else if (mockUser.role === 'schooladmin') {
-        navigate('/school-dashboard');
-      }
+      redirectBasedOnRole(mockUser.role);
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to login",
-        variant: "destructive",
-      });
+      toast.error("Daxil olmaq alınmadı");
     }
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem('user');
-    navigate('/');
-    toast({
-      title: "Success",
-      description: "Logged out successfully",
-    });
+    navigate('/login');
+    toast.success("Uğurla çıxış etdiniz");
   };
   
   const resetPassword = async (email: string) => {
     try {
       // Simulate API call to send password reset email
-      // This would be replaced with an actual API call in a real application
       await new Promise(resolve => setTimeout(resolve, 1500));
       
-      toast({
-        title: "Success",
-        description: `Password reset link has been sent to ${email}`,
-      });
+      toast.success(`Şifrə yeniləmə linki ${email} ünvanına göndərildi`);
       return Promise.resolve();
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to send password reset email",
-        variant: "destructive",
-      });
+      toast.error("Şifrə yeniləmə linki göndərilə bilmədi");
       return Promise.reject(error);
     }
   };
