@@ -4,7 +4,7 @@ import { toast } from "sonner";
 
 // Types
 export interface Category {
-  id: string; // Changed from number to string to match Supabase UUID format
+  id: string;
   name: string;
   regionId?: string;
   sectorId?: string;
@@ -13,7 +13,7 @@ export interface Category {
 }
 
 export interface Column {
-  id: string; // Changed from number to string to match Supabase UUID format
+  id: string;
   name: string;
   type: string;
   categoryId: string;
@@ -41,8 +41,7 @@ export interface Profile {
   schoolId?: string;
 }
 
-// Mock API until we create the actual tables in Supabase
-// This allows for development without changing the database schema yet
+// Connect to real database instead of mock data
 export const api = {
   // Auth
   auth: {
@@ -110,42 +109,78 @@ export const api = {
   
   // Categories
   categories: {
-    // For now, return mock data since categories table doesn't exist yet
     getAll: async () => {
-      console.log("Fetching categories (mock data)");
-      return [
-        { id: "1", name: "Məktəbin ümumi məlumatları" },
-        { id: "2", name: "Şagirdlər haqqında məlumat" },
-        { id: "3", name: "Müəllimlər haqqında məlumat" },
-        { id: "4", name: "Maddi-texniki baza" }
-      ];
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*');
+      
+      if (error) {
+        console.error('Error fetching categories:', error);
+        throw error;
+      }
+      
+      return data || [];
     },
     
     getById: async (id: string) => {
-      console.log(`Fetching category ${id} (mock data)`);
-      const mockData = [
-        { id: "1", name: "Məktəbin ümumi məlumatları" },
-        { id: "2", name: "Şagirdlər haqqında məlumat" },
-        { id: "3", name: "Müəllimlər haqqında məlumat" },
-        { id: "4", name: "Maddi-texniki baza" }
-      ];
-      return mockData.find(c => c.id === id) || mockData[0];
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching category:', error);
+        throw error;
+      }
+      
+      return data;
     },
     
     create: async (category: Omit<Category, 'id' | 'columns'>) => {
-      console.log("Creating category (mock)", category);
+      const { data, error } = await supabase
+        .from('categories')
+        .insert(category)
+        .select()
+        .single();
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+      
       toast.success('Category created successfully');
-      return { id: Date.now().toString(), ...category, columns: [] };
+      return { ...data, columns: [] };
     },
     
     update: async (id: string, category: Partial<Category>) => {
-      console.log(`Updating category ${id} (mock)`, category);
+      const { data, error } = await supabase
+        .from('categories')
+        .update(category)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+      
       toast.success('Category updated successfully');
-      return { id, ...category };
+      return data;
     },
     
     delete: async (id: string) => {
-      console.log(`Deleting category ${id} (mock)`);
+      const { error } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+      
       toast.success('Category deleted successfully');
     }
   },
@@ -153,48 +188,82 @@ export const api = {
   // Columns
   columns: {
     getAll: async (categoryId: string) => {
-      console.log(`Fetching columns for category ${categoryId} (mock data)`);
-      const mockColumns: Record<string, Column[]> = {
-        "1": [
-          { id: "101", name: "Məktəbin adı", type: "text", categoryId: "1" },
-          { id: "102", name: "Məktəbin ünvanı", type: "text", categoryId: "1" },
-          { id: "103", name: "Direktor", type: "text", categoryId: "1" },
-          { id: "104", name: "Əlaqə nömrəsi", type: "text", categoryId: "1" }
-        ],
-        "2": [
-          { id: "201", name: "Şagird sayı", type: "number", categoryId: "2" },
-          { id: "202", name: "Siniflərin sayı", type: "number", categoryId: "2" },
-          { id: "203", name: "Birinci sinif şagirdləri", type: "number", categoryId: "2" }
-        ],
-        "3": [
-          { id: "301", name: "Müəllim sayı", type: "number", categoryId: "3" },
-          { id: "302", name: "Ali təhsilli müəllimlər", type: "number", categoryId: "3" },
-          { id: "303", name: "Orta yaş", type: "number", categoryId: "3" }
-        ],
-        "4": [
-          { id: "401", name: "Sinif otaqları", type: "number", categoryId: "4" },
-          { id: "402", name: "Kompüter sayı", type: "number", categoryId: "4" },
-          { id: "403", name: "İdman zalı", type: "select", categoryId: "4" }
-        ]
-      };
+      const { data, error } = await supabase
+        .from('columns')
+        .select('*')
+        .eq('category_id', categoryId);
       
-      return mockColumns[categoryId] || [];
+      if (error) {
+        console.error('Error fetching columns:', error);
+        throw error;
+      }
+      
+      return data || [];
     },
     
     create: async (column: Omit<Column, 'id'> & { categoryId: string }) => {
-      console.log("Creating column (mock)", column);
+      const { data, error } = await supabase
+        .from('columns')
+        .insert({
+          name: column.name,
+          type: column.type,
+          category_id: column.categoryId
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+      
       toast.success('Column created successfully');
-      return { id: Date.now().toString(), ...column };
+      return {
+        id: data.id,
+        name: data.name,
+        type: data.type,
+        categoryId: data.category_id
+      };
     },
     
     update: async (id: string, column: Partial<Column>) => {
-      console.log(`Updating column ${id} (mock)`, column);
+      const updateData: any = {};
+      if (column.name) updateData.name = column.name;
+      if (column.type) updateData.type = column.type;
+      if (column.categoryId) updateData.category_id = column.categoryId;
+      
+      const { data, error } = await supabase
+        .from('columns')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+      
       toast.success('Column updated successfully');
-      return { id, ...column };
+      return {
+        id: data.id,
+        name: data.name,
+        type: data.type,
+        categoryId: data.category_id
+      };
     },
     
     delete: async (id: string) => {
-      console.log(`Deleting column ${id} (mock)`);
+      const { error } = await supabase
+        .from('columns')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+      
       toast.success('Column deleted successfully');
     }
   },
@@ -202,75 +271,118 @@ export const api = {
   // Form Data
   formData: {
     getAll: async (schoolId?: string) => {
-      console.log(`Fetching form data for school ${schoolId} (mock data)`);
-      // Mock data to simulate form submissions
-      const mockFormData: FormData[] = [
-        {
-          id: "fd1",
-          categoryId: "1",
-          schoolId: "school-1",
-          data: { "101": "Məktəb №1", "102": "Bakı şəhəri", "103": "Anar Məmmədov", "104": "+994 50 123 45 67" },
-          status: "approved",
-          submittedAt: "2023-06-12T10:15:30Z",
-          approvedAt: "2023-06-14T08:20:15Z",
-          approvedBy: "admin-1"
-        },
-        {
-          id: "fd2",
-          categoryId: "2",
-          schoolId: "school-1",
-          data: { "201": 450, "202": 25, "203": 75 },
-          status: "submitted",
-          submittedAt: "2023-06-15T11:30:00Z"
-        }
-      ];
+      let query = supabase.from('form_data').select('*');
       
       if (schoolId) {
-        return mockFormData.filter(fd => fd.schoolId === schoolId);
+        query = query.eq('school_id', schoolId);
       }
       
-      return mockFormData;
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error('Error fetching form data:', error);
+        throw error;
+      }
+      
+      return data || [];
     },
     
     getById: async (id: string) => {
-      console.log(`Fetching form data ${id} (mock)`);
-      return {
-        id,
-        categoryId: "1",
-        schoolId: "school-1",
-        data: { "101": "Məktəb №1", "102": "Bakı şəhəri", "103": "Anar Məmmədov", "104": "+994 50 123 45 67" },
-        status: "approved",
-        submittedAt: "2023-06-12T10:15:30Z"
-      };
+      const { data, error } = await supabase
+        .from('form_data')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching form data:', error);
+        throw error;
+      }
+      
+      return data;
     },
     
     submit: async (formData: Omit<FormData, 'id'>) => {
-      console.log("Submitting form data (mock)", formData);
+      const { data, error } = await supabase
+        .from('form_data')
+        .insert({
+          category_id: formData.categoryId,
+          school_id: formData.schoolId,
+          data: formData.data,
+          status: formData.status,
+          submitted_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+      
       toast.success('Form submitted successfully');
-      return { id: Date.now().toString(), ...formData, submittedAt: new Date().toISOString() };
+      return data;
     },
     
     update: async (id: string, formData: Partial<FormData>) => {
-      console.log(`Updating form data ${id} (mock)`, formData);
+      const updateData: any = {};
+      if (formData.data) updateData.data = formData.data;
+      if (formData.status) updateData.status = formData.status;
+      
+      const { data, error } = await supabase
+        .from('form_data')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+      
       toast.success('Form updated successfully');
-      return { id, ...formData };
+      return data;
     },
     
     approve: async (id: string, approvedBy: string) => {
-      console.log(`Approving form data ${id} (mock)`);
+      const { data, error } = await supabase
+        .from('form_data')
+        .update({
+          status: 'approved',
+          approved_at: new Date().toISOString(),
+          approved_by: approvedBy
+        })
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+      
       toast.success('Form approved successfully');
-      return { 
-        id, 
-        status: 'approved' as const, 
-        approvedAt: new Date().toISOString(), 
-        approvedBy 
-      };
+      return data;
     },
     
     reject: async (id: string) => {
-      console.log(`Rejecting form data ${id} (mock)`);
+      const { data, error } = await supabase
+        .from('form_data')
+        .update({
+          status: 'rejected'
+        })
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+      
       toast.success('Form rejected');
-      return { id, status: 'rejected' as const };
+      return data;
     }
   },
   
@@ -287,6 +399,53 @@ export const api = {
       }
       
       return data || [];
+    },
+    
+    create: async (name: string) => {
+      const { data, error } = await supabase
+        .from('regions')
+        .insert({ name })
+        .select()
+        .single();
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+      
+      toast.success('Region created successfully');
+      return data;
+    },
+    
+    update: async (id: string, name: string) => {
+      const { data, error } = await supabase
+        .from('regions')
+        .update({ name })
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+      
+      toast.success('Region updated successfully');
+      return data;
+    },
+    
+    delete: async (id: string) => {
+      const { error } = await supabase
+        .from('regions')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+      
+      toast.success('Region deleted successfully');
     }
   },
   
@@ -307,6 +466,56 @@ export const api = {
       }
       
       return data || [];
+    },
+    
+    create: async (name: string, regionId: string) => {
+      const { data, error } = await supabase
+        .from('sectors')
+        .insert({ 
+          name,
+          region_id: regionId
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+      
+      toast.success('Sector created successfully');
+      return data;
+    },
+    
+    update: async (id: string, name: string) => {
+      const { data, error } = await supabase
+        .from('sectors')
+        .update({ name })
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+      
+      toast.success('Sector updated successfully');
+      return data;
+    },
+    
+    delete: async (id: string) => {
+      const { error } = await supabase
+        .from('sectors')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+      
+      toast.success('Sector deleted successfully');
     }
   },
   
@@ -342,21 +551,98 @@ export const api = {
       }
       
       return data;
+    },
+    
+    create: async (school: { name: string; sectorId: string; address?: string; email?: string; phone?: string }) => {
+      const { data, error } = await supabase
+        .from('schools')
+        .insert({
+          name: school.name,
+          sector_id: school.sectorId,
+          address: school.address,
+          email: school.email,
+          phone: school.phone
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+      
+      toast.success('School created successfully');
+      return data;
+    },
+    
+    update: async (id: string, school: Partial<{ name: string; address: string; email: string; phone: string }>) => {
+      const { data, error } = await supabase
+        .from('schools')
+        .update(school)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+      
+      toast.success('School updated successfully');
+      return data;
+    },
+    
+    delete: async (id: string) => {
+      const { error } = await supabase
+        .from('schools')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+      
+      toast.success('School deleted successfully');
+    }
+  },
+  
+  // User profiles
+  profiles: {
+    getAll: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*');
+      
+      if (error) {
+        console.error('Error fetching profiles:', error);
+        throw error;
+      }
+      
+      return data || [];
     }
   },
   
   // Real-time subscriptions
   realtime: {
     subscribeToFormData: (schoolId: string, callback: (payload: any) => void) => {
-      console.log(`Setting up real-time subscription for school ${schoolId} (mock)`);
-      // Since we don't have the form_data table yet, return a mock channel 
-      // that can be "unsubscribed" without errors
-      return { id: 'mock-channel' };
+      return supabase
+        .channel(`public:form_data:school_id=eq.${schoolId}`)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'form_data',
+          filter: `school_id=eq.${schoolId}`
+        }, payload => {
+          callback(payload);
+        })
+        .subscribe();
     },
     
     unsubscribe: (channel: any) => {
-      console.log('Unsubscribing from channel (mock)', channel);
-      // Mock implementation
+      if (channel && channel.unsubscribe) {
+        channel.unsubscribe();
+      }
     }
   }
 };

@@ -16,12 +16,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { api } from "@/lib/api";
 
 interface Sector {
   id: string;
   name: string;
-  regionId: string;
-  schoolsCount?: number;
+  region_id: string;
 }
 
 const RegionSectors = () => {
@@ -33,103 +33,97 @@ const RegionSectors = () => {
   const [newSectorName, setNewSectorName] = useState("");
   const [editingSector, setEditingSector] = useState<Sector | null>(null);
   const [deletingSector, setDeletingSector] = useState<Sector | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const loadSectors = async () => {
+    if (user?.regionId) {
+      try {
+        setIsLoading(true);
+        const data = await api.sectors.getAll(user.regionId);
+        setSectors(data);
+      } catch (error) {
+        console.error("Error loading sectors:", error);
+        toast.error("Sektorları yükləmək mümkün olmadı");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
 
   useEffect(() => {
-    // Load sectors from localStorage or use mock data
-    const storedSectors = localStorage.getItem("sectors");
-    if (storedSectors) {
-      // Filter sectors for this region admin
-      const allSectors = JSON.parse(storedSectors);
-      if (user?.regionId) {
-        const filteredSectors = allSectors.filter((sector: Sector) => sector.regionId === user.regionId);
-        setSectors(filteredSectors);
-      }
-    } else {
-      // Mock data if no stored data
-      const mockSectors: Sector[] = [
-        { id: "1", name: "Sektor 1", regionId: user?.regionId || "1", schoolsCount: 15 },
-        { id: "2", name: "Sektor 2", regionId: user?.regionId || "1", schoolsCount: 22 },
-        { id: "3", name: "Sektor 3", regionId: user?.regionId || "1", schoolsCount: 18 },
-      ];
-      setSectors(mockSectors);
-      localStorage.setItem("sectors", JSON.stringify(mockSectors));
-    }
+    loadSectors();
   }, [user]);
 
-  const handleAddSector = () => {
+  const handleAddSector = async () => {
     if (!newSectorName.trim()) {
       toast.error("Sektor adı daxil edin");
       return;
     }
 
-    const newSector: Sector = {
-      id: Date.now().toString(),
-      name: newSectorName,
-      regionId: user?.regionId || "1",
-      schoolsCount: 0
-    };
-
-    // Get all sectors and add the new one
-    const storedSectors = localStorage.getItem("sectors");
-    let allSectors = storedSectors ? JSON.parse(storedSectors) : [];
-    allSectors.push(newSector);
-    localStorage.setItem("sectors", JSON.stringify(allSectors));
-
-    // Update state with only the sectors for this region
-    setSectors([...sectors, newSector]);
-    setNewSectorName("");
-    setIsAddDialogOpen(false);
-    toast.success("Sektor uğurla əlavə edildi");
+    try {
+      setIsLoading(true);
+      if (user?.regionId) {
+        const newSector = await api.sectors.create(newSectorName, user.regionId);
+        setSectors([...sectors, newSector]);
+        setNewSectorName("");
+        setIsAddDialogOpen(false);
+        toast.success("Sektor uğurla əlavə edildi");
+      } else {
+        toast.error("Region ID tapılmadı");
+      }
+    } catch (error) {
+      console.error("Error adding sector:", error);
+      toast.error("Sektor əlavə etmək mümkün olmadı");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleEditSector = () => {
+  const handleEditSector = async () => {
     if (!editingSector || !editingSector.name.trim()) {
       toast.error("Sektor adı daxil edin");
       return;
     }
 
-    // Update in localStorage
-    const storedSectors = localStorage.getItem("sectors");
-    if (storedSectors) {
-      let allSectors = JSON.parse(storedSectors);
-      const index = allSectors.findIndex((s: Sector) => s.id === editingSector.id);
-      if (index !== -1) {
-        allSectors[index] = editingSector;
-        localStorage.setItem("sectors", JSON.stringify(allSectors));
-      }
+    try {
+      setIsLoading(true);
+      const updatedSector = await api.sectors.update(editingSector.id, editingSector.name);
+      setSectors(sectors.map(sector => 
+        sector.id === updatedSector.id ? updatedSector : sector
+      ));
+      setEditingSector(null);
+      setIsEditDialogOpen(false);
+      toast.success("Sektor uğurla yeniləndi");
+    } catch (error) {
+      console.error("Error updating sector:", error);
+      toast.error("Sektoru yeniləmək mümkün olmadı");
+    } finally {
+      setIsLoading(false);
     }
-
-    // Update state
-    setSectors(sectors.map(sector => 
-      sector.id === editingSector.id ? editingSector : sector
-    ));
-    setEditingSector(null);
-    setIsEditDialogOpen(false);
-    toast.success("Sektor uğurla yeniləndi");
   };
 
-  const handleDeleteSector = () => {
+  const handleDeleteSector = async () => {
     if (!deletingSector) return;
 
-    // Update in localStorage
-    const storedSectors = localStorage.getItem("sectors");
-    if (storedSectors) {
-      let allSectors = JSON.parse(storedSectors);
-      allSectors = allSectors.filter((s: Sector) => s.id !== deletingSector.id);
-      localStorage.setItem("sectors", JSON.stringify(allSectors));
+    try {
+      setIsLoading(true);
+      await api.sectors.delete(deletingSector.id);
+      setSectors(sectors.filter(sector => sector.id !== deletingSector.id));
+      setDeletingSector(null);
+      setIsDeleteDialogOpen(false);
+      toast.success("Sektor uğurla silindi");
+    } catch (error) {
+      console.error("Error deleting sector:", error);
+      toast.error("Sektoru silmək mümkün olmadı");
+    } finally {
+      setIsLoading(false);
     }
-
-    // Update state
-    setSectors(sectors.filter(sector => sector.id !== deletingSector.id));
-    setDeletingSector(null);
-    setIsDeleteDialogOpen(false);
-    toast.success("Sektor uğurla silindi");
   };
 
   const handleExportSectors = () => {
     const csvContent = "data:text/csv;charset=utf-8," + 
-      "ID,Name,Schools Count\n" + 
-      sectors.map(sector => `${sector.id},${sector.name},${sector.schoolsCount || 0}`).join("\n");
+      "ID,Name,Region ID\n" + 
+      sectors.map(sector => `${sector.id},${sector.name},${sector.region_id}`).join("\n");
     
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -172,61 +166,64 @@ const RegionSectors = () => {
                 <CardTitle>Regionun Sektorları</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {sectors.map((sector) => (
-                    <Card key={sector.id} className="overflow-hidden">
-                      <CardHeader className="bg-primary/5 pb-2">
-                        <div className="flex justify-between items-start">
-                          <CardTitle className="text-base flex items-center">
-                            <Building className="w-4 h-4 mr-2" />
-                            {sector.name}
-                          </CardTitle>
-                          <div className="flex space-x-1">
+                {isLoading ? (
+                  <div className="flex justify-center p-4">Yüklənir...</div>
+                ) : sectors.length === 0 ? (
+                  <div className="text-center p-4">Heç bir sektor tapılmadı</div>
+                ) : (
+                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {sectors.map((sector) => (
+                      <Card key={sector.id} className="overflow-hidden">
+                        <CardHeader className="bg-primary/5 pb-2">
+                          <div className="flex justify-between items-start">
+                            <CardTitle className="text-base flex items-center">
+                              <Building className="w-4 h-4 mr-2" />
+                              {sector.name}
+                            </CardTitle>
+                            <div className="flex space-x-1">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-7 w-7"
+                                onClick={() => {
+                                  setEditingSector(sector);
+                                  setIsEditDialogOpen(true);
+                                }}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-7 w-7"
+                                onClick={() => {
+                                  setDeletingSector(sector);
+                                  setIsDeleteDialogOpen(true);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="pt-4">
+                          <div className="mt-4">
                             <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-7 w-7"
+                              variant="outline" 
+                              size="sm" 
+                              className="w-full"
                               onClick={() => {
-                                setEditingSector(sector);
-                                setIsEditDialogOpen(true);
+                                /* Handle view sector details */
                               }}
                             >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-7 w-7"
-                              onClick={() => {
-                                setDeletingSector(sector);
-                                setIsDeleteDialogOpen(true);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
+                              Ətraflı bax
                             </Button>
                           </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="pt-4">
-                        <div className="text-sm text-muted-foreground">
-                          <p>Məktəb sayı: {sector.schoolsCount || 0}</p>
-                        </div>
-                        <div className="mt-4">
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="w-full"
-                            onClick={() => {
-                              /* Handle view sector details */
-                            }}
-                          >
-                            Ətraflı bax
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </main>
@@ -254,8 +251,8 @@ const RegionSectors = () => {
             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
               Ləğv et
             </Button>
-            <Button onClick={handleAddSector}>
-              Əlavə et
+            <Button onClick={handleAddSector} disabled={isLoading}>
+              {isLoading ? "Əlavə edilir..." : "Əlavə et"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -282,8 +279,8 @@ const RegionSectors = () => {
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Ləğv et
             </Button>
-            <Button onClick={handleEditSector}>
-              Yadda saxla
+            <Button onClick={handleEditSector} disabled={isLoading}>
+              {isLoading ? "Yenilənir..." : "Yadda saxla"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -303,8 +300,8 @@ const RegionSectors = () => {
             <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
               Ləğv et
             </Button>
-            <Button variant="destructive" onClick={handleDeleteSector}>
-              Sil
+            <Button variant="destructive" onClick={handleDeleteSector} disabled={isLoading}>
+              {isLoading ? "Silinir..." : "Sil"}
             </Button>
           </DialogFooter>
         </DialogContent>

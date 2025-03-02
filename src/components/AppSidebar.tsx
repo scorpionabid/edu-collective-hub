@@ -67,7 +67,7 @@ export function AppSidebar() {
     else if (user?.role === 'sectoradmin') {
       return [
         { title: "Dashboard", icon: LayoutDashboard, href: "/sector-dashboard" },
-        { title: "Schools", icon: School, href: "/schools" },
+        { title: "Schools", icon: School, href: "/sector-schools" },
         { title: "School Admins", icon: Users, href: "/sector-users" },
         { title: "Tables", icon: Table, href: "/sector-tables" }, 
         { title: "Categories", icon: Database, href: "/sector-categories" }, 
@@ -81,7 +81,7 @@ export function AppSidebar() {
     else if (user?.role === 'schooladmin') {
       return [
         { title: "Dashboard", icon: LayoutDashboard, href: "/school-dashboard" },
-        { title: "Data Entry", icon: FileText, href: "/school-dashboard" }, 
+        { title: "Data Entry", icon: FileText, href: "/school-data-entry" }, 
         { title: "Import Data", icon: Database, href: "/school-import" },
         { title: "Profile", icon: User, href: "/school-profile" },
         ...defaultItems
