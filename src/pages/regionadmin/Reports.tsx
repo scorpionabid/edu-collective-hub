@@ -1,4 +1,3 @@
-
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -17,7 +16,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Filter, SortAsc, SortDesc, Download } from "lucide-react";
@@ -25,19 +23,7 @@ import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { utils, writeFileXLSX } from "xlsx";
-
-interface Column {
-  id: string;
-  name: string;
-  type: string;
-  categoryId: string;
-}
-
-interface Category {
-  id: string;
-  name: string;
-  columns: Column[];
-}
+import { Column, Category } from "@/lib/api/types";
 
 const RegionReports = () => {
   const { user } = useAuth();
@@ -51,7 +37,6 @@ const RegionReports = () => {
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // Load sectors
   useEffect(() => {
     const loadSectors = async () => {
       try {
@@ -68,7 +53,6 @@ const RegionReports = () => {
     loadSectors();
   }, [user]);
 
-  // Load categories when sector changes
   useEffect(() => {
     const loadCategories = async () => {
       if (!selectedSector) {
@@ -79,7 +63,6 @@ const RegionReports = () => {
       try {
         setIsLoading(true);
         const categoriesData = await api.categories.getAll();
-        // Filter categories for the selected sector
         const sectorCategories = categoriesData.filter(
           (cat: any) => cat.sectorId === selectedSector
         );
@@ -95,7 +78,6 @@ const RegionReports = () => {
     loadCategories();
   }, [selectedSector]);
 
-  // Load columns and data when category changes
   useEffect(() => {
     const loadColumnsAndData = async () => {
       if (!selectedCategory) {
@@ -107,16 +89,13 @@ const RegionReports = () => {
       try {
         setIsLoading(true);
         
-        // Load category details including columns
         const categoryDetails = await api.categories.getById(selectedCategory);
         
         if (categoryDetails && categoryDetails.columns) {
           setColumns(categoryDetails.columns);
           
-          // Load form data for this category
           const formData = await api.formData.getAll();
           
-          // Filter data for the selected category
           const categoryData = formData
             .filter((item: any) => item.categoryId === selectedCategory)
             .map((item: any) => ({
@@ -158,7 +137,6 @@ const RegionReports = () => {
   const filteredAndSortedData = () => {
     let result = [...data];
 
-    // Apply filters
     Object.keys(filters).forEach((key) => {
       if (filters[key]) {
         result = result.filter((item) =>
@@ -169,7 +147,6 @@ const RegionReports = () => {
       }
     });
 
-    // Apply sorting
     if (sortConfig) {
       result.sort((a, b) => {
         const aValue = a[sortConfig.key] || '';
@@ -197,19 +174,15 @@ const RegionReports = () => {
         return;
       }
       
-      // Prepare worksheet data
       const worksheet = utils.json_to_sheet(filteredData);
       
-      // Create workbook
       const workbook = utils.book_new();
       utils.book_append_sheet(workbook, worksheet, "Report Data");
       
-      // Generate file name
       const categoryName = categories.find(c => c.id === selectedCategory)?.name || "Report";
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
       const fileName = `${categoryName}_${timestamp}.xlsx`;
       
-      // Write file
       writeFileXLSX(workbook, fileName);
       
       toast.success("Report exported to Excel");

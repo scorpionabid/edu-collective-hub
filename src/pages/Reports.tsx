@@ -1,4 +1,3 @@
-
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -17,7 +16,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Filter, SortAsc, SortDesc, Download } from "lucide-react";
@@ -26,19 +24,7 @@ import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import * as XLSX from 'xlsx';
-
-interface Column {
-  id: string;
-  name: string;
-  type: string;
-  categoryId: string;
-}
-
-interface Category {
-  id: string;
-  name: string;
-  columns: Column[];
-}
+import { Column, Category } from "@/lib/api/types";
 
 const Reports = () => {
   const { user } = useAuth();
@@ -51,25 +37,21 @@ const Reports = () => {
   const [filters, setFilters] = useState<{ [key: string]: string }>({});
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
-  // Fetch regions
   const { data: regions = [] } = useQuery({
     queryKey: ['regions'],
     queryFn: () => api.regions.getAll(),
   });
 
-  // Fetch all sectors
   const { data: sectors = [] } = useQuery({
     queryKey: ['sectors'],
     queryFn: () => api.sectors.getAll(),
   });
 
-  // Fetch categories
   const { data: categories = [] } = useQuery({
     queryKey: ['categories'],
     queryFn: () => api.categories.getAll(),
   });
 
-  // Fetch form data for selected category
   const { data: formData = [], refetch: refetchFormData } = useQuery({
     queryKey: ['formData', selectedCategory],
     queryFn: () => api.formData.getAll(),
@@ -89,7 +71,6 @@ const Reports = () => {
 
   useEffect(() => {
     if (selectedCategory) {
-      // Fetch category details to get columns
       api.categories.getById(selectedCategory)
         .then(category => {
           if (category && category.columns) {
@@ -127,7 +108,6 @@ const Reports = () => {
   const filteredAndSortedData = () => {
     let result = [...data];
 
-    // Apply filters
     Object.keys(filters).forEach((key) => {
       if (filters[key]) {
         result = result.filter((item) => {
@@ -139,7 +119,6 @@ const Reports = () => {
       }
     });
 
-    // Apply sorting
     if (sortConfig) {
       result.sort((a, b) => {
         const aValue = a.data ? a.data[sortConfig.key] : a[sortConfig.key];
@@ -160,7 +139,6 @@ const Reports = () => {
 
   const handleExportToExcel = () => {
     const exportData = filteredAndSortedData().map(item => {
-      // Flatten the data structure for Excel
       const flatItem: Record<string, any> = {};
       columns.forEach(column => {
         flatItem[column.name] = item.data[column.name] || '';
@@ -168,13 +146,10 @@ const Reports = () => {
       return flatItem;
     });
 
-    // Create worksheet
     const ws = XLSX.utils.json_to_sheet(exportData);
-    // Create workbook
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Report");
     
-    // Generate Excel file and trigger download
     XLSX.writeFile(wb, "report.xlsx");
     
     toast.success('Report exported successfully');

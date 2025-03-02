@@ -1,4 +1,3 @@
-
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -25,19 +24,7 @@ import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import * as XLSX from 'xlsx';
-
-interface Column {
-  id: string;
-  name: string;
-  type: string;
-  categoryId: string;
-}
-
-interface Category {
-  id: string;
-  name: string;
-  columns: Column[];
-}
+import { Column, Category } from "@/lib/api/types";
 
 const SectorReports = () => {
   const { user } = useAuth();
@@ -48,20 +35,17 @@ const SectorReports = () => {
   const [filters, setFilters] = useState<{ [key: string]: string }>({});
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
-  // Fetch schools for current sector
   const { data: schools = [] } = useQuery({
     queryKey: ['schools', user?.sectorId],
     queryFn: () => user?.sectorId ? api.schools.getAll(user.sectorId) : [],
     enabled: !!user?.sectorId,
   });
 
-  // Fetch categories
   const { data: categories = [] } = useQuery({
     queryKey: ['categories'],
     queryFn: () => api.categories.getAll(),
   });
 
-  // Fetch form data for selected school and category
   const { data: formData = [], refetch: refetchFormData } = useQuery({
     queryKey: ['formData', selectedSchool, selectedCategory],
     queryFn: () => selectedSchool ? api.formData.getAll(selectedSchool) : [],
@@ -70,7 +54,6 @@ const SectorReports = () => {
 
   useEffect(() => {
     if (selectedCategory) {
-      // Fetch category details to get columns
       api.categories.getById(selectedCategory)
         .then(category => {
           if (category && category.columns) {
@@ -108,7 +91,6 @@ const SectorReports = () => {
   const filteredAndSortedData = () => {
     let result = [...data];
 
-    // Apply filters
     Object.keys(filters).forEach((key) => {
       if (filters[key]) {
         result = result.filter((item) => {
@@ -120,7 +102,6 @@ const SectorReports = () => {
       }
     });
 
-    // Apply sorting
     if (sortConfig) {
       result.sort((a, b) => {
         const aValue = a.data ? a.data[sortConfig.key] : a[sortConfig.key];
@@ -141,7 +122,6 @@ const SectorReports = () => {
 
   const handleExportToExcel = () => {
     const exportData = filteredAndSortedData().map(item => {
-      // Flatten the data structure for Excel
       const flatItem: Record<string, any> = {};
       columns.forEach(column => {
         flatItem[column.name] = item.data[column.name] || '';
@@ -149,13 +129,10 @@ const SectorReports = () => {
       return flatItem;
     });
 
-    // Create worksheet
     const ws = XLSX.utils.json_to_sheet(exportData);
-    // Create workbook
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Report");
     
-    // Generate Excel file and trigger download
     XLSX.writeFile(wb, "report.xlsx");
     
     toast.success('Report exported successfully');
