@@ -57,8 +57,8 @@ export function AppSidebar() {
         { title: "Dashboard", icon: LayoutDashboard, href: "/region-dashboard" },
         { title: "Sectors", icon: Building, href: "/region-sectors" },
         { title: "Schools", icon: School, href: "/region-schools" },
-        { title: "Reports", icon: BookOpen, href: "/reports" },
-        { title: "Tables", icon: Table, href: "/tables" },
+        { title: "Tables", icon: Table, href: "/region-tables" },
+        { title: "Reports", icon: BookOpen, href: "/region-reports" },
         ...defaultItems
       ];
     }
@@ -72,7 +72,7 @@ export function AppSidebar() {
         { title: "Tables", icon: Table, href: "/sector-tables" }, 
         { title: "Categories", icon: Database, href: "/sector-categories" }, 
         { title: "Form View", icon: FileText, href: "/sector-forms" },
-        { title: "Reports", icon: BookOpen, href: "/reports" },
+        { title: "Reports", icon: BookOpen, href: "/sector-reports" },
         ...defaultItems
       ];
     }

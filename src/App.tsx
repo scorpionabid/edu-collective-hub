@@ -20,6 +20,8 @@ import Settings from "@/pages/Settings";
 import RegionDashboard from "@/pages/regionadmin/Dashboard";
 import RegionSectors from "@/pages/regionadmin/Sectors";
 import RegionSchools from "@/pages/regionadmin/Schools";
+import RegionTables from "@/pages/regionadmin/Tables";
+import RegionReports from "@/pages/regionadmin/Reports";
 
 // SectorAdmin pages
 import SectorDashboard from "@/pages/sectoradmin/Dashboard";
@@ -27,6 +29,7 @@ import SectorTables from "@/pages/SectorTables";
 import SectorUsers from "@/pages/SectorUsers";
 import SectorCategories from "@/pages/SectorCategories";
 import SectorForms from "@/pages/SectorForms";
+import SectorReports from "@/pages/sectoradmin/Reports";
 
 // SchoolAdmin pages
 import SchoolDashboard from "@/pages/schooladmin/Dashboard";
@@ -148,7 +151,7 @@ function App() {
         <Route
           path="/reports"
           element={
-            <ProtectedRoute allowedRoles={['superadmin', 'regionadmin', 'sectoradmin']}>
+            <ProtectedRoute allowedRoles={['superadmin']}>
               <Reports />
             </ProtectedRoute>
           }
@@ -156,7 +159,7 @@ function App() {
         <Route
           path="/tables"
           element={
-            <ProtectedRoute allowedRoles={['superadmin', 'regionadmin']}>
+            <ProtectedRoute allowedRoles={['superadmin']}>
               <Tables />
             </ProtectedRoute>
           }
@@ -192,6 +195,22 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['regionadmin']}>
               <RegionSchools />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/region-tables"
+          element={
+            <ProtectedRoute allowedRoles={['regionadmin']}>
+              <RegionTables />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/region-reports"
+          element={
+            <ProtectedRoute allowedRoles={['regionadmin']}>
+              <RegionReports />
             </ProtectedRoute>
           }
         />
@@ -234,6 +253,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['sectoradmin']}>
               <SectorForms />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/sector-reports"
+          element={
+            <ProtectedRoute allowedRoles={['sectoradmin']}>
+              <SectorReports />
             </ProtectedRoute>
           }
         />
