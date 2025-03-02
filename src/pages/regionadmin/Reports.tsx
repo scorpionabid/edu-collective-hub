@@ -22,27 +22,19 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Filter, SortAsc, SortDesc, Download } from "lucide-react";
 import { useState, useEffect } from "react";
-
-interface Region {
-  id: number;
-  name: string;
-  code: string;
-}
-
-interface Sector {
-  id: number;
-  name: string;
-  regionId: number;
-}
+import { api } from "@/lib/api";
+import { toast } from "sonner";
+import { utils, writeFileXLSX } from "xlsx";
 
 interface Column {
-  id: number;
+  id: string;
   name: string;
   type: string;
+  categoryId: string;
 }
 
 interface Category {
-  id: number;
+  id: string;
   name: string;
   columns: Column[];
 }
@@ -51,45 +43,102 @@ const RegionReports = () => {
   const { user } = useAuth();
   const [selectedSector, setSelectedSector] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [sectors, setSectors] = useState<Sector[]>([]);
+  const [sectors, setSectors] = useState<any[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [columns, setColumns] = useState<Column[]>([]);
   const [data, setData] = useState<any[]>([]);
   const [filters, setFilters] = useState<{ [key: string]: string }>({});
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // Simulated data - replace with actual API calls
+  // Load sectors
   useEffect(() => {
-    // Load data from localStorage
-    const storedSectors = localStorage.getItem('sectors');
-    if (storedSectors) {
-      setSectors(JSON.parse(storedSectors));
-    }
-
-    const storedCategories = localStorage.getItem('categories');
-    if (storedCategories) {
-      setCategories(JSON.parse(storedCategories));
-    }
-  }, []);
-
-  // Filter sectors for the current region admin
-  useEffect(() => {
-    if (user?.regionId) {
-      const filtered = sectors.filter(
-        (sector) => sector.regionId === Number(user.regionId)
-      );
-      setSectors(filtered);
-    }
-  }, [user, sectors]);
-
-  useEffect(() => {
-    if (selectedCategory) {
-      const category = categories.find((cat) => cat.id === Number(selectedCategory));
-      if (category) {
-        setColumns(category.columns);
+    const loadSectors = async () => {
+      try {
+        if (user?.regionId) {
+          const sectorsData = await api.sectors.getAll(user.regionId);
+          setSectors(sectorsData);
+        }
+      } catch (error) {
+        console.error("Error loading sectors:", error);
+        toast.error("Failed to load sectors");
       }
-    }
-  }, [selectedCategory, categories]);
+    };
+    
+    loadSectors();
+  }, [user]);
+
+  // Load categories when sector changes
+  useEffect(() => {
+    const loadCategories = async () => {
+      if (!selectedSector) {
+        setCategories([]);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        const categoriesData = await api.categories.getAll();
+        // Filter categories for the selected sector
+        const sectorCategories = categoriesData.filter(
+          (cat: any) => cat.sectorId === selectedSector
+        );
+        setCategories(sectorCategories);
+      } catch (error) {
+        console.error("Error loading categories:", error);
+        toast.error("Failed to load categories");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadCategories();
+  }, [selectedSector]);
+
+  // Load columns and data when category changes
+  useEffect(() => {
+    const loadColumnsAndData = async () => {
+      if (!selectedCategory) {
+        setColumns([]);
+        setData([]);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        
+        // Load category details including columns
+        const categoryDetails = await api.categories.getById(selectedCategory);
+        
+        if (categoryDetails && categoryDetails.columns) {
+          setColumns(categoryDetails.columns);
+          
+          // Load form data for this category
+          const formData = await api.formData.getAll();
+          
+          // Filter data for the selected category
+          const categoryData = formData
+            .filter((item: any) => item.categoryId === selectedCategory)
+            .map((item: any) => ({
+              ...item.data,
+              id: item.id,
+              status: item.status,
+              submittedAt: item.submittedAt,
+              schoolName: item.schoolName || 'Unknown School'
+            }));
+            
+          setData(categoryData);
+        }
+      } catch (error) {
+        console.error("Error loading columns and data:", error);
+        toast.error("Failed to load report data");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadColumnsAndData();
+  }, [selectedCategory]);
 
   const handleFilter = (columnName: string, value: string) => {
     setFilters((prev) => ({
@@ -123,10 +172,13 @@ const RegionReports = () => {
     // Apply sorting
     if (sortConfig) {
       result.sort((a, b) => {
-        if (a[sortConfig.key] < b[sortConfig.key]) {
+        const aValue = a[sortConfig.key] || '';
+        const bValue = b[sortConfig.key] || '';
+        
+        if (aValue < bValue) {
           return sortConfig.direction === "asc" ? -1 : 1;
         }
-        if (a[sortConfig.key] > b[sortConfig.key]) {
+        if (aValue > bValue) {
           return sortConfig.direction === "asc" ? 1 : -1;
         }
         return 0;
@@ -137,8 +189,34 @@ const RegionReports = () => {
   };
 
   const handleExportToExcel = () => {
-    // Implementation for Excel export
-    console.log("Exporting to Excel...");
+    try {
+      const filteredData = filteredAndSortedData();
+      
+      if (filteredData.length === 0) {
+        toast.error("No data to export");
+        return;
+      }
+      
+      // Prepare worksheet data
+      const worksheet = utils.json_to_sheet(filteredData);
+      
+      // Create workbook
+      const workbook = utils.book_new();
+      utils.book_append_sheet(workbook, worksheet, "Report Data");
+      
+      // Generate file name
+      const categoryName = categories.find(c => c.id === selectedCategory)?.name || "Report";
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const fileName = `${categoryName}_${timestamp}.xlsx`;
+      
+      // Write file
+      writeFileXLSX(workbook, fileName);
+      
+      toast.success("Report exported to Excel");
+    } catch (error) {
+      console.error("Error exporting to Excel:", error);
+      toast.error("Failed to export data to Excel");
+    }
   };
 
   return (
@@ -158,7 +236,10 @@ const RegionReports = () => {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Hesabat Yaradıcısı</CardTitle>
-                <Button onClick={handleExportToExcel}>
+                <Button 
+                  onClick={handleExportToExcel} 
+                  disabled={data.length === 0 || isLoading}
+                >
                   <Download className="w-4 h-4 mr-2" />
                   Excel-ə çıxar
                 </Button>
@@ -170,13 +251,14 @@ const RegionReports = () => {
                     <Select
                       value={selectedSector}
                       onValueChange={setSelectedSector}
+                      disabled={isLoading}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Sektor seç" />
                       </SelectTrigger>
                       <SelectContent>
                         {sectors.map((sector) => (
-                          <SelectItem key={sector.id} value={String(sector.id)}>
+                          <SelectItem key={sector.id} value={sector.id}>
                             {sector.name}
                           </SelectItem>
                         ))}
@@ -189,14 +271,14 @@ const RegionReports = () => {
                     <Select
                       value={selectedCategory}
                       onValueChange={setSelectedCategory}
-                      disabled={!selectedSector}
+                      disabled={!selectedSector || isLoading}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Kateqoriya seç" />
                       </SelectTrigger>
                       <SelectContent>
                         {categories.map((category) => (
-                          <SelectItem key={category.id} value={String(category.id)}>
+                          <SelectItem key={category.id} value={category.id}>
                             {category.name}
                           </SelectItem>
                         ))}
@@ -205,15 +287,23 @@ const RegionReports = () => {
                   </div>
                 </div>
 
-                {selectedCategory && columns.length > 0 && (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        {columns.map((column) => (
-                          <TableHead key={column.id}>
-                            <div className="flex items-center gap-2">
-                              {column.name}
-                              <div className="flex flex-col">
+                {isLoading && (
+                  <div className="flex justify-center my-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                )}
+
+                {!isLoading && selectedCategory && columns.length > 0 && (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Məktəb</TableHead>
+                          <TableHead>Status</TableHead>
+                          {columns.map((column) => (
+                            <TableHead key={column.id}>
+                              <div className="flex items-center gap-2">
+                                {column.name}
                                 <button
                                   onClick={() => handleSort(column.name)}
                                   className="hover:text-primary"
@@ -228,40 +318,71 @@ const RegionReports = () => {
                                     <Filter className="w-4 h-4" />
                                   )}
                                 </button>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm">
+                                      <Filter className="w-4 h-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <div className="p-2">
+                                      <Input
+                                        placeholder="Filtr..."
+                                        value={filters[column.name] || ""}
+                                        onChange={(e) =>
+                                          handleFilter(column.name, e.target.value)
+                                        }
+                                      />
+                                    </div>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </div>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <Filter className="w-4 h-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <div className="p-2">
-                                    <Input
-                                      placeholder="Filtr..."
-                                      value={filters[column.name] || ""}
-                                      onChange={(e) =>
-                                        handleFilter(column.name, e.target.value)
-                                      }
-                                    />
-                                  </div>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          </TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredAndSortedData().map((row, index) => (
-                        <TableRow key={index}>
-                          {columns.map((column) => (
-                            <TableCell key={column.id}>{row[column.name]}</TableCell>
+                            </TableHead>
                           ))}
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredAndSortedData().length === 0 ? (
+                          <TableRow>
+                            <TableCell
+                              colSpan={columns.length + 2}
+                              className="text-center py-8"
+                            >
+                              Məlumat yoxdur
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredAndSortedData().map((row, index) => (
+                            <TableRow key={index}>
+                              <TableCell>{row.schoolName}</TableCell>
+                              <TableCell>
+                                <span className={`px-2 py-1 rounded text-xs ${
+                                  row.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                  row.status === 'submitted' ? 'bg-blue-100 text-blue-800' :
+                                  row.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {row.status === 'approved' ? 'Təsdiqlənib' :
+                                   row.status === 'submitted' ? 'Göndərilib' :
+                                   row.status === 'rejected' ? 'Rədd edilib' :
+                                   'Qaralama'}
+                                </span>
+                              </TableCell>
+                              {columns.map((column) => (
+                                <TableCell key={column.id}>{row[column.name]}</TableCell>
+                              ))}
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+
+                {!isLoading && selectedCategory && columns.length === 0 && (
+                  <div className="text-center py-8">
+                    Bu kateqoriya üçün heç bir sütun müəyyən edilməyib
+                  </div>
                 )}
               </CardContent>
             </Card>
