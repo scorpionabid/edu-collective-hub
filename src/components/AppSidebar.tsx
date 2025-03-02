@@ -55,10 +55,10 @@ export function AppSidebar() {
     else if (user?.role === 'regionadmin') {
       return [
         { title: "Dashboard", icon: LayoutDashboard, href: "/region-dashboard" },
-        { title: "Sectors", icon: Building, href: "/sectors" },
-        { title: "Schools", icon: School, href: "/schools" },
+        { title: "Sectors", icon: Building, href: "/region-sectors" },
+        { title: "Schools", icon: School, href: "/region-schools" },
         { title: "Reports", icon: BookOpen, href: "/reports" },
-        { title: "Tables", icon: Table, href: "/region-tables" },
+        { title: "Tables", icon: Table, href: "/tables" },
         ...defaultItems
       ];
     }

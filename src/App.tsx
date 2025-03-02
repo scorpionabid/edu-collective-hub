@@ -2,8 +2,12 @@
 import { Route, Routes, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import Index from "@/pages/Index";
-import Dashboard from "@/pages/Dashboard";
 import Login from "@/pages/Login";
+import NotFound from "@/pages/NotFound";
+import { useAuth } from "@/contexts/AuthContext";
+
+// SuperAdmin pages
+import SuperAdminDashboard from "@/pages/superadmin/Dashboard";
 import Users from "@/pages/Users";
 import Regions from "@/pages/Regions";
 import Sectors from "@/pages/Sectors";
@@ -11,16 +15,23 @@ import Schools from "@/pages/Schools";
 import Reports from "@/pages/Reports";
 import Tables from "@/pages/Tables";
 import Settings from "@/pages/Settings";
-import NotFound from "@/pages/NotFound";
-import SectorDashboard from "@/pages/SectorDashboard";
+
+// RegionAdmin pages
+import RegionDashboard from "@/pages/regionadmin/Dashboard";
+import RegionSectors from "@/pages/regionadmin/Sectors";
+import RegionSchools from "@/pages/regionadmin/Schools";
+
+// SectorAdmin pages
+import SectorDashboard from "@/pages/sectoradmin/Dashboard";
 import SectorTables from "@/pages/SectorTables";
 import SectorUsers from "@/pages/SectorUsers";
 import SectorCategories from "@/pages/SectorCategories";
 import SectorForms from "@/pages/SectorForms";
-import SchoolDashboard from "@/pages/SchoolDashboard";
+
+// SchoolAdmin pages
+import SchoolDashboard from "@/pages/schooladmin/Dashboard";
 import SchoolProfile from "@/pages/SchoolProfile";
 import SchoolImport from "@/pages/SchoolImport";
-import { useAuth } from "@/contexts/AuthContext";
 
 // Protected route component
 const ProtectedRoute = ({ 
@@ -98,7 +109,7 @@ function App() {
           path="/dashboard"
           element={
             <ProtectedRoute allowedRoles={['superadmin']}>
-              <Dashboard />
+              <SuperAdminDashboard />
             </ProtectedRoute>
           }
         />
@@ -155,6 +166,32 @@ function App() {
           element={
             <ProtectedRoute>
               <Settings />
+            </ProtectedRoute>
+          }
+        />
+        
+        {/* Region admin routes */}
+        <Route
+          path="/region-dashboard"
+          element={
+            <ProtectedRoute allowedRoles={['regionadmin']}>
+              <RegionDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/region-sectors"
+          element={
+            <ProtectedRoute allowedRoles={['regionadmin']}>
+              <RegionSectors />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/region-schools"
+          element={
+            <ProtectedRoute allowedRoles={['regionadmin']}>
+              <RegionSchools />
             </ProtectedRoute>
           }
         />
