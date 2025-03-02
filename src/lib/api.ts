@@ -226,7 +226,7 @@ export const api = {
       }
     },
     
-    create: async (column: Omit<Column, 'id'> & { categoryId: string }) => {
+    create: async (column: Omit<Column, 'id'>) => {
       try {
         const { data, error } = await supabase.rpc('create_column', {
           column_name: column.name,
@@ -674,7 +674,7 @@ export const api = {
   realtime: {
     subscribeToFormData: (schoolId: string, callback: (payload: any) => void) => {
       return supabase
-        .channel(`public:form_data:school_id=eq.${schoolId}`)
+        .channel(`form_data:school_id=eq.${schoolId}`)
         .on('postgres_changes', {
           event: '*',
           schema: 'public',

@@ -17,26 +17,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Filter, SortAsc, SortDesc, Download } from "lucide-react";
 import { useState, useEffect } from "react";
-
-interface School {
-  id: number;
-  name: string;
-  sectorId: number;
-}
+import { api } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
+import * as XLSX from 'xlsx';
 
 interface Column {
-  id: number;
+  id: string;
   name: string;
   type: string;
+  categoryId: string;
 }
 
 interface Category {
-  id: number;
+  id: string;
   name: string;
   columns: Column[];
 }
@@ -45,45 +43,52 @@ const SectorReports = () => {
   const { user } = useAuth();
   const [selectedSchool, setSelectedSchool] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [schools, setSchools] = useState<School[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [columns, setColumns] = useState<Column[]>([]);
   const [data, setData] = useState<any[]>([]);
   const [filters, setFilters] = useState<{ [key: string]: string }>({});
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
-  // Simulated data - replace with actual API calls
-  useEffect(() => {
-    // Load data from localStorage
-    const storedSchools = localStorage.getItem('schools');
-    if (storedSchools) {
-      setSchools(JSON.parse(storedSchools));
-    }
+  // Fetch schools for current sector
+  const { data: schools = [] } = useQuery({
+    queryKey: ['schools', user?.sectorId],
+    queryFn: () => user?.sectorId ? api.schools.getAll(user.sectorId) : [],
+    enabled: !!user?.sectorId,
+  });
 
-    const storedCategories = localStorage.getItem('categories');
-    if (storedCategories) {
-      setCategories(JSON.parse(storedCategories));
-    }
-  }, []);
+  // Fetch categories
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => api.categories.getAll(),
+  });
 
-  // Filter schools for the current sector admin
-  useEffect(() => {
-    if (user?.sectorId) {
-      const filtered = schools.filter(
-        (school) => school.sectorId === Number(user.sectorId)
-      );
-      setSchools(filtered);
-    }
-  }, [user, schools]);
+  // Fetch form data for selected school and category
+  const { data: formData = [], refetch: refetchFormData } = useQuery({
+    queryKey: ['formData', selectedSchool, selectedCategory],
+    queryFn: () => selectedSchool ? api.formData.getAll(selectedSchool) : [],
+    enabled: !!selectedSchool,
+  });
 
   useEffect(() => {
     if (selectedCategory) {
-      const category = categories.find((cat) => cat.id === Number(selectedCategory));
-      if (category) {
-        setColumns(category.columns);
-      }
+      // Fetch category details to get columns
+      api.categories.getById(selectedCategory)
+        .then(category => {
+          if (category && category.columns) {
+            setColumns(category.columns);
+          }
+        })
+        .catch(error => {
+          console.error('Error fetching category columns:', error);
+          toast.error('Failed to load category columns');
+        });
     }
-  }, [selectedCategory, categories]);
+  }, [selectedCategory]);
+
+  useEffect(() => {
+    if (formData.length > 0 && columns.length > 0) {
+      setData(formData);
+    }
+  }, [formData, columns]);
 
   const handleFilter = (columnName: string, value: string) => {
     setFilters((prev) => ({
@@ -106,21 +111,25 @@ const SectorReports = () => {
     // Apply filters
     Object.keys(filters).forEach((key) => {
       if (filters[key]) {
-        result = result.filter((item) =>
-          String(item[key])
+        result = result.filter((item) => {
+          const value = item.data ? item.data[key] : item[key];
+          return String(value)
             .toLowerCase()
-            .includes(filters[key].toLowerCase())
-        );
+            .includes(filters[key].toLowerCase());
+        });
       }
     });
 
     // Apply sorting
     if (sortConfig) {
       result.sort((a, b) => {
-        if (a[sortConfig.key] < b[sortConfig.key]) {
+        const aValue = a.data ? a.data[sortConfig.key] : a[sortConfig.key];
+        const bValue = b.data ? b.data[sortConfig.key] : b[sortConfig.key];
+        
+        if (aValue < bValue) {
           return sortConfig.direction === "asc" ? -1 : 1;
         }
-        if (a[sortConfig.key] > b[sortConfig.key]) {
+        if (aValue > bValue) {
           return sortConfig.direction === "asc" ? 1 : -1;
         }
         return 0;
@@ -131,8 +140,25 @@ const SectorReports = () => {
   };
 
   const handleExportToExcel = () => {
-    // Implementation for Excel export
-    console.log("Exporting to Excel...");
+    const exportData = filteredAndSortedData().map(item => {
+      // Flatten the data structure for Excel
+      const flatItem: Record<string, any> = {};
+      columns.forEach(column => {
+        flatItem[column.name] = item.data[column.name] || '';
+      });
+      return flatItem;
+    });
+
+    // Create worksheet
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Report");
+    
+    // Generate Excel file and trigger download
+    XLSX.writeFile(wb, "report.xlsx");
+    
+    toast.success('Report exported successfully');
   };
 
   return (
@@ -152,7 +178,7 @@ const SectorReports = () => {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Hesabat Yaradıcısı</CardTitle>
-                <Button onClick={handleExportToExcel}>
+                <Button onClick={handleExportToExcel} disabled={data.length === 0}>
                   <Download className="w-4 h-4 mr-2" />
                   Excel-ə çıxar
                 </Button>
@@ -170,7 +196,7 @@ const SectorReports = () => {
                       </SelectTrigger>
                       <SelectContent>
                         {schools.map((school) => (
-                          <SelectItem key={school.id} value={String(school.id)}>
+                          <SelectItem key={school.id} value={school.id}>
                             {school.name}
                           </SelectItem>
                         ))}
@@ -190,7 +216,7 @@ const SectorReports = () => {
                       </SelectTrigger>
                       <SelectContent>
                         {categories.map((category) => (
-                          <SelectItem key={category.id} value={String(category.id)}>
+                          <SelectItem key={category.id} value={category.id}>
                             {category.name}
                           </SelectItem>
                         ))}
@@ -247,13 +273,23 @@ const SectorReports = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredAndSortedData().map((row, index) => (
-                        <TableRow key={index}>
-                          {columns.map((column) => (
-                            <TableCell key={column.id}>{row[column.name]}</TableCell>
-                          ))}
+                      {filteredAndSortedData().length > 0 ? (
+                        filteredAndSortedData().map((row, index) => (
+                          <TableRow key={index}>
+                            {columns.map((column) => (
+                              <TableCell key={column.id}>
+                                {row.data && row.data[column.name] ? row.data[column.name] : ''}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={columns.length} className="text-center py-4">
+                            Məlumat yoxdur
+                          </TableCell>
                         </TableRow>
-                      ))}
+                      )}
                     </TableBody>
                   </Table>
                 )}

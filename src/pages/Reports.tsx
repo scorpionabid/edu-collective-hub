@@ -22,27 +22,20 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Filter, SortAsc, SortDesc, Download } from "lucide-react";
 import { useState, useEffect } from "react";
-
-interface Region {
-  id: number;
-  name: string;
-  code: string;
-}
-
-interface Sector {
-  id: number;
-  name: string;
-  regionId: number;
-}
+import { api } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
+import * as XLSX from 'xlsx';
 
 interface Column {
-  id: number;
+  id: string;
   name: string;
   type: string;
+  categoryId: string;
 }
 
 interface Category {
-  id: number;
+  id: string;
   name: string;
   columns: Column[];
 }
@@ -52,47 +45,41 @@ const Reports = () => {
   const [selectedRegion, setSelectedRegion] = useState<string>("");
   const [selectedSector, setSelectedSector] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [regions, setRegions] = useState<Region[]>([]);
-  const [sectors, setSectors] = useState<Sector[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [filteredSectors, setFilteredSectors] = useState<Sector[]>([]);
+  const [filteredSectors, setFilteredSectors] = useState<any[]>([]);
   const [columns, setColumns] = useState<Column[]>([]);
   const [data, setData] = useState<any[]>([]);
   const [filters, setFilters] = useState<{ [key: string]: string }>({});
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
-  // Simulated data - replace with actual API calls
-  useEffect(() => {
-    // Mock regions data
-    setRegions([
-      { id: 1, name: "Region 1", code: "R1" },
-      { id: 2, name: "Region 2", code: "R2" },
-    ]);
+  // Fetch regions
+  const { data: regions = [] } = useQuery({
+    queryKey: ['regions'],
+    queryFn: () => api.regions.getAll(),
+  });
 
-    // Mock sectors data
-    setSectors([
-      { id: 1, name: "Sector 1", regionId: 1 },
-      { id: 2, name: "Sector 2", regionId: 1 },
-      { id: 3, name: "Sector 3", regionId: 2 },
-    ]);
+  // Fetch all sectors
+  const { data: sectors = [] } = useQuery({
+    queryKey: ['sectors'],
+    queryFn: () => api.sectors.getAll(),
+  });
 
-    // Mock categories and columns from Tables section
-    setCategories([
-      {
-        id: 1,
-        name: "Category 1",
-        columns: [
-          { id: 1, name: "Column 1", type: "text" },
-          { id: 2, name: "Column 2", type: "number" },
-        ],
-      },
-    ]);
-  }, []);
+  // Fetch categories
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => api.categories.getAll(),
+  });
+
+  // Fetch form data for selected category
+  const { data: formData = [], refetch: refetchFormData } = useQuery({
+    queryKey: ['formData', selectedCategory],
+    queryFn: () => api.formData.getAll(),
+    enabled: !!selectedCategory,
+  });
 
   useEffect(() => {
     if (selectedRegion) {
       const filtered = sectors.filter(
-        (sector) => sector.regionId === Number(selectedRegion)
+        (sector) => sector.region_id === selectedRegion
       );
       setFilteredSectors(filtered);
       setSelectedSector("");
@@ -102,12 +89,25 @@ const Reports = () => {
 
   useEffect(() => {
     if (selectedCategory) {
-      const category = categories.find((cat) => cat.id === Number(selectedCategory));
-      if (category) {
-        setColumns(category.columns);
-      }
+      // Fetch category details to get columns
+      api.categories.getById(selectedCategory)
+        .then(category => {
+          if (category && category.columns) {
+            setColumns(category.columns);
+          }
+        })
+        .catch(error => {
+          console.error('Error fetching category columns:', error);
+          toast.error('Failed to load category columns');
+        });
     }
-  }, [selectedCategory, categories]);
+  }, [selectedCategory]);
+
+  useEffect(() => {
+    if (formData.length > 0 && columns.length > 0) {
+      setData(formData);
+    }
+  }, [formData, columns]);
 
   const handleFilter = (columnName: string, value: string) => {
     setFilters((prev) => ({
@@ -130,21 +130,25 @@ const Reports = () => {
     // Apply filters
     Object.keys(filters).forEach((key) => {
       if (filters[key]) {
-        result = result.filter((item) =>
-          String(item[key])
+        result = result.filter((item) => {
+          const value = item.data ? item.data[key] : item[key];
+          return String(value)
             .toLowerCase()
-            .includes(filters[key].toLowerCase())
-        );
+            .includes(filters[key].toLowerCase());
+        });
       }
     });
 
     // Apply sorting
     if (sortConfig) {
       result.sort((a, b) => {
-        if (a[sortConfig.key] < b[sortConfig.key]) {
+        const aValue = a.data ? a.data[sortConfig.key] : a[sortConfig.key];
+        const bValue = b.data ? b.data[sortConfig.key] : b[sortConfig.key];
+        
+        if (aValue < bValue) {
           return sortConfig.direction === "asc" ? -1 : 1;
         }
-        if (a[sortConfig.key] > b[sortConfig.key]) {
+        if (aValue > bValue) {
           return sortConfig.direction === "asc" ? 1 : -1;
         }
         return 0;
@@ -155,8 +159,25 @@ const Reports = () => {
   };
 
   const handleExportToExcel = () => {
-    // Implementation for Excel export
-    console.log("Exporting to Excel...");
+    const exportData = filteredAndSortedData().map(item => {
+      // Flatten the data structure for Excel
+      const flatItem: Record<string, any> = {};
+      columns.forEach(column => {
+        flatItem[column.name] = item.data[column.name] || '';
+      });
+      return flatItem;
+    });
+
+    // Create worksheet
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Report");
+    
+    // Generate Excel file and trigger download
+    XLSX.writeFile(wb, "report.xlsx");
+    
+    toast.success('Report exported successfully');
   };
 
   return (
@@ -176,7 +197,7 @@ const Reports = () => {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Report Generator</CardTitle>
-                <Button onClick={handleExportToExcel}>
+                <Button onClick={handleExportToExcel} disabled={data.length === 0}>
                   <Download className="w-4 h-4 mr-2" />
                   Export to Excel
                 </Button>
@@ -194,7 +215,7 @@ const Reports = () => {
                       </SelectTrigger>
                       <SelectContent>
                         {regions.map((region) => (
-                          <SelectItem key={region.id} value={String(region.id)}>
+                          <SelectItem key={region.id} value={region.id}>
                             {region.name}
                           </SelectItem>
                         ))}
@@ -214,7 +235,7 @@ const Reports = () => {
                       </SelectTrigger>
                       <SelectContent>
                         {filteredSectors.map((sector) => (
-                          <SelectItem key={sector.id} value={String(sector.id)}>
+                          <SelectItem key={sector.id} value={sector.id}>
                             {sector.name}
                           </SelectItem>
                         ))}
@@ -234,7 +255,7 @@ const Reports = () => {
                       </SelectTrigger>
                       <SelectContent>
                         {categories.map((category) => (
-                          <SelectItem key={category.id} value={String(category.id)}>
+                          <SelectItem key={category.id} value={category.id}>
                             {category.name}
                           </SelectItem>
                         ))}
@@ -291,13 +312,23 @@ const Reports = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredAndSortedData().map((row, index) => (
-                        <TableRow key={index}>
-                          {columns.map((column) => (
-                            <TableCell key={column.id}>{row[column.name]}</TableCell>
-                          ))}
+                      {filteredAndSortedData().length > 0 ? (
+                        filteredAndSortedData().map((row, index) => (
+                          <TableRow key={index}>
+                            {columns.map((column) => (
+                              <TableCell key={column.id}>
+                                {row.data && row.data[column.name] ? row.data[column.name] : ''}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={columns.length} className="text-center py-4">
+                            No data available
+                          </TableCell>
                         </TableRow>
-                      ))}
+                      )}
                     </TableBody>
                   </Table>
                 )}
