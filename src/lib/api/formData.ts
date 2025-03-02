@@ -6,9 +6,19 @@ import { FormData } from "./types";
 export const formData = {
   getAll: async (schoolId?: string) => {
     try {
-      const { data, error } = schoolId 
-        ? await supabase.rpc('get_form_data_by_school', { school_id: schoolId })
-        : await supabase.rpc('get_all_form_data');
+      let data, error;
+      
+      if (schoolId) {
+        const response = await supabase.rpc('get_form_data_by_school', { 
+          school_id: schoolId 
+        });
+        data = response.data;
+        error = response.error;
+      } else {
+        const response = await supabase.rpc('get_all_form_data');
+        data = response.data;
+        error = response.error;
+      }
       
       if (error) {
         console.error('Error fetching form data:', error);
@@ -55,7 +65,14 @@ export const formData = {
       }
       
       toast.success('Form submitted successfully');
-      return data;
+      return data || {
+        id: "0",
+        categoryId: formData.categoryId,
+        schoolId: formData.schoolId,
+        data: formData.data,
+        status: formData.status,
+        submittedAt: new Date().toISOString()
+      };
     } catch (error) {
       console.error('Error in submit formData:', error);
       toast.error('Failed to submit form');
@@ -75,8 +92,8 @@ export const formData = {
     try {
       const { data, error } = await supabase.rpc('update_form_data', {
         form_id: id,
-        form_data: formData.data,
-        form_status: formData.status
+        form_data: formData.data || {},
+        form_status: formData.status || 'draft'
       });
       
       if (error) {
@@ -85,7 +102,13 @@ export const formData = {
       }
       
       toast.success('Form updated successfully');
-      return data;
+      return data || {
+        id,
+        categoryId: formData.categoryId || "0",
+        schoolId: formData.schoolId || "0",
+        data: formData.data || {},
+        status: formData.status || 'draft'
+      };
     } catch (error) {
       console.error('Error in update formData:', error);
       toast.error('Failed to update form');

@@ -44,9 +44,9 @@ export const categories = {
     try {
       const { data, error } = await supabase.rpc('create_category', { 
         category_name: category.name,
-        region_id: category.regionId,
-        sector_id: category.sectorId,
-        school_id: category.schoolId
+        region_id: category.regionId || null,
+        sector_id: category.sectorId || null,
+        school_id: category.schoolId || null
       });
       
       if (error) {
@@ -55,7 +55,7 @@ export const categories = {
       }
       
       toast.success('Category created successfully');
-      return { ...data, columns: [] };
+      return data ? { ...data, columns: [] } : { id: "0", name: category.name, columns: [] };
     } catch (error) {
       console.error('Error in create category:', error);
       toast.error('Failed to create category');
@@ -68,7 +68,7 @@ export const categories = {
     try {
       const { data, error } = await supabase.rpc('update_category', {
         category_id: id,
-        category_name: category.name
+        category_name: category.name || ''
       });
       
       if (error) {
@@ -77,7 +77,7 @@ export const categories = {
       }
       
       toast.success('Category updated successfully');
-      return data;
+      return data || { id, name: category.name || "Category", columns: [] };
     } catch (error) {
       console.error('Error in update category:', error);
       toast.error('Failed to update category');

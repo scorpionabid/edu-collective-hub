@@ -37,4 +37,5 @@ export interface Profile {
   regionId?: string;
   sectorId?: string;
   schoolId?: string;
+  userId?: string;
 }

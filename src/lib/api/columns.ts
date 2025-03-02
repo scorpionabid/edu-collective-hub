@@ -37,7 +37,12 @@ export const columns = {
       }
       
       toast.success('Column created successfully');
-      return data as Column;
+      return data as Column || {
+        id: "0",
+        name: column.name,
+        type: column.type,
+        categoryId: column.categoryId
+      };
     } catch (error) {
       console.error('Error in create column:', error);
       toast.error('Failed to create column');
@@ -55,8 +60,8 @@ export const columns = {
     try {
       const { data, error } = await supabase.rpc('update_column', {
         column_id: id,
-        column_name: column.name,
-        column_type: column.type
+        column_name: column.name || '',
+        column_type: column.type || ''
       });
       
       if (error) {
@@ -65,7 +70,12 @@ export const columns = {
       }
       
       toast.success('Column updated successfully');
-      return data as Column;
+      return data as Column || {
+        id,
+        name: column.name || "Column",
+        type: column.type || "text",
+        categoryId: column.categoryId || "0"
+      };
     } catch (error) {
       console.error('Error in update column:', error);
       toast.error('Failed to update column');

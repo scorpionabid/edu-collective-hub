@@ -3,88 +3,124 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export const schools = {
-  getAll: async (sectorId?: string) => {
-    let query = supabase.from('schools').select('*');
-    
-    if (sectorId) {
-      query = query.eq('sector_id', sectorId);
+  getAll: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('schools')
+        .select('*');
+      
+      if (error) {
+        console.error('Error fetching schools:', error);
+        throw error;
+      }
+      
+      return data || [];
+    } catch (error) {
+      console.error('Error in getAll schools:', error);
+      return [];
     }
-    
-    const { data, error } = await query;
-    
-    if (error) {
-      console.error('Error fetching schools:', error);
-      throw error;
+  },
+  
+  getBySector: async (sectorId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('schools')
+        .select('*')
+        .eq('sector_id', sectorId);
+      
+      if (error) {
+        console.error('Error fetching schools by sector:', error);
+        throw error;
+      }
+      
+      return data || [];
+    } catch (error) {
+      console.error('Error in getBySector schools:', error);
+      return [];
     }
-    
-    return data || [];
   },
   
   getById: async (id: string) => {
-    const { data, error } = await supabase
-      .from('schools')
-      .select('*')
-      .eq('id', id)
-      .single();
-    
-    if (error) {
-      console.error(`Error fetching school ${id}:`, error);
-      throw error;
+    try {
+      const { data, error } = await supabase
+        .from('schools')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching school:', error);
+        throw error;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Error in getById school:', error);
+      return null;
     }
-    
-    return data;
   },
   
-  create: async (school: { name: string; sectorId: string; address?: string; email?: string; phone?: string }) => {
-    const { data, error } = await supabase
-      .from('schools')
-      .insert({
-        name: school.name,
-        sector_id: school.sectorId,
-        address: school.address,
-        email: school.email,
-        phone: school.phone
-      })
-      .select()
-      .single();
-    
-    if (error) {
-      toast.error(error.message);
-      throw error;
+  create: async (school: { name: string; sector_id: string; address?: string; email?: string; phone?: string }) => {
+    try {
+      const { data, error } = await supabase
+        .from('schools')
+        .insert(school)
+        .select()
+        .single();
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+      
+      toast.success('School created successfully');
+      return data;
+    } catch (error) {
+      console.error('Error in create school:', error);
+      toast.error('Failed to create school');
+      return { id: "0", ...school };
     }
-    
-    toast.success('School created successfully');
-    return data;
   },
   
-  update: async (id: string, school: Partial<{ name: string; address: string; email: string; phone: string }>) => {
-    const { data, error } = await supabase
-      .from('schools')
-      .update(school)
-      .eq('id', id)
-      .select()
-      .single();
-    
-    if (error) {
-      toast.error(error.message);
-      throw error;
+  update: async (id: string, school: { name?: string; address?: string; email?: string; phone?: string }) => {
+    try {
+      const { data, error } = await supabase
+        .from('schools')
+        .update(school)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+      
+      toast.success('School updated successfully');
+      return data;
+    } catch (error) {
+      console.error('Error in update school:', error);
+      toast.error('Failed to update school');
+      return { id, ...school };
     }
-    
-    toast.success('School updated successfully');
-    return data;
   },
   
   delete: async (id: string) => {
-    const { error } = await supabase
-      .from('schools')
-      .delete()
-      .eq('id', id);
-    
-    if (error) {
-      toast.error(error.message);
-      throw error;
+    try {
+      const { error } = await supabase
+        .from('schools')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+      
+      toast.success('School deleted successfully');
+    } catch (error) {
+      console.error('Error in delete school:', error);
+      toast.error('Failed to delete school');
     }
-    
-    toast.success('School deleted successfully');
   }
 };
