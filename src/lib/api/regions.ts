@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { withCache } from "@/lib/cache/withCache";
@@ -14,7 +13,12 @@ export const getAllRegions = async (): Promise<any> => {
     
     if (error) throw error;
     
-    return data;
+    // Transform data to match the Region interface
+    return data.map((region: any) => ({
+      id: region.id,
+      name: region.name,
+      createdAt: region.created_at
+    }));
   } catch (error) {
     console.error('Error fetching regions:', error);
     toast.error('Failed to load regions');
@@ -41,7 +45,12 @@ export const getRegionById = async (id: string): Promise<any> => {
     
     if (error) throw error;
     
-    return data;
+    // Transform to match Region interface
+    return {
+      id: data.id,
+      name: data.name,
+      createdAt: data.created_at
+    };
   } catch (error) {
     console.error('Error fetching region:', error);
     toast.error('Failed to load region');
@@ -65,7 +74,12 @@ export const createRegion = async (name: string): Promise<Region> => {
     // Invalidate cache
     await supabase.from('cache_entries').delete().like('cache_key', '%regions%');
     
-    return data;
+    // Transform to match Region interface
+    return {
+      id: data.id,
+      name: data.name,
+      createdAt: data.created_at
+    };
   } catch (error) {
     console.error('Error creating region:', error);
     toast.error('Failed to create region');
@@ -90,7 +104,12 @@ export const updateRegion = async (id: string, name: string): Promise<Region> =>
     // Invalidate cache
     await supabase.from('cache_entries').delete().like('cache_key', '%regions%');
     
-    return data;
+    // Transform to match Region interface
+    return {
+      id: data.id,
+      name: data.name,
+      createdAt: data.created_at
+    };
   } catch (error) {
     console.error('Error updating region:', error);
     toast.error('Failed to update region');

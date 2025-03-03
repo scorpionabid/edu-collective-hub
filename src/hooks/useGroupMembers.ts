@@ -1,47 +1,58 @@
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
-import type { AddGroupMemberData } from "@/lib/api";
+import { useState } from 'react';
+import { api } from '@/lib/api';
+import { AddGroupMemberData } from '@/lib/api/types';
 
 export const useGroupMembers = (groupId: string) => {
-  const queryClient = useQueryClient();
-  
-  const { 
-    data: members = [], 
-    isLoading, 
-    error 
-  } = useQuery({
-    queryKey: ['groupMembers', groupId],
-    queryFn: () => api.notifications.getGroupMembers(groupId),
-    enabled: !!groupId,
-  });
+  const [members, setMembers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
-  const addMembersMutation = useMutation({
-    mutationFn: (members: AddGroupMemberData[]) => api.notifications.addGroupMembers(groupId, members),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['groupMembers', groupId] });
-    },
-  });
-
-  const removeMemberMutation = useMutation({
-    mutationFn: (memberId: string) => api.notifications.removeGroupMember(memberId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['groupMembers', groupId] });
-    },
-  });
-
-  const addMembers = async (members: AddGroupMemberData[]): Promise<void> => {
-    return addMembersMutation.mutateAsync(members);
+  const fetchMembers = async () => {
+    setLoading(true);
+    try {
+      const data = await api.notifications.getGroupMembers(groupId);
+      setMembers(data);
+      return data;
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const removeMember = async (memberId: string): Promise<void> => {
-    return removeMemberMutation.mutateAsync(memberId);
+  const addMembers = async (memberData: AddGroupMemberData) => {
+    setLoading(true);
+    try {
+      await api.notifications.addGroupMembers(memberData);
+      await fetchMembers();
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const removeMember = async (memberId: string) => {
+    setLoading(true);
+    try {
+      await api.notifications.removeGroupMember(groupId, memberId);
+      await fetchMembers();
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   };
 
   return {
     members,
-    isLoading,
-    error: error as Error | null,
+    loading,
+    error,
+    fetchMembers,
     addMembers,
     removeMember
   };

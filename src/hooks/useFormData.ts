@@ -1,46 +1,43 @@
 
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { FormData } from '@/lib/api/types';
 import { api } from '@/lib/api';
-import { FormData, PaginatedResponse } from '@/lib/api/types';
 
-export function useFormData() {
+export const useFormData = (options = {}) => {
   const [formData, setFormData] = useState<FormData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
+  // Fetch form data
   const fetchFormData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      setError(null);
-
-      const response = await api.formData.getAll();
-      if (response && response.data) {
-        setFormData(response.data);
-      }
+      // Use the new api method structure
+      const response = await api.formData.getFormData();
+      setFormData(response.data);
     } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to fetch form data'));
+      setError(err as Error);
+      console.error('Error fetching form data:', err);
     } finally {
       setLoading(false);
     }
   }, []);
 
+  useEffect(() => {
+    fetchFormData();
+  }, [fetchFormData]);
+
+  // Submit form data
   const submitFormData = useCallback(async (data: Omit<FormData, 'id'>) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      setError(null);
-
-      // Add createdAt and updatedAt fields if they're missing
-      const formDataWithTimestamps: Omit<FormData, 'id'> = {
-        ...data,
-        createdAt: data.createdAt || new Date().toISOString(),
-        updatedAt: data.updatedAt || new Date().toISOString()
-      };
-
-      const result = await api.formData.create(formDataWithTimestamps);
-      await fetchFormData();
+      // Use the renamed method
+      const result = await api.formData.createFormData(data);
+      await fetchFormData(); // Refresh data
       return result;
     } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to submit form data'));
+      console.error('Error submitting form data:', err);
       throw err;
     } finally {
       setLoading(false);
@@ -54,4 +51,4 @@ export function useFormData() {
     fetchFormData,
     submitFormData
   };
-}
+};

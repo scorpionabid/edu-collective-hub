@@ -1,5 +1,90 @@
+// Only updating the ValidationRule interface
+export interface ValidationRule {
+  id: string;
+  name: string;
+  type: string;
+  targetField: string;
+  condition: string;
+  value: any;
+  message: string;
+  sourceField?: string;
+  categoryId: string;
+  createdAt: string;
+  updatedAt: string;
+  roles?: string[];
+  validationFn?: string;
+  expression?: string;
+}
 
-// Only adding the missing properties to the NotificationStats interface
+// Add missing interfaces for notification-related hooks
+export interface AddGroupMemberData {
+  groupId: string;
+  memberIds: string[];
+  memberType: string;
+}
+
+export interface CreateNotificationGroupData {
+  name: string;
+  description?: string;
+}
+
+export interface UpdateNotificationGroupData {
+  id: string;
+  name?: string;
+  description?: string;
+}
+
+export interface CreateMassNotificationData {
+  title: string;
+  message: string;
+  notificationType: string;
+  recipients: {
+    type: string;
+    ids: string[];
+  }[];
+}
+
+export interface GetMassNotificationsParams {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+}
+
+// Expand the CacheManager interface
+export interface CacheManager {
+  get: <T>(key: string) => Promise<T | null>;
+  set: <T>(key: string, value: T, ttl?: number) => Promise<void>;
+  invalidate: (keys: string[]) => Promise<void>;
+  invalidateByTags: (tags: string[]) => Promise<void>;
+  clearAll: () => Promise<void>;
+}
+
+// Update the ColumnDefinition interface
+export interface ColumnDefinition {
+  name: string;
+  label: string;
+  type: string;
+  required: boolean;
+  options: string[];
+  defaultValue: any;
+}
+
+// Update the UserProfile interface
+export interface UserProfile {
+  id: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  email?: string;
+  regionId?: string | null;
+  sectorId?: string | null;
+  schoolId?: string | null;
+  createdAt: string;
+  name?: string;
+}
+
+// Update NotificationStats to add missing fields
 export interface NotificationStats {
   total: number;
   pending: number;
@@ -153,20 +238,6 @@ export interface CacheOptions {
   invalidationTags?: string[];
 }
 
-export interface UserProfile {
-  id: string;
-  userId: string;
-  firstName: string;
-  lastName: string;
-  role: string;
-  email?: string;
-  regionId?: string | null;
-  sectorId?: string | null;
-  schoolId?: string | null;
-  createdAt: string;
-  name?: string;
-}
-
 export interface Profile {
   id: string;
   userId: string;
@@ -177,23 +248,6 @@ export interface Profile {
   sectorId?: string | null;
   schoolId?: string | null;
   createdAt: string;
-}
-
-export interface ValidationRule {
-  id: string;
-  name: string;
-  type: string;
-  targetField: string;
-  condition: string;
-  value: any;
-  message: string;
-  sourceField?: string;
-  categoryId: string;
-  createdAt: string;
-  updatedAt: string;
-  roles?: string[];
-  validationFn?: string;
-  expression?: string;
 }
 
 export interface FormEntryVersion {
@@ -264,38 +318,4 @@ export interface ColumnDefinition {
   required: boolean;
   options: string[];
   defaultValue: any;
-}
-
-// Add interfaces for notification-related hooks
-export interface AddGroupMemberData {
-  groupId: string;
-  memberIds: string[];
-  memberType: string;
-}
-
-export interface CreateNotificationGroupData {
-  name: string;
-  description?: string;
-}
-
-export interface UpdateNotificationGroupData {
-  id: string;
-  name?: string;
-  description?: string;
-}
-
-export interface CreateMassNotificationData {
-  title: string;
-  message: string;
-  notificationType: string;
-  recipients: {
-    type: string;
-    ids: string[];
-  }[];
-}
-
-export interface GetMassNotificationsParams {
-  page?: number;
-  pageSize?: number;
-  search?: string;
 }

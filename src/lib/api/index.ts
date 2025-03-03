@@ -12,10 +12,7 @@ import { notifications } from './notifications';
 import { categoryValidation } from './categoryValidation';
 
 export const api = {
-  categories: {
-    ...categories,
-    ...categoryValidation,
-  },
+  categories,
   columns,
   formData,
   auth,

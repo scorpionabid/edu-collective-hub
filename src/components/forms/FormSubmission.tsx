@@ -1,370 +1,309 @@
-
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast } from "sonner";
+import React, { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { api } from '@/lib/api';
-import { useAuth } from '@/hooks/useAuth';
 import { Category, Column, FormData } from '@/lib/api/types';
-import { useNavigate } from 'react-router-dom';
-import { AlertCircle, Info, Loader2 } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useFormValidation } from '@/hooks/useFormValidation';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Calendar } from '@/components/ui/calendar';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
+import { format } from "date-fns"
+import { CalendarIcon } from "lucide-react";
+import { useValidatedFormSubmission } from '@/hooks/useValidatedFormSubmission';
 
 interface FormSubmissionProps {
-  categoryId: string;
-  formId?: string; // Optional - if editing an existing form
-  onSuccess?: (formData: FormData) => void;
+  onComplete?: (formData: FormData) => void;
 }
 
-const FormSubmission: React.FC<FormSubmissionProps> = ({ 
-  categoryId, 
-  formId,
-  onSuccess
-}) => {
+const FormSubmission: React.FC<FormSubmissionProps> = ({ onComplete }) => {
+  const { categoryId, formDataId } = useParams<{ categoryId?: string; formDataId?: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [category, setCategory] = useState<Category | null>(null);
+  const [category, setCategory] = useState<Category>({
+    id: '',
+    name: '',
+    regionId: '',
+    sectorId: '',
+    schoolId: '',
+    columns: [],
+    description: '',
+    createdAt: '',
+    updatedAt: '',
+    createdBy: ''
+  });
   const [columns, setColumns] = useState<Column[]>([]);
+  const [formData, setFormData] = useState<FormData>({
+    id: '',
+    categoryId: '',
+    schoolId: '',
+    data: {},
+    status: 'draft',
+    createdAt: '',
+    updatedAt: ''
+  });
   const [formValues, setFormValues] = useState<Record<string, any>>({});
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [existingForm, setExistingForm] = useState<FormData | null>(null);
-  
+  const [formAction, setFormAction] = useState<'draft' | 'submit'>('draft');
+  const [showErrors, setShowErrors] = useState(false);
+  const { formErrors, setFormErrors, submitForm, submitting } = useValidatedFormSubmission(categoryId || '');
+  const { schema } = useFormValidation(categoryId || '');
+  const [date, setDate] = useState<Date | undefined>(new Date());
+
   useEffect(() => {
-    const fetchCategoryAndColumns = async () => {
-      setLoading(true);
-      try {
-        // Fetch category
-        const categoryData = await api.categories.getById(categoryId);
-        if (!categoryData) {
-          toast.error("Category not found");
-          return;
-        }
-        setCategory(categoryData);
+    if (schema) {
+      // Initialize form values based on schema
+      const initialValues: Record<string, any> = {};
+      columns.forEach(column => {
+        initialValues[column.name] = ''; // Default value
+      });
+      setFormValues(initialValues);
+    }
+  }, [schema, columns]);
+
+  useEffect(() => {
+    if (categoryId) {
+      fetchCategoryDetails();
+    }
+    if (formDataId) {
+      fetchFormData();
+    }
+  }, [categoryId, formDataId]);
+
+  useEffect(() => {
+    if (formData.data) {
+      setFormValues(formData.data);
+    }
+  }, [formData]);
+
+  const fetchCategoryDetails = async () => {
+    try {
+      if (categoryId) {
+        const category = await api.categories.getById(categoryId);
+        // Add missing fields to match Category interface
+        const completeCategory: Category = {
+          ...category,
+          description: category.description || "",
+          createdAt: category.createdAt || new Date().toISOString(),
+          updatedAt: category.updatedAt || new Date().toISOString(),
+          createdBy: category.createdBy || ""
+        };
+        setCategory(completeCategory);
         
-        // Fetch columns for this category
-        const columnsData = await api.categories.getCategoryColumns(categoryId);
-        setColumns(columnsData);
+        // Also fetch columns for this category
+        const columnsData = await api.columns.getAll(categoryId);
         
-        // If editing, fetch the existing form data
-        if (formId) {
-          const formData = await api.formData.getById(formId);
-          if (formData) {
-            setExistingForm(formData);
-            setFormValues(formData.data || {});
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching category and columns:", error);
-        toast.error("Failed to load form data");
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchCategoryAndColumns();
-  }, [categoryId, formId]);
-  
-  const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
-    let isValid = true;
-    
-    columns.forEach(column => {
-      // Check required fields
-      if (column.required && !formValues[column.name]) {
-        newErrors[column.name] = "This field is required";
-        isValid = false;
-      }
-      
-      // Additional validation based on field type
-      if (formValues[column.name]) {
-        const value = formValues[column.name];
+        // Convert from snake_case to camelCase
+        const formattedColumns: Column[] = columnsData.map((col: any) => ({
+          id: col.id,
+          name: col.name,
+          type: col.type,
+          categoryId: col.category_id,
+          required: col.required,
+          options: col.options,
+          description: col.description || null,
+          createdAt: col.created_at,
+          updatedAt: col.updated_at
+        }));
         
-        switch(column.type) {
-          case 'number':
-            if (isNaN(Number(value))) {
-              newErrors[column.name] = "Must be a valid number";
-              isValid = false;
-            }
-            break;
-          case 'email':
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(value)) {
-              newErrors[column.name] = "Must be a valid email address";
-              isValid = false;
-            }
-            break;
-          case 'phone':
-            const phoneRegex = /^\+?[0-9\s-]{10,15}$/;
-            if (!phoneRegex.test(value)) {
-              newErrors[column.name] = "Must be a valid phone number";
-              isValid = false;
-            }
-            break;
-          // Additional validation types as needed
-        }
+        setColumns(formattedColumns);
       }
-    });
-    
-    setErrors(newErrors);
-    return isValid;
+    } catch (error) {
+      console.error('Error fetching category details:', error);
+    }
   };
-  
-  const handleInputChange = (columnName: string, value: any) => {
+
+  const fetchFormData = async () => {
+    try {
+      if (formDataId) {
+        const response = await api.formData.getFormDataById(formDataId);
+        if (response) {
+          setFormData(response);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching form data:', error);
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>, column: Column) => {
+    const { name, value, type, checked } = e.target;
+
+    let parsedValue = value;
+
+    if (type === 'number') {
+      parsedValue = Number(value);
+    } else if (type === 'checkbox') {
+      parsedValue = checked;
+    }
+
     setFormValues(prev => ({
       ...prev,
-      [columnName]: value
+      [name]: parsedValue,
     }));
-    
-    // Clear error for this field
-    if (errors[columnName]) {
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[columnName];
-        return newErrors;
-      });
-    }
   };
-  
-  const handleSubmit = async (saveAsDraft: boolean = false) => {
-    // For drafts, we skip validation
-    if (!saveAsDraft && !validateForm()) {
-      toast.error("Please fix the errors in the form");
-      return;
-    }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     
-    setSubmitting(true);
     try {
-      const formData: any = {
-        categoryId,
-        schoolId: user?.schoolId,
+      // Show validation errors
+      if (formErrors.length > 0) {
+        setShowErrors(true);
+        return;
+      }
+      
+      const submissionData = {
+        ...formData,
         data: formValues,
-        status: saveAsDraft ? "draft" : "pending"
+        status: formAction === 'submit' ? 'submitted' : 'draft',
+        submittedAt: formAction === 'submit' ? new Date().toISOString() : undefined
       };
       
       let result;
       
-      if (formId) {
-        // Update existing form
-        result = await api.formData.update(formId, formData);
-        toast.success(saveAsDraft 
-          ? "Form saved as draft" 
-          : "Form submitted successfully");
+      if (formDataId) {
+        // Use updateFormData instead of update
+        result = await api.formData.updateFormData(formDataId, submissionData);
       } else {
-        // Create new form
-        result = await api.formData.create(formData);
-        toast.success(saveAsDraft 
-          ? "Form saved as draft" 
-          : "Form submitted for approval");
+        // Use createFormData instead of create
+        result = await api.formData.createFormData(submissionData);
       }
       
-      if (onSuccess && result) {
-        onSuccess(result);
-      }
-      
-      // Navigate back or clear form depending on the flow
-      if (!saveAsDraft && !onSuccess) {
-        navigate("/schooladmin/dashboard");
+      if (result.success) {
+        toast.success(
+          formAction === 'submit'
+            ? 'Form submitted successfully!'
+            : 'Form saved as draft.'
+        );
+        
+        if (onComplete) {
+          onComplete(result.data!);
+        }
+      } else {
+        toast.error(result.error || 'Failed to save form data.');
       }
     } catch (error) {
-      console.error("Error submitting form:", error);
-      toast.error("Failed to submit form");
-    } finally {
-      setSubmitting(false);
+      console.error('Form submission error:', error);
+      toast.error('An error occurred while saving the form.');
     }
   };
-  
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-48">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-2">Loading form...</span>
-      </div>
-    );
-  }
-  
-  if (!category || columns.length === 0) {
-    return (
-      <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Error</AlertTitle>
-        <AlertDescription>
-          Failed to load form configuration. Please try again or contact support.
-        </AlertDescription>
-      </Alert>
-    );
-  }
-  
-  return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>{category.name}</CardTitle>
-        <CardDescription>
-          {category.description || 'Please fill in the required information'}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {existingForm?.status === 'rejected' && (
-          <Alert className="mb-6">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Form Rejected</AlertTitle>
-            <AlertDescription>
-              This form was rejected. Please make the necessary corrections and resubmit.
-            </AlertDescription>
-          </Alert>
-        )}
-        
-        <div className="space-y-6">
-          {columns.map((column) => (
-            <div key={column.id} className="space-y-2">
-              <Label 
-                htmlFor={column.name}
-                className="flex items-center"
-              >
-                {column.name}
-                {column.required && <span className="text-red-500 ml-1">*</span>}
-                {column.description && (
-                  <span className="ml-2 text-muted-foreground text-xs flex items-center">
-                    <Info className="h-3 w-3 mr-1" />
-                    {column.description}
-                  </span>
-                )}
-              </Label>
-              
-              {renderFormField(column, formValues, handleInputChange)}
-              
-              {errors[column.name] && (
-                <p className="text-sm text-red-500">{errors[column.name]}</p>
-              )}
-            </div>
-          ))}
-        </div>
-      </CardContent>
-      <CardFooter className="flex justify-between">
-        <Button 
-          variant="outline" 
-          onClick={() => handleSubmit(true)}
-          disabled={submitting}
-        >
-          {submitting ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Saving...
-            </>
-          ) : 'Save as Draft'}
-        </Button>
-        <Button 
-          onClick={() => handleSubmit(false)}
-          disabled={submitting}
-        >
-          {submitting ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Submitting...
-            </>
-          ) : existingForm ? 'Update & Submit' : 'Submit for Approval'}
-        </Button>
-      </CardFooter>
-    </Card>
-  );
-};
 
-// Helper function to render different form fields based on column type
-const renderFormField = (
-  column: Column, 
-  formValues: Record<string, any>,
-  onChange: (name: string, value: any) => void
-) => {
-  const value = formValues[column.name] || '';
-  
-  switch (column.type) {
-    case 'text':
-      return (
-        <Input
-          id={column.name}
-          placeholder={`Enter ${column.name}`}
-          value={value}
-          onChange={(e) => onChange(column.name, e.target.value)}
-        />
-      );
-      
-    case 'textarea':
-      return (
-        <Textarea
-          id={column.name}
-          placeholder={`Enter ${column.name}`}
-          value={value}
-          onChange={(e) => onChange(column.name, e.target.value)}
-          rows={4}
-        />
-      );
-      
-    case 'number':
-      return (
-        <Input
-          id={column.name}
-          type="number"
-          placeholder={`Enter ${column.name}`}
-          value={value}
-          onChange={(e) => onChange(column.name, e.target.value)}
-        />
-      );
-      
-    case 'email':
-      return (
-        <Input
-          id={column.name}
-          type="email"
-          placeholder={`Enter ${column.name}`}
-          value={value}
-          onChange={(e) => onChange(column.name, e.target.value)}
-        />
-      );
-      
-    case 'date':
-      return (
-        <Input
-          id={column.name}
-          type="date"
-          value={value}
-          onChange={(e) => onChange(column.name, e.target.value)}
-        />
-      );
-      
-    case 'select':
-      return (
-        <Select 
-          value={value}
-          onValueChange={(value) => onChange(column.name, value)}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder={`Select ${column.name}`} />
-          </SelectTrigger>
-          <SelectContent>
-            {column.options && Array.isArray(column.options) && column.options.map((option: string) => (
-              <SelectItem key={option} value={option}>
-                {option}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      );
-    
-    default:
-      return (
-        <Input
-          id={column.name}
-          placeholder={`Enter ${column.name}`}
-          value={value}
-          onChange={(e) => onChange(column.name, e.target.value)}
-        />
-      );
-  }
+  const handleSaveDraft = () => {
+    setFormAction('draft');
+  };
+
+  const handleFinalSubmit = () => {
+    setFormAction('submit');
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="max-w-3xl mx-auto mt-8 space-y-6">
+      <h2 className="text-2xl font-bold">{category.name}</h2>
+      <p className="text-gray-600">Fill out the form below to submit your data.</p>
+
+      {columns.map(column => (
+        <div key={column.id} className="space-y-2">
+          <Label htmlFor={column.name}>{column.name} {column.required && <span className="text-red-500">*</span>}</Label>
+          {column.type === 'text' && (
+            <Input
+              type="text"
+              id={column.name}
+              name={column.name}
+              value={formValues[column.name] || ''}
+              onChange={(e) => handleChange(e, column)}
+              required={column.required}
+              aria-required={column.required}
+            />
+          )}
+
+          {column.type === 'number' && (
+            <Input
+              type="number"
+              id={column.name}
+              name={column.name}
+              value={formValues[column.name] || ''}
+              onChange={(e) => handleChange(e, column)}
+              required={column.required}
+              aria-required={column.required}
+            />
+          )}
+
+          {column.type === 'date' && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn(
+                    "w-[280px] justify-start text-left font-normal",
+                    !date && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {date ? format(date, "PPP") : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={setDate}
+                  disabled={(date) =>
+                    date > new Date()
+                  }
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          )}
+
+          {column.type === 'select' && column.options && (
+            <Select>
+              <SelectTrigger className="w-[280px]">
+                <SelectValue placeholder="Select a fruit" />
+              </SelectTrigger>
+              <SelectContent>
+                {column.options.map(option => (
+                  <SelectItem key={option} value={option}>{option}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {column.type === 'textarea' && (
+            <Textarea
+              id={column.name}
+              name={column.name}
+              value={formValues[column.name] || ''}
+              onChange={(e) => handleChange(e, column)}
+              required={column.required}
+              aria-required={column.required}
+            />
+          )}
+
+          {showErrors && formErrors.find(error => error.field === column.name) && (
+            <p className="text-red-500 text-sm">{formErrors.find(error => error.field === column.name)?.message}</p>
+          )}
+        </div>
+      ))}
+
+      <div className="flex justify-between">
+        <Button type="button" variant="secondary" onClick={handleSaveDraft} disabled={submitting}>
+          Save as Draft
+        </Button>
+        <Button type="submit" disabled={submitting} onClick={handleFinalSubmit}>
+          {submitting ? 'Submitting...' : 'Submit Form'}
+        </Button>
+      </div>
+    </form>
+  );
 };
 
 export default FormSubmission;

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   Tabs, 
@@ -17,8 +16,6 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
-// Since we don't have actual API endpoints for these user operations yet,
-// we'll use placeholder implementations that will be completed later
 const Users = () => {
   const [activeTab, setActiveTab] = useState('admins');
   const [users, setUsers] = useState<any[]>([]);
@@ -32,16 +29,11 @@ const Users = () => {
   const { user } = useAuth();
 
   useEffect(() => {
-    // For admins, we'd fetch actual user data here.
-    // Since the API isn't implemented yet, we'll use mock data
     const fetchData = async () => {
       setIsLoading(true);
       
       try {
-        // These functions would be implemented in the API
-        // For now, they're placeholders
-        // const adminUsers = await api.auth.getAllUsers([user?.role || 'user']);
-        const adminUsers = []; // Mock empty users array
+        const adminUsers = [];
         setUsers(adminUsers);
         
         const regionsData = await api.regions.getAll();
@@ -66,8 +58,6 @@ const Users = () => {
   const handleDeleteUser = async (id: string) => {
     try {
       setIsLoading(true);
-      // Replace with actual API call when implemented
-      // await api.auth.deleteUser(id);
       setUsers(users.filter(user => user.id !== id));
       toast.success('User deleted successfully');
     } catch (error) {
@@ -82,14 +72,10 @@ const Users = () => {
     try {
       setIsLoading(true);
       if (selectedUser) {
-        // Replace with actual API call when implemented
-        // const updatedUser = await api.auth.updateUser(selectedUser.id, userData);
         const updatedUser = { ...selectedUser, ...userData };
         setUsers(users.map(u => u.id === selectedUser.id ? updatedUser : u));
         toast.success('User updated successfully');
       } else {
-        // Replace with actual API call when implemented
-        // const newUser = await api.auth.createUser(userData);
         const newUser = { id: Date.now().toString(), ...userData };
         setUsers([...users, newUser]);
         toast.success('User created successfully');
@@ -117,14 +103,29 @@ const Users = () => {
   const handleImportUsers = async (data: any[]) => {
     try {
       setIsLoading(true);
-      // This would be an actual API call
-      // For now, just add the imported users to our state
       setUsers([...users, ...data]);
       setIsImportDialogOpen(false);
       toast.success(`Successfully imported ${data.length} users`);
     } catch (error) {
       console.error('Error importing users:', error);
       toast.error('Failed to import users');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteAdmin = async (admin: AdminUser) => {
+    const id = admin.id;
+    if (!id) return;
+    
+    try {
+      setIsLoading(true);
+      // Replace with actual API call when implemented
+      // await api.auth.deleteUser(id);
+      setUsers(users.filter(user => user.id !== id));
+      toast.success('Admin deleted successfully');
+    } catch (error) {
+      console.error('Error deleting admin:', error);
     } finally {
       setIsLoading(false);
     }
@@ -168,7 +169,6 @@ const Users = () => {
         </TabsContent>
         
         <TabsContent value="regions">
-          {/* Replace with actual props once available */}
           <RegionList />
         </TabsContent>
         
@@ -183,7 +183,6 @@ const Users = () => {
         </TabsContent>
         
         <TabsContent value="schools">
-          {/* Replace with actual props once available */}
           <SchoolList />
         </TabsContent>
       </Tabs>

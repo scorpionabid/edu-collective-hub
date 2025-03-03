@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { FormData, PaginatedResponse, QueryOptions } from "./types";
@@ -499,4 +498,12 @@ export const formData = {
   submitFormData,
   approveFormData,
   rejectFormData,
+  getById: getFormDataById,
+  create: createFormData,
+  update: updateFormData,
+  delete: deleteFormData,
+  submit: submitFormData,
+  approve: approveFormData,
+  reject: rejectFormData,
+  getAll: getFormData
 };

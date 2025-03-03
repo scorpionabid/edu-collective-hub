@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { CacheOptions } from "../api/types";
 
@@ -54,12 +53,16 @@ export async function withCache<T>(
 
     // Store the result in the cache
     const expiresAt = new Date(Date.now() + ttl);
+    
+    // Convert result to JSON before storing
+    const jsonResult = JSON.parse(JSON.stringify(result));
+    
     await supabase
       .from('cache_entries')
       .upsert(
         {
           cache_key: cacheKey,
-          cache_value: result as any,
+          cache_value: jsonResult,
           expires_at: expiresAt.toISOString(),
         },
         { onConflict: 'cache_key' }

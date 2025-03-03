@@ -1,72 +1,61 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api';
 import { UserProfile } from '@/lib/api/types';
-import { toast } from 'sonner';
 
-export const useUserProfile = (userId?: string) => {
+export const useUserProfile = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const fetchProfile = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Use getProfile instead of getUserProfile
+      const result = await api.auth.getProfile();
+      if (result.success && result.profile) {
+        setProfile(result.profile);
+      } else {
+        throw new Error(result.error || 'Failed to fetch profile');
+      }
+    } catch (err) {
+      setError(err as Error);
+      console.error('Error fetching user profile:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    if (userId) {
-      fetchUserProfile(userId);
-    } else {
-      setLoading(false);
-    }
-  }, [userId]);
+    fetchProfile();
+  }, [fetchProfile]);
 
-  const fetchUserProfile = async (uid: string) => {
+  const updateProfile = useCallback(async (data: Partial<UserProfile>) => {
     setLoading(true);
     try {
-      const response = await api.auth.getUserProfile(uid);
-      if (response.success && response.profile) {
-        setProfile(response.profile);
-      } else if (response.error) {
-        setError(response.error);
-        toast.error('Failed to load user profile');
+      // Use updateProfile instead of updateUserProfile
+      const result = await api.auth.updateProfile(data);
+      if (result.success && result.profile) {
+        setProfile(result.profile);
+        return result.profile;
+      } else {
+        throw new Error(result.error || 'Failed to update profile');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      toast.error('Failed to load user profile');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const updateUserProfile = async (profileData: Partial<UserProfile>) => {
-    setLoading(true);
-    try {
-      if (!profile?.id) {
-        throw new Error('No profile to update');
-      }
-      
-      const response = await api.auth.updateUserProfile(profile.id, profileData);
-      if (response.success && response.profile) {
-        setProfile(response.profile);
-        toast.success('Profile updated successfully');
-        return response.profile;
-      } else if (response.error) {
-        setError(response.error);
-        toast.error('Failed to update profile');
-        return null;
-      }
-      return null;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      toast.error('Failed to update profile');
+      setError(err as Error);
+      console.error('Error updating user profile:', err);
       return null;
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   return {
     profile,
     loading,
     error,
-    fetchUserProfile,
-    updateUserProfile
+    fetchProfile,
+    updateProfile
   };
 };
