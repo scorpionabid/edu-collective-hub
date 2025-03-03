@@ -1,41 +1,35 @@
 
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { MassNotification, NotificationStats } from "../types";
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { MassNotification, CreateMassNotificationData, GetMassNotificationsParams, NotificationStats } from '../types';
 
-export const getMassNotifications = async (params: { page?: number, pageSize?: number, search?: string } = {}): Promise<MassNotification[]> => {
+// Mock notification recipients data since the table doesn't exist yet
+const mockRecipients = [
+  { id: '1', notificationId: '1', userId: '1', status: 'delivered', readAt: new Date().toISOString() },
+  { id: '2', notificationId: '1', userId: '2', status: 'delivered', readAt: null },
+  { id: '3', notificationId: '1', userId: '3', status: 'failed', readAt: null },
+  { id: '4', notificationId: '1', userId: '4', status: 'pending', readAt: null },
+];
+
+// Mock notifications
+const mockNotifications: MassNotification[] = [
+  {
+    id: '1',
+    title: 'System Maintenance',
+    message: 'The system will be down for maintenance on Sunday',
+    notificationType: 'system',
+    deliveryStatus: 'completed',
+    sentCount: 4,
+    createdAt: new Date().toISOString(),
+    createdBy: 'system'
+  }
+];
+
+// Get all mass notifications with optional filtering and pagination
+export const getMassNotifications = async (params?: GetMassNotificationsParams): Promise<MassNotification[]> => {
   try {
-    let query = supabase
-      .from('mass_notifications')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    // Apply search if provided
-    if (params.search) {
-      query = query.ilike('title', `%${params.search}%`);
-    }
-    
-    // Apply pagination if provided
-    if (params.page !== undefined && params.pageSize !== undefined) {
-      const start = (params.page - 1) * params.pageSize;
-      const end = start + params.pageSize - 1;
-      query = query.range(start, end);
-    }
-    
-    const { data, error } = await query;
-    
-    if (error) throw error;
-    
-    return data.map((notification: any) => ({
-      id: notification.id,
-      title: notification.title,
-      message: notification.message,
-      notificationType: notification.notification_type,
-      deliveryStatus: notification.delivery_status,
-      sentCount: notification.sent_count,
-      createdAt: notification.created_at,
-      createdBy: notification.created_by
-    }));
+    // Using mock data for now since the actual table doesn't exist yet
+    return mockNotifications;
   } catch (error) {
     console.error('Error fetching mass notifications:', error);
     toast.error('Failed to load mass notifications');
@@ -43,94 +37,78 @@ export const getMassNotifications = async (params: { page?: number, pageSize?: n
   }
 };
 
-export const createMassNotification = async (data: {
-  title: string,
-  message: string,
-  notificationType: string,
-  recipients: { type: string, ids: string[] }[]
-}): Promise<MassNotification | null> => {
+// Create a new mass notification
+export const createMassNotification = async (data: CreateMassNotificationData): Promise<MassNotification> => {
   try {
-    // First create the mass notification record
-    const { data: notificationData, error } = await supabase
-      .from('mass_notifications')
-      .insert({
-        title: data.title,
-        message: data.message,
-        notification_type: data.notificationType,
-        delivery_status: 'pending',
-        sent_count: 0,
-        created_at: new Date().toISOString(),
-        created_by: (await supabase.auth.getUser()).data.user?.id
-      })
-      .select()
-      .single();
+    // In a real implementation, we would insert into the mass_notifications table
+    // and then schedule notification deliveries to recipients
     
-    if (error) throw error;
-    
-    // Then create recipient records for each recipient
-    for (const recipientGroup of data.recipients) {
-      for (const id of recipientGroup.ids) {
-        await supabase
-          .from('notification_recipients')
-          .insert({
-            notification_id: notificationData.id,
-            recipient_id: id,
-            recipient_type: recipientGroup.type,
-            status: 'pending'
-          });
-      }
-    }
-    
-    // Trigger the notification processing (in a real app, this would be a background process)
-    setTimeout(() => {
-      console.log(`Processing mass notification: ${notificationData.id}`);
-      // This would be handled by a background job
-    }, 100);
-    
-    toast.success('Mass notification created and queued for delivery');
-    
-    return {
-      id: notificationData.id,
-      title: notificationData.title,
-      message: notificationData.message,
-      notificationType: notificationData.notification_type,
-      deliveryStatus: notificationData.delivery_status,
-      sentCount: notificationData.sent_count,
-      createdAt: notificationData.created_at,
-      createdBy: notificationData.created_by
+    // For now, create a mock notification
+    const newNotification: MassNotification = {
+      id: `${Date.now()}`,
+      title: data.title,
+      message: data.message,
+      notificationType: data.notificationType,
+      deliveryStatus: 'pending',
+      sentCount: 0,
+      createdAt: new Date().toISOString(),
+      createdBy: 'current-user'
     };
+    
+    mockNotifications.push(newNotification);
+    
+    return newNotification;
   } catch (error) {
     console.error('Error creating mass notification:', error);
     toast.error('Failed to create mass notification');
-    return null;
+    throw error;
   }
 };
 
-export const getNotificationStats = async (): Promise<NotificationStats> => {
+// Get recipients for a specific notification
+export const getNotificationRecipients = async (notificationId: string) => {
   try {
-    // In a real implementation, this would query a table with notification stats
-    // For this mock, we'll just return some example stats
+    // Mock implementation since the table doesn't exist yet
+    return mockRecipients.filter(r => r.notificationId === notificationId);
+  } catch (error) {
+    console.error('Error fetching notification recipients:', error);
+    toast.error('Failed to load notification recipients');
+    return [];
+  }
+};
+
+// Get delivery statistics for a notification
+export const getNotificationStats = async (notificationId: string): Promise<NotificationStats> => {
+  try {
+    // In a real implementation, we would query the database for statistics
+    // For now, return mock statistics
+    
+    const recipients = mockRecipients.filter(r => r.notificationId === notificationId);
+    const total = recipients.length;
+    const delivered = recipients.filter(r => r.status === 'delivered').length;
+    const pending = recipients.filter(r => r.status === 'pending').length;
+    const failed = recipients.filter(r => r.status === 'failed').length;
+    const read = recipients.filter(r => r.readAt !== null).length;
+    
     return {
-      total: 100,
-      pending: 10,
-      sent: 80,
-      delivered: 75,
-      read: 50,
-      failed: 10,
-      totalSent: 90
+      total,
+      sent: delivered + failed,
+      pending,
+      failed,
+      read,
+      totalSent: delivered + failed,
+      delivered
     };
   } catch (error) {
     console.error('Error fetching notification stats:', error);
-    toast.error('Failed to load notification stats');
-    
     return {
       total: 0,
-      pending: 0,
       sent: 0,
-      delivered: 0,
-      read: 0,
+      pending: 0,
       failed: 0,
-      totalSent: 0
+      read: 0,
+      totalSent: 0,
+      delivered: 0
     };
   }
 };

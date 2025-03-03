@@ -1,191 +1,229 @@
 
-import { useState, useEffect, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
-import { FormData, Category, Column, PaginatedResponse } from '@/lib/api/types';
-import { usePaginatedData } from './usePaginatedData';
+import { FormData, Category, Column, QueryOptions, PaginatedResponse, Region, School, Sector } from '@/lib/api/types';
 
-interface ReportFilters {
-  categoryId?: string;
-  schoolId?: string;
-  regionId?: string;
-  sectorId?: string;
+export interface ReportFilters {
+  region?: string;
+  sector?: string;
+  school?: string;
+  category?: string;
+  dateFrom?: string;
+  dateTo?: string;
   status?: string;
-  startDate?: string;
-  endDate?: string;
   [key: string]: any;
 }
 
 export const useReportData = (initialFilters: ReportFilters = {}) => {
-  const [filters, setFilters] = useState<ReportFilters>(initialFilters);
+  const [formData, setFormData] = useState<FormData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [categoryColumns, setCategoryColumns] = useState<Column[]>([]);
-  const [formData, setFormData] = useState<FormData[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-
-  // Fetch form data based on filters
-  const fetchReportData = usePaginatedData({
-    queryKey: ['report-data', filters],
-    fetchFn: async ({ pagination, sort }) => {
-      try {
-        setIsLoading(true);
-        let result: FormData[] = [];
+  const [filters, setFilters] = useState<ReportFilters>(initialFilters);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    pageSize: 10,
+    total: 0
+  });
+  const [sortConfig, setSortConfig] = useState({
+    column: 'createdAt',
+    direction: 'desc' as 'asc' | 'desc'
+  });
+  
+  // Fetch form data with filters
+  const fetchFormData = async () => {
+    try {
+      setLoading(true);
+      let data: FormData[] = [];
+      
+      // Check if we have a category filter
+      if (filters.category) {
+        data = await api.formData.getAllByCategory(filters.category);
         
-        // Fetch data based on filters
-        if (filters.categoryId) {
-          result = await api.formData.getAllByCategory(filters.categoryId);
-          
-          // Apply additional filters
-          if (filters.schoolId) {
-            result = result.filter(item => item.schoolId === filters.schoolId);
-          }
-          
-          if (filters.status) {
-            result = result.filter(item => item.status === filters.status);
-          }
-          
-          // Apply date filters if provided
-          if (filters.startDate) {
-            const startDate = new Date(filters.startDate);
-            result = result.filter(item => new Date(item.createdAt) >= startDate);
-          }
-          
-          if (filters.endDate) {
-            const endDate = new Date(filters.endDate);
-            result = result.filter(item => new Date(item.createdAt) <= endDate);
-          }
-        } else if (filters.regionId) {
-          // Fetch schools in this region
-          const schools = await api.schools.getByRegionId(filters.regionId);
-          
-          // Fetch data for all schools
-          let allFormData: FormData[] = [];
-          for (const school of schools) {
-            const schoolData = await api.formData.getAllFormData();
-            const filteredData = schoolData.filter(item => item.schoolId === school.id);
-            allFormData = [...allFormData, ...filteredData];
-          }
-          
-          result = allFormData;
+        // Apply additional filters
+        if (filters.school) {
+          data = data.filter(item => item.schoolId === filters.school);
         }
         
-        // Manual pagination
-        const totalCount = result.length;
-        const pageSize = pagination.pageSize;
-        const start = (pagination.page - 1) * pageSize;
-        const end = start + pageSize;
-        const paginatedData = result.slice(start, end);
+        if (filters.status) {
+          data = data.filter(item => item.status === filters.status);
+        }
         
-        // Convert to PaginatedResponse format
-        const response: PaginatedResponse<FormData> = {
-          data: paginatedData,
-          metadata: {
-            total: totalCount,
-            page: pagination.page,
-            pageSize,
-            pageCount: Math.ceil(totalCount / pageSize)
-          }
-        };
-        
-        setFormData(result);
-        return response;
-      } catch (error: any) {
-        console.error('Error fetching report data:', error);
-        setError(error);
-        throw error;
-      } finally {
-        setIsLoading(false);
+        // Add date range filtering
+        if (filters.dateFrom || filters.dateTo) {
+          data = data.filter(item => {
+            const createdDate = new Date(item.createdAt);
+            
+            if (filters.dateFrom && new Date(filters.dateFrom) > createdDate) {
+              return false;
+            }
+            
+            if (filters.dateTo && new Date(filters.dateTo) < createdDate) {
+              return false;
+            }
+            
+            return true;
+          });
+        }
+      } else {
+        // If no category is selected, fetch all form data
+        data = await api.formData.getAllFormData();
       }
-    },
-    initialPagination: {
-      page: 1,
-      pageSize: 10
-    },
-    initialSort: {
-      column: 'createdAt',
-      direction: 'desc'
+      
+      // Apply school filtering
+      if (filters.school) {
+        // For school filtering, get all schools in the sector
+        const schools = await api.schools.getBySector(filters.sector || '');
+        const schoolIds = schools.map(school => school.id);
+        data = data.filter(item => schoolIds.includes(item.schoolId));
+      }
+      
+      setFormData(data);
+      setPagination(prev => ({ ...prev, total: data.length }));
+    } catch (err) {
+      console.error('Error fetching form data:', err);
+      setError(err instanceof Error ? err : new Error('Failed to fetch form data'));
+    } finally {
+      setLoading(false);
     }
-  });
-
+  };
+  
   // Fetch categories
-  const fetchCategories = useCallback(async () => {
+  const fetchCategories = async () => {
     try {
-      setIsLoading(true);
       const data = await api.categories.getAll();
       setCategories(data);
-      return data;
-    } catch (error: any) {
-      console.error('Error fetching categories:', error);
-      setError(error);
-      return [];
-    } finally {
-      setIsLoading(false);
+    } catch (err) {
+      console.error('Error fetching categories:', err);
     }
-  }, []);
-
+  };
+  
   // Fetch columns for a category
-  const fetchCategoryColumns = useCallback(async (categoryId: string) => {
+  const fetchCategoryColumns = async (categoryId: string) => {
     try {
-      setIsLoading(true);
-      const data = await api.categories.getCategoryColumns(categoryId);
+      if (!categoryId) return;
+      
+      const data = await api.columns.getAll(categoryId);
       setCategoryColumns(data);
-      return data;
-    } catch (error: any) {
-      console.error('Error fetching category columns:', error);
-      setError(error);
-      return [];
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  // Extract column values from form data
-  const extractColumnValues = useCallback((columnName: string): string[] => {
-    const values = new Set<string>();
-    
-    formData.forEach(item => {
-      if (item.data && item.data[columnName]) {
-        values.add(String(item.data[columnName]));
+      
+      // Find and set the selected category
+      const category = categories.find(cat => cat.id === categoryId);
+      if (category) {
+        setSelectedCategory(category);
       }
+    } catch (err) {
+      console.error('Error fetching category columns:', err);
+    }
+  };
+  
+  // Apply filters
+  const applyFilters = (newFilters: ReportFilters) => {
+    setFilters(prev => ({ ...prev, ...newFilters }));
+  };
+  
+  // Handle filter change
+  const handleFilterChange = (newFilters: ReportFilters) => {
+    applyFilters(newFilters);
+  };
+  
+  // Handle sort change
+  const handleSortChange = (column: string) => {
+    setSortConfig(prev => ({
+      column,
+      direction: prev.column === column && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+  
+  // Handle pagination change
+  const handlePageChange = (page: number) => {
+    setPagination(prev => ({ ...prev, page }));
+  };
+  
+  // Handle page size change
+  const handlePageSizeChange = (pageSize: number) => {
+    setPagination(prev => ({ ...prev, pageSize, page: 1 }));
+  };
+  
+  // Export data to Excel
+  const handleExportToExcel = () => {
+    // Implementation for Excel export
+    console.log('Exporting to Excel:', formData, categoryColumns);
+  };
+  
+  // Apply sorting to data
+  const getSortedData = () => {
+    return [...formData].sort((a, b) => {
+      // Handle special case for nested data properties
+      if (sortConfig.column.includes('.')) {
+        const parts = sortConfig.column.split('.');
+        const aValue = parts.reduce((obj, key) => obj && obj[key] !== undefined ? obj[key] : null, a);
+        const bValue = parts.reduce((obj, key) => obj && obj[key] !== undefined ? obj[key] : null, b);
+        
+        if (aValue === bValue) return 0;
+        
+        const direction = sortConfig.direction === 'asc' ? 1 : -1;
+        return aValue < bValue ? -1 * direction : 1 * direction;
+      }
+      
+      // Handle direct properties
+      const aValue = a[sortConfig.column as keyof FormData];
+      const bValue = b[sortConfig.column as keyof FormData];
+      
+      if (aValue === bValue) return 0;
+      
+      const direction = sortConfig.direction === 'asc' ? 1 : -1;
+      return aValue < bValue ? -1 * direction : 1 * direction;
     });
-    
-    return Array.from(values);
-  }, [formData]);
-
-  // Initialize
+  };
+  
+  // Get paginated data
+  const getPaginatedData = () => {
+    const sorted = getSortedData();
+    const startIndex = (pagination.page - 1) * pagination.pageSize;
+    const endIndex = startIndex + pagination.pageSize;
+    return sorted.slice(startIndex, endIndex);
+  };
+  
+  // Fetch data on mount and when filters change
   useEffect(() => {
     fetchCategories();
-  }, [fetchCategories]);
-
-  // Update selected category
+  }, []);
+  
   useEffect(() => {
-    if (filters.categoryId && categories.length > 0) {
-      const category = categories.find(cat => cat.id === filters.categoryId);
-      setSelectedCategory(category || null);
-      
-      if (category) {
-        fetchCategoryColumns(category.id);
-      }
-    } else {
-      setSelectedCategory(null);
-      setCategoryColumns([]);
+    fetchFormData();
+  }, [filters, sortConfig.column, sortConfig.direction]);
+  
+  useEffect(() => {
+    if (filters.category) {
+      fetchCategoryColumns(filters.category);
     }
-  }, [filters.categoryId, categories, fetchCategoryColumns]);
-
+  }, [filters.category, categories]);
+  
   return {
-    ...fetchReportData,
     formData,
     categories,
     selectedCategory,
     categoryColumns,
     filters,
     setFilters,
-    isLoading,
+    pagination,
+    setPagination,
+    sortConfig,
+    setSortConfig,
+    loading,
     error,
+    fetchFormData,
     fetchCategories,
     fetchCategoryColumns,
-    extractColumnValues
+    handleFilterChange,
+    handleSortChange,
+    handlePageChange,
+    handlePageSizeChange,
+    handleExportToExcel,
+    getSortedData,
+    getPaginatedData,
+    applyFilters
   };
 };

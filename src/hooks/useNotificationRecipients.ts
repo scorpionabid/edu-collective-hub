@@ -1,69 +1,66 @@
 
-import { useState, useEffect, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { toast } from 'sonner';
 import { NotificationStats } from '@/lib/api/types';
 
-export const useNotificationRecipients = (notificationId: string) => {
+export const useNotificationRecipients = (notificationId?: string) => {
+  const queryClient = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<NotificationStats>({
     total: 0,
     sent: 0,
     pending: 0,
     failed: 0,
     read: 0,
-    delivered: 0,
-    totalSent: 0
+    totalSent: 0,
+    delivered: 0
   });
-  const [error, setError] = useState<string | null>(null);
 
-  // Get notification stats
   const {
-    data: recipients,
+    data: recipients = [],
     isLoading,
     isError,
-    refetch
+    refetch,
   } = useQuery({
-    queryKey: ['notification-recipients', notificationId],
+    queryKey: ['notificationRecipients', notificationId],
     queryFn: async () => {
-      if (api.mass && api.mass.getNotificationRecipients) {
-        return api.mass.getNotificationRecipients(notificationId);
+      if (!notificationId) return [];
+      try {
+        const response = await api.notifications.mass.getNotificationRecipients(notificationId);
+        return response;
+      } catch (err) {
+        console.error('Error fetching notification recipients:', err);
+        setError('Failed to load recipients');
+        return [];
       }
-      setError('API method not available: getNotificationRecipients');
-      return [];
     },
-    enabled: !!notificationId
+    enabled: !!notificationId,
   });
 
-  // Get notification stats
-  const getStats = useCallback(async () => {
-    try {
-      if (api.mass && api.mass.getNotificationStats) {
-        const notificationStats = await api.mass.getNotificationStats(notificationId);
-        setStats({
-          total: notificationStats.total,
-          sent: notificationStats.sent,
-          pending: notificationStats.pending,
-          failed: notificationStats.failed,
-          read: notificationStats.read,
-          delivered: notificationStats.delivered,
-          totalSent: notificationStats.totalSent
-        });
-        return notificationStats;
-      }
-      setError('API method not available: getNotificationStats');
-      return null;
-    } catch (error: any) {
-      setError(error.message || 'Failed to get notification stats');
-      return null;
-    }
-  }, [notificationId]);
-
-  // Get stats on initial load
   useEffect(() => {
     if (notificationId) {
-      getStats();
+      const fetchStats = async () => {
+        try {
+          const response = await api.notifications.mass.getNotificationStats(notificationId);
+          setStats({
+            total: response.total,
+            sent: response.sent,
+            pending: response.pending,
+            failed: response.failed,
+            read: response.read,
+            totalSent: response.totalSent,
+            delivered: response.delivered
+          });
+        } catch (err) {
+          console.error('Error fetching notification stats:', err);
+        }
+      };
+      
+      fetchStats();
     }
-  }, [notificationId, getStats]);
+  }, [notificationId]);
 
   return {
     recipients,
@@ -71,7 +68,6 @@ export const useNotificationRecipients = (notificationId: string) => {
     isLoading,
     isError,
     error,
-    refreshStats: getStats,
-    refreshRecipients: refetch
+    refetch,
   };
 };

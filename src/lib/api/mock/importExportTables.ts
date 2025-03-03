@@ -94,81 +94,10 @@ export const mockImportExportTables = {
   }
 };
 
-// Provide mock functions for Supabase RPC compatibility
-export const getMockSupabase = () => {
+// Use this when you need to mock Supabase responses
+export const getMockSupabaseResponse = () => {
   return {
-    from: (tableName: string) => {
-      if (tableName === 'import_jobs') {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({ data: mockImportJobs[0], error: null })
-            }),
-            order: () => ({
-              data: mockImportJobs,
-              error: null
-            })
-          }),
-          insert: (data: any) => {
-            const newJob = {
-              id: uuidv4(),
-              ...data,
-              created_at: new Date().toISOString()
-            };
-            mockImportJobs.push(newJob as unknown as ImportJob);
-            return { data: newJob, error: null };
-          },
-          update: (data: any) => {
-            const index = mockImportJobs.findIndex(job => job.id === data.id);
-            if (index !== -1) {
-              mockImportJobs[index] = { ...mockImportJobs[index], ...data } as ImportJob;
-              return { data: mockImportJobs[index], error: null };
-            }
-            return { data: null, error: { message: 'Job not found' } };
-          }
-        };
-      } else if (tableName === 'export_jobs') {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({ data: mockExportJobs[0], error: null })
-            }),
-            order: () => ({
-              data: mockExportJobs,
-              error: null
-            })
-          }),
-          insert: (data: any) => {
-            const newJob = {
-              id: uuidv4(),
-              ...data,
-              created_at: new Date().toISOString()
-            };
-            mockExportJobs.push(newJob as unknown as ExportJob);
-            return { data: newJob, error: null };
-          },
-          update: (data: any) => {
-            const index = mockExportJobs.findIndex(job => job.id === data.id);
-            if (index !== -1) {
-              mockExportJobs[index] = { ...mockExportJobs[index], ...data } as ExportJob;
-              return { data: mockExportJobs[index], error: null };
-            }
-            return { data: null, error: { message: 'Job not found' } };
-          }
-        };
-      }
-      return {
-        select: () => ({ data: [], error: null })
-      };
-    },
-    rpc: (functionName: string, params: any) => {
-      // Mock RPC functions related to import/export operations
-      if (functionName === 'get_import_jobs') {
-        return { data: mockImportJobs, error: null };
-      } else if (functionName === 'get_export_jobs') {
-        return { data: mockExportJobs, error: null };
-      }
-      return { data: null, error: { message: 'RPC function not found' } };
-    }
+    data: mockImportJobs,
+    error: null
   };
 };

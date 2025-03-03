@@ -1,77 +1,97 @@
 
-import { useState } from 'react';
-import { z, ZodType, ZodTypeDef } from 'zod';
+import { useState, useCallback } from 'react';
+import { z } from 'zod';
 import { api } from '@/lib/api';
-import { FormData } from '@/lib/api/types';
-import { sanitizeText } from '@/lib/validation/sanitization';
+import { toast } from 'sonner';
+import * as sanitize from '@/lib/validation/sanitization';
 
-// Options for form submission
-interface SubmitOptions {
+interface FormSubmissionOptions {
   categoryId: string;
   schoolId?: string;
   id?: string;
   isUpdate?: boolean;
 }
 
-// Hook for validated form submissions
-export function useValidatedFormSubmission(categoryId: string) {
-  const [error, setError] = useState<string>('');
+export const useValidatedFormSubmission = () => {
+  const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Generic function to submit form data with validation
+  // Helper to sanitize form data before submission
+  const sanitizeFormData = <T extends Record<string, any>>(data: T): T => {
+    const sanitizedData = { ...data };
+    
+    // Create a safe copy to avoid mutation issues
+    const copyOfData = { ...data };
+    
+    // Apply sanitization to each field
+    Object.keys(copyOfData).forEach(key => {
+      const value = copyOfData[key];
+      
+      if (typeof value === 'string') {
+        // Use our sanitize text function
+        sanitizedData[key] = sanitize.sanitizeText(value) as any;
+      }
+    });
+    
+    return sanitizedData;
+  };
+
+  // Submit form data after validation
   const submitFormData = async <T extends Record<string, any>>(
     data: T,
-    options: SubmitOptions
-  ): Promise<FormData | null> => {
+    schema: z.ZodType<any, z.ZodTypeDef, any>,
+    options: FormSubmissionOptions
+  ) => {
     try {
       setIsSubmitting(true);
       setError('');
-
-      // Sanitize text fields to prevent XSS
-      const sanitizedData = { ...data };
-      Object.keys(sanitizedData).forEach(key => {
-        if (typeof sanitizedData[key] === 'string') {
-          sanitizedData[key] = sanitizeText(sanitizedData[key]);
-        }
-      });
-
-      let result: FormData | null = null;
-
-      // If we're updating an existing form
-      if (options.isUpdate && options.id) {
-        result = await api.formData.updateFormData(options.id, {
-          ...sanitizedData,
-          categoryId: options.categoryId,
-          schoolId: sanitizedData.schoolId || options.schoolId || '',
-        });
-      } else {
-        // Creating a new form
-        const formDataToSubmit: Omit<FormData, 'id'> = {
-          categoryId: options.categoryId,
-          schoolId: sanitizedData.schoolId || options.schoolId || '',
-          data: sanitizedData.data || {},
-          status: sanitizedData.status || 'draft',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
-        
-        result = await api.formData.createFormData(formDataToSubmit);
+      
+      // Validate form data with Zod schema
+      const validateResult = schema.safeParse(data);
+      
+      if (!validateResult.success) {
+        const formattedErrors = validateResult.error.format();
+        const firstError = validateResult.error.errors[0]?.message || 'Validation failed';
+        setError(firstError);
+        toast.error(firstError);
+        return { success: false, errors: formattedErrors };
       }
-
-      return result;
-    } catch (error: any) {
-      console.error('Form submission error:', error);
-      setError(error.message || 'An error occurred while submitting the form');
-      return null;
+      
+      // Sanitize form data
+      const sanitizedData = sanitizeFormData(data);
+      
+      // Prepare form data object
+      const formDataToSubmit = {
+        categoryId: options.categoryId,
+        schoolId: options.schoolId || '',
+        data: sanitizedData,
+        status: 'pending'
+      };
+      
+      // Update or create based on isUpdate flag
+      if (options.isUpdate && options.id) {
+        const result = await api.formData.updateFormData(options.id, formDataToSubmit);
+        toast.success('Form data updated successfully');
+        return { success: true, result };
+      } else {
+        const result = await api.formData.createFormData(formDataToSubmit);
+        toast.success('Form data submitted successfully');
+        return { success: true, result };
+      }
+    } catch (err) {
+      console.error('Error submitting form data:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(errorMessage);
+      toast.error(errorMessage);
+      return { success: false, error: errorMessage };
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Clear any errors
-  const clearError = () => {
+  const clearError = useCallback(() => {
     setError('');
-  };
+  }, []);
 
   return {
     submitFormData,
@@ -79,4 +99,4 @@ export function useValidatedFormSubmission(categoryId: string) {
     isSubmitting,
     clearError
   };
-}
+};

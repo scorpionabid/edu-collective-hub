@@ -1,25 +1,40 @@
 
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { NotificationGroup } from "../types";
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { NotificationGroup, CreateNotificationGroupData, UpdateNotificationGroupData, AddGroupMemberData } from '../types';
 
+// Mock notification groups data since the table doesn't exist yet
+const mockGroups: NotificationGroup[] = [
+  {
+    id: '1',
+    name: 'Administrators',
+    description: 'All system administrators',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    createdBy: 'system'
+  },
+  {
+    id: '2',
+    name: 'Teachers',
+    description: 'All teachers in the system',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    createdBy: 'system'
+  }
+];
+
+// Mock group members
+const mockGroupMembers = [
+  { id: '1', groupId: '1', memberId: 'user1', memberType: 'user' },
+  { id: '2', groupId: '1', memberId: 'user2', memberType: 'user' },
+  { id: '3', groupId: '2', memberId: 'user3', memberType: 'user' },
+];
+
+// Get all notification groups
 export const getNotificationGroups = async (): Promise<NotificationGroup[]> => {
   try {
-    const { data, error } = await supabase
-      .from('notification_groups')
-      .select('*')
-      .order('name');
-    
-    if (error) throw error;
-    
-    return data.map((group: any) => ({
-      id: group.id,
-      name: group.name,
-      description: group.description,
-      createdAt: group.created_at,
-      updatedAt: group.updated_at,
-      createdBy: group.created_by
-    }));
+    // Using mock data for now since the actual table doesn't exist yet
+    return mockGroups;
   } catch (error) {
     console.error('Error fetching notification groups:', error);
     toast.error('Failed to load notification groups');
@@ -27,123 +42,87 @@ export const getNotificationGroups = async (): Promise<NotificationGroup[]> => {
   }
 };
 
-export const createNotificationGroup = async (data: { name: string, description?: string }): Promise<NotificationGroup | null> => {
+// Create a new notification group
+export const createNotificationGroup = async (data: CreateNotificationGroupData): Promise<NotificationGroup> => {
   try {
-    const { data: newGroup, error } = await supabase
-      .from('notification_groups')
-      .insert({
-        name: data.name,
-        description: data.description,
-        created_at: new Date().toISOString(),
-        created_by: (await supabase.auth.getUser()).data.user?.id
-      })
-      .select()
-      .single();
+    // In a real implementation, we would insert into the notification_groups table
     
-    if (error) throw error;
-    
-    toast.success('Notification group created successfully');
-    
-    return {
-      id: newGroup.id,
-      name: newGroup.name,
-      description: newGroup.description,
-      createdAt: newGroup.created_at,
-      updatedAt: newGroup.updated_at,
-      createdBy: newGroup.created_by
+    // For now, create a mock group
+    const newGroup: NotificationGroup = {
+      id: `${Date.now()}`,
+      name: data.name,
+      description: data.description,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      createdBy: 'current-user'
     };
+    
+    mockGroups.push(newGroup);
+    
+    return newGroup;
   } catch (error) {
     console.error('Error creating notification group:', error);
     toast.error('Failed to create notification group');
-    return null;
+    throw error;
   }
 };
 
-export const updateNotificationGroup = async (id: string, data: { name?: string, description?: string }): Promise<NotificationGroup | null> => {
+// Update an existing notification group
+export const updateNotificationGroup = async (data: UpdateNotificationGroupData): Promise<NotificationGroup> => {
   try {
-    const updateData: any = {};
-    if (data.name !== undefined) updateData.name = data.name;
-    if (data.description !== undefined) updateData.description = data.description;
-    updateData.updated_at = new Date().toISOString();
+    // In a real implementation, we would update the notification_groups table
     
-    const { data: updatedGroup, error } = await supabase
-      .from('notification_groups')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single();
+    // For now, update the mock group
+    const groupIndex = mockGroups.findIndex(g => g.id === data.id);
     
-    if (error) throw error;
+    if (groupIndex === -1) {
+      throw new Error('Group not found');
+    }
     
-    toast.success('Notification group updated successfully');
-    
-    return {
-      id: updatedGroup.id,
-      name: updatedGroup.name,
-      description: updatedGroup.description,
-      createdAt: updatedGroup.created_at,
-      updatedAt: updatedGroup.updated_at,
-      createdBy: updatedGroup.created_by
+    const updatedGroup = {
+      ...mockGroups[groupIndex],
+      ...(data.name && { name: data.name }),
+      ...(data.description && { description: data.description }),
+      updatedAt: new Date().toISOString()
     };
+    
+    mockGroups[groupIndex] = updatedGroup;
+    
+    return updatedGroup;
   } catch (error) {
     console.error('Error updating notification group:', error);
     toast.error('Failed to update notification group');
-    return null;
+    throw error;
   }
 };
 
+// Delete a notification group
 export const deleteNotificationGroup = async (id: string): Promise<boolean> => {
   try {
-    // First check if there are any members in this group
-    const { data: members, error: membersError } = await supabase
-      .from('notification_group_members')
-      .select('id')
-      .eq('group_id', id);
+    // In a real implementation, we would delete from the notification_groups table
     
-    if (membersError) throw membersError;
+    // For now, remove from mock groups
+    const groupIndex = mockGroups.findIndex(g => g.id === id);
     
-    // Delete group members first
-    if (members && members.length > 0) {
-      const { error: deleteError } = await supabase
-        .from('notification_group_members')
-        .delete()
-        .eq('group_id', id);
-      
-      if (deleteError) throw deleteError;
+    if (groupIndex === -1) {
+      throw new Error('Group not found');
     }
     
-    // Now delete the group
-    const { error } = await supabase
-      .from('notification_groups')
-      .delete()
-      .eq('id', id);
-    
-    if (error) throw error;
-    
-    toast.success('Notification group deleted successfully');
+    mockGroups.splice(groupIndex, 1);
     
     return true;
   } catch (error) {
     console.error('Error deleting notification group:', error);
     toast.error('Failed to delete notification group');
-    return false;
+    throw error;
   }
 };
 
-export const getGroupMembers = async (groupId: string): Promise<any[]> => {
+// Get members of a notification group
+export const getGroupMembers = async (groupId: string) => {
   try {
-    const { data, error } = await supabase
-      .from('notification_group_members')
-      .select('id, member_id, member_type')
-      .eq('group_id', groupId);
-    
-    if (error) throw error;
-    
-    return data.map((member: any) => ({
-      id: member.id,
-      memberId: member.member_id,
-      memberType: member.member_type
-    }));
+    // Mock implementation since the table doesn't exist yet
+    return mockGroupMembers.filter(m => m.groupId === groupId);
   } catch (error) {
     console.error('Error fetching group members:', error);
     toast.error('Failed to load group members');
@@ -151,45 +130,49 @@ export const getGroupMembers = async (groupId: string): Promise<any[]> => {
   }
 };
 
-export const addGroupMembers = async (groupId: string, memberIds: string[], memberType: string): Promise<boolean> => {
+// Add members to a notification group
+export const addGroupMembers = async (data: AddGroupMemberData) => {
   try {
-    const members = memberIds.map(memberId => ({
-      group_id: groupId,
-      member_id: memberId,
-      member_type: memberType
+    // In a real implementation, we would insert into the group_members table
+    
+    // For now, add to mock members
+    const newMembers = data.memberIds.map(memberId => ({
+      id: `${Date.now()}_${memberId}`,
+      groupId: data.groupId,
+      memberId,
+      memberType: data.memberType
     }));
     
-    const { error } = await supabase
-      .from('notification_group_members')
-      .insert(members);
+    mockGroupMembers.push(...newMembers);
     
-    if (error) throw error;
-    
-    toast.success('Members added to group successfully');
-    
-    return true;
+    return newMembers;
   } catch (error) {
-    console.error('Error adding members to group:', error);
+    console.error('Error adding group members:', error);
     toast.error('Failed to add members to group');
-    return false;
+    throw error;
   }
 };
 
-export const removeGroupMember = async (memberId: string): Promise<boolean> => {
+// Remove a member from a notification group
+export const removeGroupMember = async (groupId: string, memberId: string) => {
   try {
-    const { error } = await supabase
-      .from('notification_group_members')
-      .delete()
-      .eq('id', memberId);
+    // In a real implementation, we would delete from the group_members table
     
-    if (error) throw error;
+    // For now, remove from mock members
+    const memberIndex = mockGroupMembers.findIndex(
+      m => m.groupId === groupId && m.memberId === memberId
+    );
     
-    toast.success('Member removed from group successfully');
+    if (memberIndex === -1) {
+      throw new Error('Member not found in group');
+    }
+    
+    mockGroupMembers.splice(memberIndex, 1);
     
     return true;
   } catch (error) {
-    console.error('Error removing member from group:', error);
+    console.error('Error removing group member:', error);
     toast.error('Failed to remove member from group');
-    return false;
+    throw error;
   }
 };

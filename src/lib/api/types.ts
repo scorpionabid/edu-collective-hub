@@ -1,3 +1,13 @@
+// Only updating the ValidationTextOptions interface to include the label property
+export interface ValidationTextOptions {
+  required?: boolean;
+  minLength?: number;
+  maxLength?: number;
+  errorMessage?: string;
+  isHtml?: boolean;
+  htmlProfile?: 'basic' | 'strict' | 'medium' | 'rich' | 'custom';
+  label?: string; // Add the label property
+}
 
 // Only updating the Category interface and NotificationStats to match the required properties
 export interface Category {

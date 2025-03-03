@@ -2,80 +2,83 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { AddGroupMemberData } from '@/lib/api/types';
 import { toast } from 'sonner';
+import { AddGroupMemberData } from '@/lib/api/types';
 
 export const useGroupMembers = (groupId: string) => {
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
 
-  // Get members of a notification group
   const {
-    data: members,
+    data: members = [],
     isLoading,
     isError,
-    refetch
+    refetch,
   } = useQuery({
-    queryKey: ['group-members', groupId],
+    queryKey: ['notificationGroups', groupId, 'members'],
     queryFn: async () => {
-      if (api.groups && api.groups.getGroupMembers) {
-        return api.groups.getGroupMembers(groupId);
+      try {
+        const response = await api.notifications.groups.getGroupMembers(groupId);
+        return response;
+      } catch (err) {
+        console.error('Error fetching group members:', err);
+        setError('Failed to load group members');
+        return [];
       }
-      setError('API method not available: getGroupMembers');
-      return [];
     },
-    enabled: !!groupId
   });
 
-  // Add members to a group
   const addMembersMutation = useMutation({
     mutationFn: async (data: AddGroupMemberData) => {
-      if (api.groups && api.groups.addGroupMembers) {
-        return api.groups.addGroupMembers(data);
+      try {
+        return await api.notifications.groups.addGroupMembers(data);
+      } catch (err) {
+        console.error('Error adding group members:', err);
+        throw new Error('Failed to add members to group');
       }
-      throw new Error('API method not available: addGroupMembers');
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notificationGroups', groupId, 'members'] });
       toast.success('Members added to group successfully');
-      queryClient.invalidateQueries({ queryKey: ['group-members', groupId] });
     },
-    onError: (error: any) => {
+    onError: (error) => {
       toast.error(error.message || 'Failed to add members to group');
       setError(error.message || 'Failed to add members to group');
-    }
+    },
   });
 
-  // Remove a member from a group
   const removeMemberMutation = useMutation({
     mutationFn: async (memberId: string) => {
-      if (api.groups && api.groups.removeGroupMember) {
-        return api.groups.removeGroupMember(groupId, memberId);
+      try {
+        return await api.notifications.groups.removeGroupMember(groupId, memberId);
+      } catch (err) {
+        console.error('Error removing group member:', err);
+        throw new Error('Failed to remove member from group');
       }
-      throw new Error('API method not available: removeGroupMember');
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notificationGroups', groupId, 'members'] });
       toast.success('Member removed from group successfully');
-      queryClient.invalidateQueries({ queryKey: ['group-members', groupId] });
     },
-    onError: (error: any) => {
+    onError: (error) => {
       toast.error(error.message || 'Failed to remove member from group');
       setError(error.message || 'Failed to remove member from group');
-    }
+    },
   });
 
-  // Add members to the group
-  const addMembers = useCallback(async (memberIds: string[], memberType: string) => {
-    return addMembersMutation.mutateAsync({
-      groupId,
-      memberIds,
-      memberType
-    });
-  }, [groupId, addMembersMutation]);
+  const addMembers = useCallback(
+    (memberIds: string[], memberType: string) => {
+      addMembersMutation.mutate({ groupId, memberIds, memberType });
+    },
+    [groupId, addMembersMutation]
+  );
 
-  // Remove a member from the group
-  const removeMember = useCallback(async (memberId: string) => {
-    return removeMemberMutation.mutateAsync(memberId);
-  }, [groupId, removeMemberMutation]);
+  const removeMember = useCallback(
+    (memberId: string) => {
+      removeMemberMutation.mutate(memberId);
+    },
+    [removeMemberMutation]
+  );
 
   return {
     members,
@@ -84,6 +87,6 @@ export const useGroupMembers = (groupId: string) => {
     error,
     addMembers,
     removeMember,
-    refetch
+    refetch,
   };
 };
