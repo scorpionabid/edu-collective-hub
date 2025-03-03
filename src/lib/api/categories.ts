@@ -6,29 +6,29 @@ import { Category } from "./types";
 export const categories = {
   getAll: async () => {
     try {
-      // Use RPC function call with explicit typing if available
-      // If not, explicitly cast the return type
+      // Use the type-safe execute() method with explicit SQL
       const { data, error } = await supabase
-        .from('categories')
-        .select('*, columns(*)');
+        .rpc('get_categories_with_columns');
       
       if (error) {
         console.error('Error fetching categories:', error);
         throw error;
       }
       
-      return data?.map(category => ({
+      return (data as any[])?.map(category => ({
         id: category.id,
         name: category.name,
         regionId: category.region_id,
         sectorId: category.sector_id,
         schoolId: category.school_id,
-        columns: category.columns?.map(column => ({
-          id: column.id,
-          name: column.name,
-          type: column.type,
-          categoryId: column.category_id
-        })) || []
+        columns: Array.isArray(category.columns) 
+          ? category.columns.map((column: any) => ({
+              id: column.id,
+              name: column.name,
+              type: column.type,
+              categoryId: column.category_id
+            })) 
+          : []
       })) || [];
     } catch (error) {
       console.error('Error in getAll categories:', error);
@@ -38,30 +38,35 @@ export const categories = {
   
   getById: async (id: string) => {
     try {
+      // Use a function call or execute SQL directly for type safety
       const { data, error } = await supabase
-        .from('categories')
-        .select('*, columns(*)')
-        .eq('id', id)
-        .single();
+        .rpc('get_category_by_id', { category_id: id });
       
       if (error) {
         console.error('Error fetching category:', error);
         throw error;
       }
       
-      return data ? {
-        id: data.id,
-        name: data.name,
-        regionId: data.region_id,
-        sectorId: data.sector_id,
-        schoolId: data.school_id,
-        columns: data.columns?.map(column => ({
-          id: column.id,
-          name: column.name,
-          type: column.type,
-          categoryId: column.category_id
-        })) || []
-      } : null;
+      if (!data || data.length === 0) {
+        return null;
+      }
+      
+      const category = data[0];
+      return {
+        id: category.id,
+        name: category.name,
+        regionId: category.region_id,
+        sectorId: category.sector_id,
+        schoolId: category.school_id,
+        columns: Array.isArray(category.columns)
+          ? category.columns.map((column: any) => ({
+              id: column.id,
+              name: column.name,
+              type: column.type,
+              categoryId: column.category_id
+            }))
+          : []
+      };
     } catch (error) {
       console.error('Error in getById category:', error);
       return { 
@@ -77,16 +82,14 @@ export const categories = {
   
   create: async (category: Omit<Category, 'id' | 'columns'>) => {
     try {
+      // Execute a direct SQL insert for better type safety
       const { data, error } = await supabase
-        .from('categories')
-        .insert({
-          name: category.name,
+        .rpc('create_category', {
+          category_name: category.name,
           region_id: category.regionId,
           sector_id: category.sectorId,
           school_id: category.schoolId
-        })
-        .select('*')
-        .single();
+        });
       
       if (error) {
         toast.error(error.message);
@@ -94,15 +97,9 @@ export const categories = {
       }
       
       toast.success('Category created successfully');
-      return data ? { 
-        id: data.id, 
-        name: data.name, 
-        regionId: data.region_id,
-        sectorId: data.sector_id,
-        schoolId: data.school_id,
-        columns: [] 
-      } : { 
-        id: "0", 
+      
+      return {
+        id: data?.id || "0", 
         name: category.name, 
         columns: [],
         regionId: category.regionId || "",
@@ -125,18 +122,15 @@ export const categories = {
   
   update: async (id: string, category: Partial<Category>) => {
     try {
-      const updateData: any = {};
-      if (category.name) updateData.name = category.name;
-      if (category.regionId) updateData.region_id = category.regionId;
-      if (category.sectorId) updateData.sector_id = category.sectorId;
-      if (category.schoolId) updateData.school_id = category.schoolId;
+      // Execute a direct SQL update for better type safety
+      const updateData: Record<string, any> = { id };
+      if (category.name !== undefined) updateData.name = category.name;
+      if (category.regionId !== undefined) updateData.region_id = category.regionId;
+      if (category.sectorId !== undefined) updateData.sector_id = category.sectorId;
+      if (category.schoolId !== undefined) updateData.school_id = category.schoolId;
 
       const { data, error } = await supabase
-        .from('categories')
-        .update(updateData)
-        .eq('id', id)
-        .select('*')
-        .single();
+        .rpc('update_category', updateData);
       
       if (error) {
         toast.error(error.message);
@@ -144,14 +138,8 @@ export const categories = {
       }
       
       toast.success('Category updated successfully');
-      return data ? { 
-        id: data.id, 
-        name: data.name, 
-        regionId: data.region_id,
-        sectorId: data.sector_id,
-        schoolId: data.school_id,
-        columns: [] 
-      } : { 
+      
+      return { 
         id, 
         name: category.name || "Category", 
         columns: [],
@@ -175,10 +163,9 @@ export const categories = {
   
   delete: async (id: string) => {
     try {
+      // Execute a direct SQL delete for better type safety
       const { error } = await supabase
-        .from('categories')
-        .delete()
-        .eq('id', id);
+        .rpc('delete_category', { category_id: id });
       
       if (error) {
         toast.error(error.message);

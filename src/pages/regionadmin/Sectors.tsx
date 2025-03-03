@@ -1,22 +1,16 @@
-
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  PlusCircle, 
-  Building,
-  Edit, 
-  Trash2,
-  FileDown
-} from "lucide-react";
-import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PlusCircle, Pencil, Trash2 } from "lucide-react";
+import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
+import { toast } from "sonner";
 
 interface Sector {
   id: string;
@@ -27,113 +21,124 @@ interface Sector {
 const RegionSectors = () => {
   const { user } = useAuth();
   const [sectors, setSectors] = useState<Sector[]>([]);
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [newSectorName, setNewSectorName] = useState("");
-  const [editingSector, setEditingSector] = useState<Sector | null>(null);
-  const [deletingSector, setDeletingSector] = useState<Sector | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [showAddDialog, setShowAddDialog] = useState<boolean>(false);
+  const [showEditDialog, setShowEditDialog] = useState<boolean>(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState<boolean>(false);
+  const [currentSector, setCurrentSector] = useState<Sector | null>(null);
+  const [newSectorName, setNewSectorName] = useState<string>("");
 
-  const loadSectors = async () => {
-    if (user?.regionId) {
-      try {
-        setIsLoading(true);
-        const data = await api.sectors.getAll(user.regionId);
-        setSectors(data);
-      } catch (error) {
-        console.error("Error loading sectors:", error);
-        toast.error("Sektorları yükləmək mümkün olmadı");
-      } finally {
-        setIsLoading(false);
-      }
+  useEffect(() => {
+    fetchSectors();
+  }, [user]);
+
+  const fetchSectors = async () => {
+    if (!user?.regionId) return;
+    
+    setIsLoading(true);
+    try {
+      const allSectors = await api.sectors.getAll();
+      const regionSectors = allSectors.filter(
+        sector => sector.region_id === user.regionId
+      );
+      
+      const formattedSectors = regionSectors.map(sector => ({
+        id: sector.id,
+        name: sector.name,
+        region_id: sector.region_id
+      }));
+      
+      setSectors(formattedSectors);
+    } catch (error) {
+      console.error("Error fetching sectors:", error);
+      toast.error("Failed to load sectors");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadSectors();
-  }, [user]);
-
   const handleAddSector = async () => {
     if (!newSectorName.trim()) {
-      toast.error("Sektor adı daxil edin");
+      toast.error("Sector name cannot be empty");
       return;
     }
 
+    if (!user?.regionId) {
+      toast.error("Region ID is required");
+      return;
+    }
+
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      if (user?.regionId) {
-        const newSector = await api.sectors.create(newSectorName, user.regionId);
-        setSectors([...sectors, newSector]);
-        setNewSectorName("");
-        setIsAddDialogOpen(false);
-        toast.success("Sektor uğurla əlavə edildi");
-      } else {
-        toast.error("Region ID tapılmadı");
-      }
+      const newSector = await api.sectors.create({
+        name: newSectorName,
+        region_id: user.regionId
+      });
+
+      setSectors([...sectors, { 
+        id: newSector.id, 
+        name: newSector.name,
+        region_id: newSector.region_id
+      }]);
+      
+      setShowAddDialog(false);
+      setNewSectorName("");
+      toast.success("Sector added successfully");
     } catch (error) {
       console.error("Error adding sector:", error);
-      toast.error("Sektor əlavə etmək mümkün olmadı");
+      toast.error("Failed to add sector");
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleEditSector = async () => {
-    if (!editingSector || !editingSector.name.trim()) {
-      toast.error("Sektor adı daxil edin");
+    if (!currentSector) return;
+    if (!newSectorName.trim()) {
+      toast.error("Sector name cannot be empty");
       return;
     }
 
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      const updatedSector = await api.sectors.update(editingSector.id, editingSector.name);
+      const updatedSector = await api.sectors.update(currentSector.id, {
+        name: newSectorName
+      });
+
       setSectors(sectors.map(sector => 
-        sector.id === updatedSector.id ? updatedSector : sector
+        sector.id === currentSector.id 
+          ? { ...sector, name: newSectorName } 
+          : sector
       ));
-      setEditingSector(null);
-      setIsEditDialogOpen(false);
-      toast.success("Sektor uğurla yeniləndi");
+      
+      setShowEditDialog(false);
+      setCurrentSector(null);
+      setNewSectorName("");
+      toast.success("Sector updated successfully");
     } catch (error) {
       console.error("Error updating sector:", error);
-      toast.error("Sektoru yeniləmək mümkün olmadı");
+      toast.error("Failed to update sector");
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleDeleteSector = async () => {
-    if (!deletingSector) return;
+    if (!currentSector) return;
 
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      await api.sectors.delete(deletingSector.id);
-      setSectors(sectors.filter(sector => sector.id !== deletingSector.id));
-      setDeletingSector(null);
-      setIsDeleteDialogOpen(false);
-      toast.success("Sektor uğurla silindi");
+      await api.sectors.delete(currentSector.id);
+      setSectors(sectors.filter(sector => sector.id !== currentSector.id));
+      setShowDeleteDialog(false);
+      setCurrentSector(null);
+      toast.success("Sector deleted successfully");
     } catch (error) {
       console.error("Error deleting sector:", error);
-      toast.error("Sektoru silmək mümkün olmadı");
+      toast.error("Failed to delete sector");
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleExportSectors = () => {
-    const csvContent = "data:text/csv;charset=utf-8," + 
-      "ID,Name,Region ID\n" + 
-      sectors.map(sector => `${sector.id},${sector.name},${sector.region_id}`).join("\n");
-    
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "sectors.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    toast.success("Sektorlar uğurla export edildi");
   };
 
   return (
@@ -148,11 +153,7 @@ const RegionSectors = () => {
                 <h1 className="text-xl font-semibold">Sektorlar</h1>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" onClick={handleExportSectors}>
-                  <FileDown className="w-4 h-4 mr-2" />
-                  Export
-                </Button>
-                <Button onClick={() => setIsAddDialogOpen(true)}>
+                <Button variant="outline" onClick={() => setShowAddDialog(true)}>
                   <PlusCircle className="w-4 h-4 mr-2" />
                   Yeni Sektor
                 </Button>
@@ -186,19 +187,19 @@ const RegionSectors = () => {
                                 size="icon" 
                                 className="h-7 w-7"
                                 onClick={() => {
-                                  setEditingSector(sector);
-                                  setIsEditDialogOpen(true);
+                                  setCurrentSector(sector);
+                                  setShowEditDialog(true);
                                 }}
                               >
-                                <Edit className="h-4 w-4" />
+                                <Pencil className="h-4 w-4" />
                               </Button>
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
                                 className="h-7 w-7"
                                 onClick={() => {
-                                  setDeletingSector(sector);
-                                  setIsDeleteDialogOpen(true);
+                                  setCurrentSector(sector);
+                                  setShowDeleteDialog(true);
                                 }}
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -231,7 +232,7 @@ const RegionSectors = () => {
       </div>
 
       {/* Add Sector Dialog */}
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Yeni Sektor əlavə et</DialogTitle>
@@ -248,7 +249,7 @@ const RegionSectors = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
               Ləğv et
             </Button>
             <Button onClick={handleAddSector} disabled={isLoading}>
@@ -259,7 +260,7 @@ const RegionSectors = () => {
       </Dialog>
 
       {/* Edit Sector Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Sektoru redaktə et</DialogTitle>
@@ -270,13 +271,13 @@ const RegionSectors = () => {
               <Input
                 id="edit-sector-name"
                 placeholder="Sektor adını daxil edin"
-                value={editingSector?.name || ""}
-                onChange={(e) => setEditingSector(editingSector ? {...editingSector, name: e.target.value} : null)}
+                value={newSectorName}
+                onChange={(e) => setNewSectorName(e.target.value)}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)}>
               Ləğv et
             </Button>
             <Button onClick={handleEditSector} disabled={isLoading}>
@@ -287,17 +288,17 @@ const RegionSectors = () => {
       </Dialog>
 
       {/* Delete Sector Dialog */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Sektoru sil</DialogTitle>
           </DialogHeader>
           <div className="py-4">
             <p>Bu sektoru silmək istədiyinizə əminsiniz? Bu əməliyyat geri qaytarıla bilməz.</p>
-            <p className="font-medium mt-2">{deletingSector?.name}</p>
+            <p className="font-medium mt-2">{currentSector?.name}</p>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
               Ləğv et
             </Button>
             <Button variant="destructive" onClick={handleDeleteSector} disabled={isLoading}>

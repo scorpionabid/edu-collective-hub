@@ -6,17 +6,16 @@ import { Column } from "./types";
 export const columns = {
   getAll: async (categoryId: string) => {
     try {
+      // Execute a direct SQL query
       const { data, error } = await supabase
-        .from('columns')
-        .select('*')
-        .eq('category_id', categoryId);
+        .rpc('get_columns_by_category', { category_id: categoryId });
       
       if (error) {
         console.error('Error fetching columns:', error);
         throw error;
       }
       
-      return data?.map(column => ({
+      return (data as any[])?.map(column => ({
         id: column.id,
         name: column.name,
         type: column.type,
@@ -30,15 +29,13 @@ export const columns = {
   
   create: async (column: Omit<Column, 'id'>) => {
     try {
+      // Execute a direct SQL insert
       const { data, error } = await supabase
-        .from('columns')
-        .insert({
-          name: column.name,
-          type: column.type,
+        .rpc('create_column', {
+          column_name: column.name,
+          column_type: column.type,
           category_id: column.categoryId
-        })
-        .select('*')
-        .single();
+        });
       
       if (error) {
         toast.error(error.message);
@@ -46,6 +43,7 @@ export const columns = {
       }
       
       toast.success('Column created successfully');
+      
       return data ? {
         id: data.id,
         name: data.name,
@@ -71,16 +69,13 @@ export const columns = {
   
   update: async (id: string, column: Partial<Column>) => {
     try {
-      const updateData: any = {};
-      if (column.name) updateData.name = column.name;
-      if (column.type) updateData.type = column.type;
+      // Execute a direct SQL update
+      const updateData: Record<string, any> = { column_id: id };
+      if (column.name !== undefined) updateData.column_name = column.name;
+      if (column.type !== undefined) updateData.column_type = column.type;
       
       const { data, error } = await supabase
-        .from('columns')
-        .update(updateData)
-        .eq('id', id)
-        .select('*')
-        .single();
+        .rpc('update_column', updateData);
       
       if (error) {
         toast.error(error.message);
@@ -88,6 +83,7 @@ export const columns = {
       }
       
       toast.success('Column updated successfully');
+      
       return data ? {
         id: data.id,
         name: data.name,
@@ -113,10 +109,9 @@ export const columns = {
   
   delete: async (id: string) => {
     try {
+      // Execute a direct SQL delete
       const { error } = await supabase
-        .from('columns')
-        .delete()
-        .eq('id', id);
+        .rpc('delete_column', { column_id: id });
       
       if (error) {
         toast.error(error.message);

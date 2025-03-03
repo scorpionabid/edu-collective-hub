@@ -259,7 +259,7 @@ export const getGroupMembers = async (groupId: string): Promise<NotificationGrou
       return {
         id: member.id,
         groupId: member.group_id,
-        memberType: member.member_type,
+        memberType: member.member_type as "region" | "sector" | "school" | "profile",
         memberId: member.member_id,
         memberName,
         createdAt: member.created_at
@@ -358,8 +358,8 @@ export const createMassNotification = async (data: CreateMassNotificationData): 
       id: updatedNotification.id,
       title: updatedNotification.title,
       message: updatedNotification.message,
-      notificationType: updatedNotification.notification_type,
-      deliveryStatus: updatedNotification.delivery_status,
+      notificationType: updatedNotification.notification_type as "email" | "sms" | "app" | "all",
+      deliveryStatus: updatedNotification.delivery_status as "pending" | "in-progress" | "completed" | "failed",
       sentCount: updatedNotification.sent_count || 0,
       createdBy: updatedNotification.created_by,
       createdAt: updatedNotification.created_at
@@ -408,8 +408,8 @@ export const getMassNotifications = async (params?: GetMassNotificationsParams):
       id: notification.id,
       title: notification.title,
       message: notification.message,
-      notificationType: notification.notification_type,
-      deliveryStatus: notification.delivery_status,
+      notificationType: notification.notification_type as "email" | "sms" | "app" | "all",
+      deliveryStatus: notification.delivery_status as "pending" | "in-progress" | "completed" | "failed",
       sentCount: notification.sent_count || 0,
       createdBy: notification.created_by,
       createdAt: notification.created_at
@@ -438,8 +438,8 @@ export const getMassNotificationById = async (id: string): Promise<MassNotificat
       id: notification.id,
       title: notification.title,
       message: notification.message,
-      notificationType: notification.notification_type,
-      deliveryStatus: notification.delivery_status,
+      notificationType: notification.notification_type as "email" | "sms" | "app" | "all",
+      deliveryStatus: notification.delivery_status as "pending" | "in-progress" | "completed" | "failed",
       sentCount: notification.sent_count || 0,
       createdBy: notification.created_by,
       createdAt: notification.created_at
@@ -504,7 +504,7 @@ export const getNotificationRecipients = async (notificationId: string): Promise
       return {
         id: recipient.id,
         notificationId: recipient.notification_id,
-        recipientType: recipient.recipient_type,
+        recipientType: recipient.recipient_type as "region" | "sector" | "school" | "profile",
         recipientId: recipient.recipient_id,
         recipientName,
         status: recipient.status,

@@ -1,3 +1,4 @@
+
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -95,9 +96,11 @@ const RegionReports = () => {
         const categoryDetails = await api.categories.getById(selectedCategory);
         
         if (categoryDetails && categoryDetails.columns) {
+          // Ensure columns is an array with valid objects
           const validColumns = Array.isArray(categoryDetails.columns) 
             ? categoryDetails.columns.filter(col => col && typeof col === 'object' && 'id' in col)
             : [];
+          
           setColumns(validColumns as Column[]);
           
           const formData = await api.formData.getAll();

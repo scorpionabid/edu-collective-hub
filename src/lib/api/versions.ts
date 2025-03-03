@@ -3,377 +3,358 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { TableVersion, FormEntryVersion, VersionDiff } from "./types";
 
-// Export the versions API object
-export const versions = {
-  // Table versions
-  createTableVersion: async (tableId: string, schema: any, description?: string): Promise<TableVersion> => {
-    try {
-      // First get the latest version number for this table
-      const { data: existingVersions, error: countError } = await supabase
-        .from('table_versions')
-        .select('version_number')
-        .eq('table_id', tableId)
-        .order('version_number', { ascending: false })
-        .limit(1);
-      
-      if (countError) {
-        console.error('Error getting latest version number:', countError);
-        throw countError;
-      }
-      
-      const newVersionNumber = existingVersions && existingVersions.length > 0 
-        ? existingVersions[0].version_number + 1 
-        : 1;
-      
-      // Insert the new version
-      const { data, error } = await supabase
-        .from('table_versions')
-        .insert({
-          table_id: tableId,
-          version_number: newVersionNumber,
-          schema: schema,
-          is_active: false, // Default to inactive until activated
-          started_at: null,
-          created_by: supabase.auth.getUser() ? (await supabase.auth.getUser()).data?.user?.id : null
-        })
-        .select('*')
-        .single();
-      
-      if (error) {
-        toast.error(`Error creating table version: ${error.message}`);
-        throw error;
-      }
-      
-      toast.success('Table version created successfully');
-      
-      return {
-        id: data.id,
-        tableId: data.table_id,
-        versionNumber: data.version_number,
-        schema: data.schema,
-        isActive: data.is_active,
-        startedAt: data.started_at,
-        endedAt: data.ended_at,
-        createdBy: data.created_by,
-        createdAt: data.created_at
+// Helper function to compare object properties
+const compareObjects = (before: any, after: any): VersionDiff => {
+  const diff: VersionDiff = {
+    added: [],
+    removed: [],
+    modified: {}
+  };
+
+  // Find added properties
+  Object.keys(after).forEach(key => {
+    if (before[key] === undefined) {
+      diff.added.push(key);
+    }
+  });
+
+  // Find removed properties
+  Object.keys(before).forEach(key => {
+    if (after[key] === undefined) {
+      diff.removed.push(key);
+    }
+  });
+
+  // Find modified properties
+  Object.keys(after).forEach(key => {
+    if (before[key] !== undefined && 
+        JSON.stringify(before[key]) !== JSON.stringify(after[key])) {
+      diff.modified[key] = {
+        before: before[key],
+        after: after[key]
       };
-    } catch (error) {
-      console.error('Error in createTableVersion:', error);
-      toast.error('Failed to create table version');
+    }
+  });
+
+  return diff;
+};
+
+// Table Versions
+const getTableVersions = async (tableId: string): Promise<TableVersion[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('table_versions')
+      .select('*')
+      .eq('table_id', tableId)
+      .order('version_number', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching table versions:', error);
       throw error;
     }
-  },
-  
-  getTableVersions: async (tableId: string): Promise<TableVersion[]> => {
-    try {
-      const { data, error } = await supabase
-        .from('table_versions')
-        .select('*')
-        .eq('table_id', tableId)
-        .order('version_number', { ascending: false });
-      
-      if (error) {
-        console.error('Error fetching table versions:', error);
-        throw error;
-      }
-      
-      return data?.map(version => ({
-        id: version.id,
-        tableId: version.table_id,
-        versionNumber: version.version_number,
-        schema: version.schema,
-        isActive: version.is_active,
-        startedAt: version.started_at,
-        endedAt: version.ended_at,
-        createdBy: version.created_by,
-        createdAt: version.created_at
-      })) || [];
-    } catch (error) {
-      console.error('Error in getTableVersions:', error);
-      return [];
+
+    return data.map(version => ({
+      id: version.id,
+      tableId: version.table_id,
+      versionNumber: version.version_number,
+      schema: version.schema,
+      isActive: version.is_active,
+      startedAt: version.started_at,
+      endedAt: version.ended_at,
+      createdBy: version.created_by,
+      createdAt: version.created_at
+    }));
+  } catch (error) {
+    console.error(`Error in getTableVersions: ${error}`);
+    return [];
+  }
+};
+
+const getLatestTableVersion = async (tableId: string): Promise<TableVersion | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('table_versions')
+      .select('*')
+      .eq('table_id', tableId)
+      .order('version_number', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error) {
+      console.error('Error fetching latest table version:', error);
+      throw error;
     }
-  },
-  
-  getCurrentTableVersion: async (tableId: string): Promise<TableVersion | null> => {
-    try {
-      const { data, error } = await supabase
-        .from('table_versions')
-        .select('*')
-        .eq('table_id', tableId)
-        .eq('is_active', true)
-        .maybeSingle();
-      
-      if (error) {
-        console.error('Error fetching current table version:', error);
-        throw error;
-      }
-      
-      if (!data) return null;
-      
-      return {
-        id: data.id,
-        tableId: data.table_id,
-        versionNumber: data.version_number,
-        schema: data.schema,
-        isActive: data.is_active,
-        startedAt: data.started_at,
-        endedAt: data.ended_at,
-        createdBy: data.created_by,
-        createdAt: data.created_at
-      };
-    } catch (error) {
-      console.error('Error in getCurrentTableVersion:', error);
-      return null;
-    }
-  },
-  
-  activateTableVersion: async (versionId: string): Promise<void> => {
-    try {
-      // Get the version we want to activate to find its tableId
-      const { data: versionToActivate, error: getError } = await supabase
-        .from('table_versions')
-        .select('*')
-        .eq('id', versionId)
-        .single();
-      
-      if (getError) {
-        console.error('Error fetching version to activate:', getError);
-        throw getError;
-      }
-      
-      // First, deactivate all other versions for this table
-      const { error: deactivateError } = await supabase
+
+    return {
+      id: data.id,
+      tableId: data.table_id,
+      versionNumber: data.version_number,
+      schema: data.schema, 
+      isActive: data.is_active,
+      startedAt: data.started_at,
+      endedAt: data.ended_at,
+      createdBy: data.created_by,
+      createdAt: data.created_at
+    };
+  } catch (error) {
+    console.error(`Error in getLatestTableVersion: ${error}`);
+    return null;
+  }
+};
+
+const createTableVersion = async (
+  tableId: string, 
+  schema: Record<string, any>, 
+  createdBy: string
+): Promise<TableVersion> => {
+  try {
+    // Get the latest version number
+    const latestVersion = await getLatestTableVersion(tableId);
+    const newVersionNumber = latestVersion ? latestVersion.versionNumber + 1 : 1;
+    
+    // Deactivate previous versions if any
+    if (latestVersion) {
+      await supabase
         .from('table_versions')
         .update({ 
           is_active: false,
           ended_at: new Date().toISOString()
         })
-        .eq('table_id', versionToActivate.table_id)
-        .eq('is_active', true);
-      
-      if (deactivateError) {
-        console.error('Error deactivating current versions:', deactivateError);
-        throw deactivateError;
-      }
-      
-      // Now activate the requested version
-      const { error: activateError } = await supabase
-        .from('table_versions')
-        .update({ 
-          is_active: true,
-          started_at: new Date().toISOString(),
-          ended_at: null
-        })
-        .eq('id', versionId);
-      
-      if (activateError) {
-        console.error('Error activating version:', activateError);
-        throw activateError;
-      }
-      
-      toast.success('Table version activated successfully');
-    } catch (error) {
-      console.error('Error in activateTableVersion:', error);
-      toast.error('Failed to activate table version');
+        .eq('id', latestVersion.id);
+    }
+    
+    // Create new version
+    const { data, error } = await supabase
+      .from('table_versions')
+      .insert({
+        table_id: tableId,
+        version_number: newVersionNumber,
+        schema: schema,
+        is_active: true,
+        started_at: new Date().toISOString(),
+        created_by: createdBy
+      })
+      .select('*')
+      .single();
+    
+    if (error) {
+      console.error('Error creating table version:', error);
+      toast.error('Failed to create table version');
       throw error;
     }
-  },
-  
-  compareTableVersions: async (versionId1: string, versionId2: string): Promise<VersionDiff> => {
-    try {
-      // Get both versions
-      const { data: version1, error: error1 } = await supabase
-        .from('table_versions')
-        .select('*')
-        .eq('id', versionId1)
-        .single();
-      
-      if (error1) {
-        console.error('Error fetching version 1:', error1);
-        throw error1;
-      }
-      
-      const { data: version2, error: error2 } = await supabase
-        .from('table_versions')
-        .select('*')
-        .eq('id', versionId2)
-        .single();
-      
-      if (error2) {
-        console.error('Error fetching version 2:', error2);
-        throw error2;
-      }
-      
-      // Compare schemas
-      const schema1 = version1.schema;
-      const schema2 = version2.schema;
-      
-      const fields1 = Object.keys(schema1);
-      const fields2 = Object.keys(schema2);
-      
-      const added = fields2.filter(field => !fields1.includes(field));
-      const removed = fields1.filter(field => !fields2.includes(field));
-      
-      const modified: Record<string, { before: any; after: any }> = {};
-      
-      fields1.forEach(field => {
-        if (fields2.includes(field) && schema1[field] !== schema2[field]) {
-          modified[field] = {
-            before: schema1[field],
-            after: schema2[field]
-          };
-        }
-      });
-      
-      return {
-        added,
-        removed,
-        modified
-      };
-    } catch (error) {
-      console.error('Error in compareTableVersions:', error);
-      return {
-        added: [],
-        removed: [],
-        modified: {}
-      };
+    
+    toast.success('New table version created successfully');
+    
+    return {
+      id: data.id,
+      tableId: data.table_id,
+      versionNumber: data.version_number,
+      schema: data.schema,
+      isActive: data.is_active,
+      startedAt: data.started_at,
+      endedAt: data.ended_at,
+      createdBy: data.created_by,
+      createdAt: data.created_at
+    };
+  } catch (error) {
+    console.error(`Error in createTableVersion: ${error}`);
+    throw error;
+  }
+};
+
+const compareTableVersions = async (
+  versionId1: string, 
+  versionId2: string
+): Promise<VersionDiff> => {
+  try {
+    const { data, error } = await supabase
+      .from('table_versions')
+      .select('id, schema')
+      .in('id', [versionId1, versionId2]);
+    
+    if (error) {
+      console.error('Error fetching versions for comparison:', error);
+      throw error;
     }
-  },
-  
-  // Form entry versions
-  createFormEntryVersion: async (formEntryId: string, tableVersionId: string, data: any): Promise<FormEntryVersion> => {
-    try {
-      // First get the latest version number for this form entry
-      const { data: existingVersions, error: countError } = await supabase
-        .from('form_entry_versions')
-        .select('version_number')
-        .eq('form_entry_id', formEntryId)
-        .order('version_number', { ascending: false })
-        .limit(1);
-      
-      if (countError) {
-        console.error('Error getting latest version number:', countError);
-        throw countError;
-      }
-      
-      const newVersionNumber = existingVersions && existingVersions.length > 0 
-        ? existingVersions[0].version_number + 1 
-        : 1;
-      
-      // Insert the new version
-      const { data: versionData, error } = await supabase
-        .from('form_entry_versions')
-        .insert({
-          form_entry_id: formEntryId,
-          version_number: newVersionNumber,
-          table_version_id: tableVersionId,
-          data: data,
-          created_by: supabase.auth.getUser() ? (await supabase.auth.getUser()).data?.user?.id : null
-        })
-        .select('*')
-        .single();
-      
-      if (error) {
-        toast.error(`Error creating form entry version: ${error.message}`);
-        throw error;
-      }
-      
-      toast.success('Form entry version created successfully');
-      
-      return {
-        id: versionData.id,
-        formEntryId: versionData.form_entry_id,
-        versionNumber: versionData.version_number,
-        tableVersionId: versionData.table_version_id,
-        data: versionData.data,
-        createdBy: versionData.created_by,
-        createdAt: versionData.created_at
-      };
-    } catch (error) {
-      console.error('Error in createFormEntryVersion:', error);
+    
+    if (data.length !== 2) {
+      throw new Error('Could not find both versions for comparison');
+    }
+    
+    const version1 = data.find(v => v.id === versionId1);
+    const version2 = data.find(v => v.id === versionId2);
+    
+    if (!version1 || !version2) {
+      throw new Error('Could not find both versions for comparison');
+    }
+    
+    return compareObjects(version1.schema, version2.schema);
+  } catch (error) {
+    console.error(`Error in compareTableVersions: ${error}`);
+    toast.error('Failed to compare table versions');
+    return {
+      added: [],
+      removed: [],
+      modified: {}
+    };
+  }
+};
+
+// Form Entry Versions
+const getFormEntryVersions = async (formEntryId: string): Promise<FormEntryVersion[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('form_entry_versions')
+      .select('*')
+      .eq('form_entry_id', formEntryId)
+      .order('version_number', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching form entry versions:', error);
+      throw error;
+    }
+    
+    return data.map(version => ({
+      id: version.id,
+      formEntryId: version.form_entry_id,
+      versionNumber: version.version_number,
+      tableVersionId: version.table_version_id,
+      data: version.data as Record<string, any>,
+      createdBy: version.created_by,
+      createdAt: version.created_at
+    }));
+  } catch (error) {
+    console.error(`Error in getFormEntryVersions: ${error}`);
+    return [];
+  }
+};
+
+const getLatestFormEntryVersion = async (formEntryId: string): Promise<FormEntryVersion | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('form_entry_versions')
+      .select('*')
+      .eq('form_entry_id', formEntryId)
+      .order('version_number', { ascending: false })
+      .limit(1)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching latest form entry version:', error);
+      throw error;
+    }
+    
+    return {
+      id: data.id,
+      formEntryId: data.form_entry_id,
+      versionNumber: data.version_number,
+      tableVersionId: data.table_version_id,
+      data: data.data as Record<string, any>,
+      createdBy: data.created_by,
+      createdAt: data.created_at
+    };
+  } catch (error) {
+    console.error(`Error in getLatestFormEntryVersion: ${error}`);
+    return null;
+  }
+};
+
+const createFormEntryVersion = async (
+  formEntryId: string,
+  tableVersionId: string, 
+  data: Record<string, any>,
+  createdBy: string
+): Promise<FormEntryVersion> => {
+  try {
+    // Get the latest version number
+    const latestVersion = await getLatestFormEntryVersion(formEntryId);
+    const newVersionNumber = latestVersion ? latestVersion.versionNumber + 1 : 1;
+    
+    // Create new version
+    const { data: newVersion, error } = await supabase
+      .from('form_entry_versions')
+      .insert({
+        form_entry_id: formEntryId,
+        version_number: newVersionNumber,
+        table_version_id: tableVersionId,
+        data: data,
+        created_by: createdBy
+      })
+      .select('*')
+      .single();
+    
+    if (error) {
+      console.error('Error creating form entry version:', error);
       toast.error('Failed to create form entry version');
       throw error;
     }
-  },
-  
-  getFormEntryVersions: async (formEntryId: string): Promise<FormEntryVersion[]> => {
-    try {
-      const { data, error } = await supabase
-        .from('form_entry_versions')
-        .select('*')
-        .eq('form_entry_id', formEntryId)
-        .order('version_number', { ascending: false });
-      
-      if (error) {
-        console.error('Error fetching form entry versions:', error);
-        throw error;
-      }
-      
-      return data?.map(version => ({
-        id: version.id,
-        formEntryId: version.form_entry_id,
-        versionNumber: version.version_number,
-        tableVersionId: version.table_version_id,
-        data: version.data,
-        createdBy: version.created_by,
-        createdAt: version.created_at
-      })) || [];
-    } catch (error) {
-      console.error('Error in getFormEntryVersions:', error);
-      return [];
-    }
-  },
-  
-  migrateFormData: async (data: any, fromVersionId: string, toVersionId: string): Promise<any> => {
-    try {
-      // Get the source and target versions
-      const { data: fromVersion, error: fromError } = await supabase
-        .from('table_versions')
-        .select('*')
-        .eq('id', fromVersionId)
-        .single();
-      
-      if (fromError) {
-        console.error('Error fetching source version:', fromError);
-        throw fromError;
-      }
-      
-      const { data: toVersion, error: toError } = await supabase
-        .from('table_versions')
-        .select('*')
-        .eq('id', toVersionId)
-        .single();
-      
-      if (toError) {
-        console.error('Error fetching target version:', toError);
-        throw toError;
-      }
-      
-      // Get schemas
-      const fromSchema = fromVersion.schema;
-      const toSchema = toVersion.schema;
-      
-      // Initialize migrated data
-      let migratedData: Record<string, any> = {};
-      
-      // Copy data for fields that exist in both schemas
-      Object.keys(data).forEach(key => {
-        if (key in toSchema) {
-          migratedData[key] = data[key];
-        }
-      });
-      
-      // Set default values for new fields in target schema
-      Object.keys(toSchema).forEach(key => {
-        if (!(key in data)) {
-          migratedData[key] = null; // Default value
-        }
-      });
-      
-      return migratedData;
-    } catch (error) {
-      console.error('Error in migrateFormData:', error);
-      return data; // Return original data on error
-    }
+    
+    toast.success('New form entry version created successfully');
+    
+    return {
+      id: newVersion.id,
+      formEntryId: newVersion.form_entry_id,
+      versionNumber: newVersion.version_number,
+      tableVersionId: newVersion.table_version_id,
+      data: newVersion.data as Record<string, any>,
+      createdBy: newVersion.created_by,
+      createdAt: newVersion.created_at
+    };
+  } catch (error) {
+    console.error(`Error in createFormEntryVersion: ${error}`);
+    throw error;
   }
+};
+
+const compareFormEntryVersions = async (
+  versionId1: string, 
+  versionId2: string
+): Promise<VersionDiff> => {
+  try {
+    const { data, error } = await supabase
+      .from('form_entry_versions')
+      .select('id, data')
+      .in('id', [versionId1, versionId2]);
+    
+    if (error) {
+      console.error('Error fetching versions for comparison:', error);
+      throw error;
+    }
+    
+    if (data.length !== 2) {
+      throw new Error('Could not find both versions for comparison');
+    }
+    
+    const version1 = data.find(v => v.id === versionId1);
+    const version2 = data.find(v => v.id === versionId2);
+    
+    if (!version1 || !version2) {
+      throw new Error('Could not find both versions for comparison');
+    }
+    
+    return compareObjects(version1.data, version2.data);
+  } catch (error) {
+    console.error(`Error in compareFormEntryVersions: ${error}`);
+    toast.error('Failed to compare form entry versions');
+    return {
+      added: [],
+      removed: [],
+      modified: {}
+    };
+  }
+};
+
+// Export all functions
+export const versions = {
+  // Table versions
+  getTableVersions,
+  getLatestTableVersion,
+  createTableVersion,
+  compareTableVersions,
+  
+  // Form entry versions
+  getFormEntryVersions,
+  getLatestFormEntryVersion,
+  createFormEntryVersion,
+  compareFormEntryVersions
 };

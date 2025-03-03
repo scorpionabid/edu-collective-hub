@@ -6,22 +6,19 @@ import { FormData } from "./types";
 export const formData = {
   getAll: async (schoolId?: string) => {
     try {
-      let query = supabase
-        .from('form_data')
-        .select('*');
+      // Execute a direct SQL query with optional filtering
+      const params: Record<string, any> = {};
+      if (schoolId) params.school_id_filter = schoolId;
       
-      if (schoolId) {
-        query = query.eq('school_id', schoolId);
-      }
-      
-      const { data, error } = await query;
+      const { data, error } = await supabase
+        .rpc('get_form_data', params);
       
       if (error) {
         console.error('Error fetching form data:', error);
         throw error;
       }
       
-      return data?.map(entry => ({
+      return (data as any[])?.map(entry => ({
         id: entry.id,
         categoryId: entry.category_id,
         schoolId: entry.school_id,
@@ -39,27 +36,30 @@ export const formData = {
   
   getById: async (id: string) => {
     try {
+      // Execute a direct SQL query by ID
       const { data, error } = await supabase
-        .from('form_data')
-        .select('*')
-        .eq('id', id)
-        .single();
+        .rpc('get_form_data_by_id', { form_id: id });
       
       if (error) {
         console.error('Error fetching form data:', error);
         throw error;
       }
       
-      return data ? {
-        id: data.id,
-        categoryId: data.category_id,
-        schoolId: data.school_id,
-        data: data.data,
-        status: data.status,
-        submittedAt: data.submitted_at,
-        approvedAt: data.approved_at,
-        approvedBy: data.approved_by
-      } : null;
+      if (!data || data.length === 0) {
+        return null;
+      }
+      
+      const entry = data[0];
+      return {
+        id: entry.id,
+        categoryId: entry.category_id,
+        schoolId: entry.school_id,
+        data: entry.data,
+        status: entry.status,
+        submittedAt: entry.submitted_at,
+        approvedAt: entry.approved_at,
+        approvedBy: entry.approved_by
+      };
     } catch (error) {
       console.error(`Error in getById formData ${id}:`, error);
       return null;
@@ -68,17 +68,15 @@ export const formData = {
   
   submit: async (formData: Omit<FormData, 'id'>) => {
     try {
+      // Execute a direct SQL insert
       const { data, error } = await supabase
-        .from('form_data')
-        .insert({
+        .rpc('submit_form_data', {
           category_id: formData.categoryId,
           school_id: formData.schoolId,
-          data: formData.data,
+          form_data: formData.data,
           status: formData.status,
           submitted_at: formData.status === 'submitted' ? new Date().toISOString() : null
-        })
-        .select('*')
-        .single();
+        });
       
       if (error) {
         toast.error(error.message);
@@ -86,6 +84,7 @@ export const formData = {
       }
       
       toast.success('Form submitted successfully');
+      
       return data ? {
         id: data.id,
         categoryId: data.category_id,
@@ -119,9 +118,10 @@ export const formData = {
   
   update: async (id: string, formData: Partial<FormData>) => {
     try {
-      const updateData: any = {};
-      if (formData.data) updateData.data = formData.data;
-      if (formData.status) {
+      // Execute a direct SQL update
+      const updateData: Record<string, any> = { form_id: id };
+      if (formData.data !== undefined) updateData.form_data = formData.data;
+      if (formData.status !== undefined) {
         updateData.status = formData.status;
         if (formData.status === 'submitted') {
           updateData.submitted_at = new Date().toISOString();
@@ -129,11 +129,7 @@ export const formData = {
       }
       
       const { data, error } = await supabase
-        .from('form_data')
-        .update(updateData)
-        .eq('id', id)
-        .select('*')
-        .single();
+        .rpc('update_form_data', updateData);
       
       if (error) {
         toast.error(error.message);
@@ -141,6 +137,7 @@ export const formData = {
       }
       
       toast.success('Form updated successfully');
+      
       return data ? {
         id: data.id,
         categoryId: data.category_id,
@@ -172,16 +169,12 @@ export const formData = {
   
   approve: async (id: string, approvedBy: string) => {
     try {
+      // Execute a direct SQL update for approval
       const { data, error } = await supabase
-        .from('form_data')
-        .update({
-          status: 'approved',
-          approved_at: new Date().toISOString(),
+        .rpc('approve_form_data', {
+          form_id: id,
           approved_by: approvedBy
-        })
-        .eq('id', id)
-        .select('*')
-        .single();
+        });
       
       if (error) {
         toast.error(error.message);
@@ -189,6 +182,7 @@ export const formData = {
       }
       
       toast.success('Form approved successfully');
+      
       return data ? {
         id: data.id,
         categoryId: data.category_id,
@@ -208,14 +202,9 @@ export const formData = {
   
   reject: async (id: string) => {
     try {
+      // Execute a direct SQL update for rejection
       const { data, error } = await supabase
-        .from('form_data')
-        .update({
-          status: 'rejected'
-        })
-        .eq('id', id)
-        .select('*')
-        .single();
+        .rpc('reject_form_data', { form_id: id });
       
       if (error) {
         toast.error(error.message);
@@ -223,6 +212,7 @@ export const formData = {
       }
       
       toast.success('Form rejected');
+      
       return data ? {
         id: data.id,
         categoryId: data.category_id,
