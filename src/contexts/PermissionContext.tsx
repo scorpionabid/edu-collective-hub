@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useMemo } from 'react';
-import { useAuth } from './AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 
 // Define permission types
 type PermissionAction = 

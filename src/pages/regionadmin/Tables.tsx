@@ -1,5 +1,4 @@
-
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -38,7 +37,6 @@ const RegionTables = () => {
   const [deletingColumn, setDeletingColumn] = useState<Column | null>(null);
   const [filteredCategories, setFilteredCategories] = useState<Category[]>([]);
 
-  // Load categories from localStorage on mount
   useEffect(() => {
     const storedCategories = localStorage.getItem('categories');
     if (storedCategories) {
@@ -46,19 +44,16 @@ const RegionTables = () => {
     }
   }, []);
 
-  // Save categories to localStorage when they change
   useEffect(() => {
     localStorage.setItem('categories', JSON.stringify(categories));
   }, [categories]);
 
-  // Filter categories based on user role and assigned entities
   useEffect(() => {
     if (!user) {
       setFilteredCategories([]);
       return;
     }
 
-    // For regionadmin, show only categories for their region
     const filtered = categories.filter(category => {
       if (user.role === 'regionadmin' && user.regionId) {
         return category.regionId === user.regionId ||
@@ -162,7 +157,6 @@ const RegionTables = () => {
     }
   };
 
-  // Helper function to get visibility text
   const getCategoryVisibilityText = (category: Category) => {
     if (category.schoolId) {
       return "Məktəb səviyyəsi";
