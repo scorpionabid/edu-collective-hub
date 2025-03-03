@@ -9,9 +9,13 @@ import { schools } from './schools';
 import { profiles } from './profiles';
 import { versions } from './versions';
 import { notifications } from './notifications';
+import { categoryValidation } from './categoryValidation';
 
 export const api = {
-  categories,
+  categories: {
+    ...categories,
+    ...categoryValidation,
+  },
   columns,
   formData,
   auth,
