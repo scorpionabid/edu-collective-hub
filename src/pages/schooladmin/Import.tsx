@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { InfoIcon, Upload } from 'lucide-react';
 import { ExcelImportDropzone } from '@/components/excel/ExcelImportDropzone';
@@ -10,21 +10,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-
-interface ImportStatus {
-  id: string;
-  status: string;
-  progress: number;
-  total_rows: number;
-  processed_rows: number;
-  created_at: string;
-  file_name: string;
-}
+import { ImportJob } from '@/lib/api/types';
 
 const SchoolImport = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('upload');
-  const [recentImports, setRecentImports] = useState<ImportStatus[]>([]);
+  const [recentImports, setRecentImports] = useState<ImportJob[]>([]);
   
   // Fetch recent imports when active tab changes to history
   React.useEffect(() => {
@@ -61,20 +52,25 @@ const SchoolImport = () => {
   const fetchRecentImports = async () => {
     if (!user?.id) return;
     
-    const { data, error } = await supabase
-      .from('import_jobs')
-      .select('*')
-      .eq('created_by', user.id)
-      .order('created_at', { ascending: false })
-      .limit(10);
+    try {
+      const { data, error } = await supabase
+        .from('import_jobs')
+        .select('*')
+        .eq('created_by', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+        
+      if (error) {
+        console.error('Error fetching recent imports:', error);
+        toast.error('Failed to load import history');
+        return;
+      }
       
-    if (error) {
-      console.error('Error fetching recent imports:', error);
+      setRecentImports(data as ImportJob[]);
+    } catch (error) {
+      console.error('Error in fetchRecentImports:', error);
       toast.error('Failed to load import history');
-      return;
     }
-    
-    setRecentImports(data as unknown as ImportStatus[]);
   };
   
   const handleImportComplete = (data: any[]) => {

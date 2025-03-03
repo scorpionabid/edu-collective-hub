@@ -1,7 +1,8 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import {
-  NotificationGroup,
+import { 
+  NotificationGroup, 
   CreateNotificationGroupData,
   UpdateNotificationGroupData,
   NotificationGroupMember,
@@ -13,526 +14,335 @@ import {
   GetMassNotificationsParams
 } from "./types";
 
-// Notification Groups API
-export const createNotificationGroup = async (data: CreateNotificationGroupData): Promise<NotificationGroup> => {
-  try {
-    const { data: group, error } = await supabase
-      .from('notification_groups')
-      .insert({
-        name: data.name,
-        description: data.description,
-        created_by: (await supabase.auth.getUser()).data.user?.id
-      })
-      .select('*')
-      .single();
+export const notifications = {
+  // Notification Groups
+  getGroups: async (): Promise<NotificationGroup[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('notification_groups')
+        .select('*')
+        .order('name', { ascending: true });
 
-    if (error) {
-      toast.error(error.message);
-      throw error;
+      if (error) throw error;
+      return data as NotificationGroup[];
+    } catch (error) {
+      console.error('Error fetching notification groups:', error);
+      toast.error('Failed to load notification groups');
+      return [];
     }
+  },
 
-    toast.success('Bildiriş qrupu yaradıldı');
+  getGroupById: async (id: string): Promise<NotificationGroup | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('notification_groups')
+        .select('*')
+        .eq('id', id)
+        .single();
 
-    return {
-      id: group.id,
-      name: group.name,
-      description: group.description,
-      createdBy: group.created_by,
-      createdAt: group.created_at,
-      updatedAt: group.updated_at
-    };
-  } catch (error) {
-    console.error('Error creating notification group:', error);
-    toast.error('Bildiriş qrupu yaratmaq alınmadı');
-    throw error;
-  }
-};
-
-export const getNotificationGroups = async (): Promise<NotificationGroup[]> => {
-  try {
-    const { data: groups, error } = await supabase
-      .from('notification_groups')
-      .select('*')
-      .order('name', { ascending: true });
-
-    if (error) {
-      toast.error(error.message);
-      throw error;
+      if (error) throw error;
+      return data as NotificationGroup;
+    } catch (error) {
+      console.error('Error fetching notification group:', error);
+      toast.error('Failed to load notification group');
+      return null;
     }
+  },
 
-    return groups.map(group => ({
-      id: group.id,
-      name: group.name,
-      description: group.description,
-      createdBy: group.created_by,
-      createdAt: group.created_at,
-      updatedAt: group.updated_at
-    }));
-  } catch (error) {
-    console.error('Error fetching notification groups:', error);
-    toast.error('Bildiriş qruplarını almaq alınmadı');
-    return [];
-  }
-};
+  createGroup: async (groupData: CreateNotificationGroupData): Promise<NotificationGroup | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('notification_groups')
+        .insert({
+          name: groupData.name,
+          description: groupData.description,
+          created_by: (await supabase.auth.getUser()).data.user?.id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
 
-export const getNotificationGroupById = async (id: string): Promise<NotificationGroup> => {
-  try {
-    const { data: group, error } = await supabase
-      .from('notification_groups')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error) {
-      toast.error(error.message);
-      throw error;
-    }
-
-    return {
-      id: group.id,
-      name: group.name,
-      description: group.description,
-      createdBy: group.created_by,
-      createdAt: group.created_at,
-      updatedAt: group.updated_at
-    };
-  } catch (error) {
-    console.error(`Error fetching notification group ${id}:`, error);
-    toast.error('Bildiriş qrupunu almaq alınmadı');
-    throw error;
-  }
-};
-
-export const updateNotificationGroup = async (id: string, data: UpdateNotificationGroupData): Promise<NotificationGroup> => {
-  try {
-    const updateData: any = {};
-    if (data.name !== undefined) updateData.name = data.name;
-    if (data.description !== undefined) updateData.description = data.description;
-    updateData.updated_at = new Date().toISOString();
-
-    const { data: group, error } = await supabase
-      .from('notification_groups')
-      .update(updateData)
-      .eq('id', id)
-      .select('*')
-      .single();
-
-    if (error) {
-      toast.error(error.message);
-      throw error;
-    }
-
-    toast.success('Bildiriş qrupu yeniləndi');
-
-    return {
-      id: group.id,
-      name: group.name,
-      description: group.description,
-      createdBy: group.created_by,
-      createdAt: group.created_at,
-      updatedAt: group.updated_at
-    };
-  } catch (error) {
-    console.error(`Error updating notification group ${id}:`, error);
-    toast.error('Bildiriş qrupunu yeniləmək alınmadı');
-    throw error;
-  }
-};
-
-export const deleteNotificationGroup = async (id: string): Promise<void> => {
-  try {
-    const { error } = await supabase
-      .from('notification_groups')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      toast.error(error.message);
-      throw error;
-    }
-
-    toast.success('Bildiriş qrupu silindi');
-  } catch (error) {
-    console.error(`Error deleting notification group ${id}:`, error);
-    toast.error('Bildiriş qrupunu silmək alınmadı');
-    throw error;
-  }
-};
-
-// Group Members API
-export const addGroupMembers = async (groupId: string, members: AddGroupMemberData[]): Promise<void> => {
-  try {
-    const dataToInsert = members.map(member => ({
-      group_id: groupId,
-      member_type: member.memberType,
-      member_id: member.memberId
-    }));
-
-    const { error } = await supabase
-      .from('notification_group_members')
-      .insert(dataToInsert);
-
-    if (error) {
-      toast.error(error.message);
-      throw error;
-    }
-
-    toast.success('Üzvlər qrupa əlavə edildi');
-  } catch (error) {
-    console.error(`Error adding members to group ${groupId}:`, error);
-    toast.error('Üzvləri qrupa əlavə etmək alınmadı');
-    throw error;
-  }
-};
-
-export const removeGroupMember = async (memberId: string): Promise<void> => {
-  try {
-    const { error } = await supabase
-      .from('notification_group_members')
-      .delete()
-      .eq('id', memberId);
-
-    if (error) {
-      toast.error(error.message);
-      throw error;
-    }
-
-    toast.success('Üzv qrupdan silindi');
-  } catch (error) {
-    console.error(`Error removing group member ${memberId}:`, error);
-    toast.error('Üzvü qrupdan silmək alınmadı');
-    throw error;
-  }
-};
-
-export const getGroupMembers = async (groupId: string): Promise<NotificationGroupMember[]> => {
-  try {
-    const { data: members, error } = await supabase
-      .from('notification_group_members')
-      .select('*')
-      .eq('group_id', groupId);
-
-    if (error) {
-      toast.error(error.message);
-      throw error;
-    }
-
-    // Get additional information for each member based on their type
-    const enhancedMembers = await Promise.all(members.map(async member => {
-      let memberName = '';
+      if (error) throw error;
       
-      try {
-        if (member.member_type === 'region') {
-          const { data } = await supabase
-            .from('regions')
-            .select('name')
-            .eq('id', member.member_id)
-            .single();
-          memberName = data?.name || '';
-        } else if (member.member_type === 'sector') {
-          const { data } = await supabase
-            .from('sectors')
-            .select('name')
-            .eq('id', member.member_id)
-            .single();
-          memberName = data?.name || '';
-        } else if (member.member_type === 'school') {
-          const { data } = await supabase
-            .from('schools')
-            .select('name')
-            .eq('id', member.member_id)
-            .single();
-          memberName = data?.name || '';
-        } else if (member.member_type === 'profile') {
-          const { data } = await supabase
-            .from('profiles')
-            .select('first_name, last_name')
-            .eq('id', member.member_id)
-            .single();
-          memberName = data ? `${data.first_name} ${data.last_name}` : '';
-        }
-      } catch (error) {
-        console.error(`Error fetching name for ${member.member_type} with ID ${member.member_id}:`, error);
-      }
+      toast.success('Notification group created successfully');
+      return data as NotificationGroup;
+    } catch (error) {
+      console.error('Error creating notification group:', error);
+      toast.error('Failed to create notification group');
+      return null;
+    }
+  },
 
-      return {
-        id: member.id,
-        groupId: member.group_id,
-        memberType: member.member_type as "region" | "sector" | "school" | "profile",
-        memberId: member.member_id,
-        memberName,
-        createdAt: member.created_at
+  updateGroup: async (id: string, groupData: UpdateNotificationGroupData): Promise<NotificationGroup | null> => {
+    try {
+      const updateData: any = {
+        updated_at: new Date().toISOString()
       };
-    }));
+      
+      if (groupData.name !== undefined) updateData.name = groupData.name;
+      if (groupData.description !== undefined) updateData.description = groupData.description;
+      
+      const { data, error } = await supabase
+        .from('notification_groups')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
 
-    return enhancedMembers;
-  } catch (error) {
-    console.error(`Error fetching members for group ${groupId}:`, error);
-    toast.error('Qrup üzvlərini almaq alınmadı');
-    return [];
-  }
-};
-
-// Mass Notifications API
-export const createMassNotification = async (data: CreateMassNotificationData): Promise<MassNotification> => {
-  try {
-    // First, create the notification
-    const { data: notification, error } = await supabase
-      .from('mass_notifications')
-      .insert({
-        title: data.title,
-        message: data.message,
-        notification_type: data.notificationType,
-        delivery_status: 'pending',
-        created_by: (await supabase.auth.getUser()).data.user?.id
-      })
-      .select('*')
-      .single();
-
-    if (error) {
-      toast.error(error.message);
-      throw error;
+      if (error) throw error;
+      
+      toast.success('Notification group updated successfully');
+      return data as NotificationGroup;
+    } catch (error) {
+      console.error('Error updating notification group:', error);
+      toast.error('Failed to update notification group');
+      return null;
     }
+  },
 
-    // Process recipients
-    const recipientsToAdd: any[] = [];
-    
-    for (const recipient of data.recipients) {
-      if (recipient.type === 'group') {
-        // If it's a group, get all members of the group and add them
-        const { data: groupMembers } = await supabase
-          .from('notification_group_members')
-          .select('*')
-          .eq('group_id', recipient.id);
-          
-        if (groupMembers && groupMembers.length > 0) {
-          groupMembers.forEach(member => {
-            recipientsToAdd.push({
-              notification_id: notification.id,
-              recipient_type: member.member_type,
-              recipient_id: member.member_id,
-              status: 'pending'
-            });
-          });
-        }
-      } else {
-        // Direct recipient
-        recipientsToAdd.push({
-          notification_id: notification.id,
-          recipient_type: recipient.type,
-          recipient_id: recipient.id,
-          status: 'pending'
-        });
+  deleteGroup: async (id: string): Promise<boolean> => {
+    try {
+      // First delete all members
+      const { error: membersError } = await supabase
+        .from('notification_group_members')
+        .delete()
+        .eq('group_id', id);
+        
+      if (membersError) throw membersError;
+      
+      // Then delete the group
+      const { error } = await supabase
+        .from('notification_groups')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      toast.success('Notification group deleted successfully');
+      return true;
+    } catch (error) {
+      console.error('Error deleting notification group:', error);
+      toast.error('Failed to delete notification group');
+      return false;
+    }
+  },
+
+  // Group Members
+  getGroupMembers: async (groupId: string): Promise<NotificationGroupMember[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('notification_group_members')
+        .select('*')
+        .eq('group_id', groupId);
+
+      if (error) throw error;
+      return data as NotificationGroupMember[];
+    } catch (error) {
+      console.error('Error fetching group members:', error);
+      toast.error('Failed to load group members');
+      return [];
+    }
+  },
+
+  addGroupMember: async (memberData: AddGroupMemberData): Promise<NotificationGroupMember | null> => {
+    try {
+      // Check if member already exists
+      const { data: existingMember, error: checkError } = await supabase
+        .from('notification_group_members')
+        .select('*')
+        .eq('group_id', memberData.groupId)
+        .eq('member_id', memberData.memberId)
+        .eq('member_type', memberData.memberType)
+        .maybeSingle();
+        
+      if (checkError) throw checkError;
+      
+      if (existingMember) {
+        toast.info('Member already exists in this group');
+        return existingMember as NotificationGroupMember;
       }
+      
+      const { data, error } = await supabase
+        .from('notification_group_members')
+        .insert({
+          group_id: memberData.groupId,
+          member_id: memberData.memberId,
+          member_type: memberData.memberType,
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      toast.success('Member added to group successfully');
+      return data as NotificationGroupMember;
+    } catch (error) {
+      console.error('Error adding group member:', error);
+      toast.error('Failed to add member to group');
+      return null;
     }
+  },
 
-    // Add recipients to the notification
-    if (recipientsToAdd.length > 0) {
-      const { error: recipientsError } = await supabase
-        .from('mass_notification_recipients')
-        .insert(recipientsToAdd);
+  removeGroupMember: async (id: string): Promise<boolean> => {
+    try {
+      const { error } = await supabase
+        .from('notification_group_members')
+        .delete()
+        .eq('id', id);
 
-      if (recipientsError) {
-        toast.error(`Recipients error: ${recipientsError.message}`);
-        throw recipientsError;
+      if (error) throw error;
+      
+      toast.success('Member removed from group successfully');
+      return true;
+    } catch (error) {
+      console.error('Error removing group member:', error);
+      toast.error('Failed to remove member from group');
+      return false;
+    }
+  },
+
+  // Mass Notifications
+  getMassNotifications: async (params?: GetMassNotificationsParams): Promise<MassNotification[]> => {
+    try {
+      let query = supabase
+        .from('mass_notifications')
+        .select('*')
+        .order('created_at', { ascending: false });
+        
+      if (params?.fromDate) {
+        query = query.gte('created_at', params.fromDate);
       }
-    }
-
-    // Update notification with the count of recipients
-    const { data: updatedNotification, error: updateError } = await supabase
-      .from('mass_notifications')
-      .update({ sent_count: recipientsToAdd.length })
-      .eq('id', notification.id)
-      .select('*')
-      .single();
-
-    if (updateError) {
-      toast.error(updateError.message);
-      throw updateError;
-    }
-
-    toast.success('Kütləvi bildiriş yaradıldı');
-
-    return {
-      id: updatedNotification.id,
-      title: updatedNotification.title,
-      message: updatedNotification.message,
-      notificationType: updatedNotification.notification_type as "email" | "sms" | "app" | "all",
-      deliveryStatus: updatedNotification.delivery_status as "pending" | "in-progress" | "completed" | "failed",
-      sentCount: updatedNotification.sent_count || 0,
-      createdBy: updatedNotification.created_by,
-      createdAt: updatedNotification.created_at
-    };
-  } catch (error) {
-    console.error('Error creating mass notification:', error);
-    toast.error('Kütləvi bildiriş yaratmaq alınmadı');
-    throw error;
-  }
-};
-
-export const getMassNotifications = async (params?: GetMassNotificationsParams): Promise<MassNotification[]> => {
-  try {
-    let query = supabase
-      .from('mass_notifications')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    // Apply filters if provided
-    if (params) {
-      if (params.status) {
+      
+      if (params?.toDate) {
+        query = query.lte('created_at', params.toDate);
+      }
+      
+      if (params?.status) {
         query = query.eq('delivery_status', params.status);
       }
-      if (params.createdBy) {
-        query = query.eq('created_by', params.createdBy);
-      }
-      if (params.createdAfter) {
-        query = query.gte('created_at', params.createdAfter);
-      }
-      if (params.createdBefore) {
-        query = query.lte('created_at', params.createdBefore);
-      }
-      if (params.limit) {
-        query = query.limit(params.limit);
-      }
-    }
-
-    const { data: notifications, error } = await query;
-
-    if (error) {
-      toast.error(error.message);
-      throw error;
-    }
-
-    return notifications.map(notification => ({
-      id: notification.id,
-      title: notification.title,
-      message: notification.message,
-      notificationType: notification.notification_type as "email" | "sms" | "app" | "all",
-      deliveryStatus: notification.delivery_status as "pending" | "in-progress" | "completed" | "failed",
-      sentCount: notification.sent_count || 0,
-      createdBy: notification.created_by,
-      createdAt: notification.created_at
-    }));
-  } catch (error) {
-    console.error('Error fetching mass notifications:', error);
-    toast.error('Kütləvi bildirişləri almaq alınmadı');
-    return [];
-  }
-};
-
-export const getMassNotificationById = async (id: string): Promise<MassNotification> => {
-  try {
-    const { data: notification, error } = await supabase
-      .from('mass_notifications')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error) {
-      toast.error(error.message);
-      throw error;
-    }
-
-    return {
-      id: notification.id,
-      title: notification.title,
-      message: notification.message,
-      notificationType: notification.notification_type as "email" | "sms" | "app" | "all",
-      deliveryStatus: notification.delivery_status as "pending" | "in-progress" | "completed" | "failed",
-      sentCount: notification.sent_count || 0,
-      createdBy: notification.created_by,
-      createdAt: notification.created_at
-    };
-  } catch (error) {
-    console.error(`Error fetching mass notification ${id}:`, error);
-    toast.error('Kütləvi bildirişi almaq alınmadı');
-    throw error;
-  }
-};
-
-export const getNotificationRecipients = async (notificationId: string): Promise<MassNotificationRecipient[]> => {
-  try {
-    const { data: recipientsData, error } = await supabase
-      .from('mass_notification_recipients')
-      .select('*')
-      .eq('notification_id', notificationId);
       
-    if (error) {
+      if (params?.type) {
+        query = query.eq('notification_type', params.type);
+      }
+      
+      if (params?.page !== undefined && params?.limit !== undefined) {
+        const from = (params.page - 1) * params.limit;
+        const to = from + params.limit - 1;
+        query = query.range(from, to);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      return data as MassNotification[];
+    } catch (error) {
+      console.error('Error fetching mass notifications:', error);
+      toast.error('Failed to load notifications');
+      return [];
+    }
+  },
+
+  getMassNotificationById: async (id: string): Promise<MassNotification | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('mass_notifications')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+      return data as MassNotification;
+    } catch (error) {
+      console.error('Error fetching notification:', error);
+      toast.error('Failed to load notification');
+      return null;
+    }
+  },
+
+  createMassNotification: async (notificationData: CreateMassNotificationData): Promise<MassNotification | null> => {
+    try {
+      // Create notification
+      const { data: notification, error: notificationError } = await supabase
+        .from('mass_notifications')
+        .insert({
+          title: notificationData.title,
+          message: notificationData.message,
+          notification_type: notificationData.notificationType,
+          delivery_status: 'pending',
+          created_by: (await supabase.auth.getUser()).data.user?.id,
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+        
+      if (notificationError) throw notificationError;
+      
+      // Trigger the function to process recipients and send the notification
+      const { error: functionError } = await supabase.functions.invoke('process-notification', {
+        body: { 
+          notificationId: notification.id,
+          recipients: notificationData.recipients
+        }
+      });
+      
+      if (functionError) throw functionError;
+      
+      toast.success('Notification sent successfully');
+      return notification as MassNotification;
+    } catch (error) {
+      console.error('Error creating mass notification:', error);
+      toast.error('Failed to send notification');
+      return null;
+    }
+  },
+
+  // Notification Recipients
+  getNotificationRecipients: async (notificationId: string): Promise<MassNotificationRecipient[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('mass_notification_recipients')
+        .select('*')
+        .eq('notification_id', notificationId);
+
+      if (error) throw error;
+      return data as MassNotificationRecipient[];
+    } catch (error) {
       console.error('Error fetching notification recipients:', error);
-      throw error;
+      toast.error('Failed to load notification recipients');
+      return [];
     }
-    
-    // Cast the status field to the correct type
-    return recipientsData?.map((r: any) => ({
-      id: r.id,
-      notificationId: r.notification_id,
-      recipientType: r.recipient_type as "region" | "sector" | "school" | "profile",
-      recipientId: r.recipient_id,
-      recipientName: r.recipient_name || '',  // Adding a fallback value
-      status: r.status as "pending" | "sent" | "failed" | "read",
-      sentAt: r.sent_at,
-      readAt: r.read_at,
-      createdAt: r.created_at
-    })) || [];
-  } catch (error) {
-    console.error('Error in getNotificationRecipients:', error);
-    return [];
-  }
-};
+  },
 
-export const getNotificationStats = async (notificationId: string): Promise<NotificationStats> => {
-  try {
-    const { data: recipients, error } = await supabase
-      .from('mass_notification_recipients')
-      .select('status')
-      .eq('notification_id', notificationId);
+  getNotificationStats: async (notificationId: string): Promise<NotificationStats> => {
+    try {
+      const { data, error } = await supabase
+        .from('mass_notification_recipients')
+        .select('status')
+        .eq('notification_id', notificationId);
 
-    if (error) {
-      toast.error(error.message);
-      throw error;
+      if (error) throw error;
+      
+      const stats: NotificationStats = {
+        totalSent: data.length,
+        delivered: data.filter(r => r.status === 'sent').length,
+        read: data.filter(r => r.status === 'read').length,
+        failed: data.filter(r => r.status === 'failed').length,
+        pending: data.filter(r => r.status === 'pending').length
+      };
+      
+      return stats;
+    } catch (error) {
+      console.error('Error fetching notification stats:', error);
+      toast.error('Failed to load notification statistics');
+      return {
+        totalSent: 0,
+        delivered: 0,
+        read: 0,
+        failed: 0,
+        pending: 0
+      };
     }
-
-    const stats: NotificationStats = {
-      total: recipients.length,
-      pending: 0,
-      sent: 0,
-      failed: 0,
-      read: 0
-    };
-
-    recipients.forEach(recipient => {
-      if (recipient.status === 'pending') stats.pending++;
-      else if (recipient.status === 'sent') stats.sent++;
-      else if (recipient.status === 'failed') stats.failed++;
-      else if (recipient.status === 'read') stats.read++;
-    });
-
-    return stats;
-  } catch (error) {
-    console.error(`Error fetching stats for notification ${notificationId}:`, error);
-    toast.error('Bildiriş statistikasını almaq alınmadı');
-    return {
-      total: 0,
-      pending: 0,
-      sent: 0,
-      failed: 0,
-      read: 0
-    };
   }
-};
-
-export const notifications = {
-  createNotificationGroup,
-  getNotificationGroups,
-  getNotificationGroupById,
-  updateNotificationGroup,
-  deleteNotificationGroup,
-  addGroupMembers,
-  removeGroupMember,
-  getGroupMembers,
-  createMassNotification,
-  getMassNotifications,
-  getMassNotificationById,
-  getNotificationRecipients,
-  getNotificationStats
 };

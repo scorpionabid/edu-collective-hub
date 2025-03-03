@@ -1,43 +1,38 @@
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { useState, ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { useState } from 'react';
 
 interface QueryProviderProps {
-  children: ReactNode;
+  children: React.ReactNode;
 }
 
-export function QueryProvider({ children }: QueryProviderProps) {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            refetchOnWindowFocus: false,
-            staleTime: 1000 * 60 * 5, // 5 minutes
-            retry: 1,
-            // Add these for performance optimization
-            refetchOnMount: true,
-            refetchOnReconnect: true,
-            retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-            // Cache data between component unmounts (important for route changes)
-            cacheTime: 1000 * 60 * 30, // 30 minutes
-          },
-          mutations: {
-            // Make mutations more reliable by retrying failed requests
-            retry: 1,
-            retryDelay: 1000,
-          }
-        },
-      })
-  );
+export const QueryProvider = ({ children }: QueryProviderProps) => {
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: {
+        refetchOnWindowFocus: false,
+        refetchOnMount: false,
+        refetchOnReconnect: false,
+        retry: 1,
+        staleTime: 5 * 60 * 1000, // 5 minutes
+        gcTime: 10 * 60 * 1000, // 10 minutes
+        networkMode: 'always',
+      },
+      mutations: {
+        retry: 1,
+        networkMode: 'always',
+      },
+    },
+  }));
 
   return (
     <QueryClientProvider client={queryClient}>
       {children}
-      {process.env.NODE_ENV === 'development' && (
-        <ReactQueryDevtools initialIsOpen={false} position="bottom-right" />
-      )}
+      <ReactQueryDevtools 
+        initialIsOpen={false} 
+        position="bottom-right" 
+      />
     </QueryClientProvider>
   );
-}
+};

@@ -1,3 +1,4 @@
+
 export interface Column {
   id: string;
   name: string;
@@ -73,4 +74,195 @@ export interface QueryOptions {
   sort?: SortParams;
   filters?: FilterParams;
   cache?: CacheOptions;
+}
+
+// Form data related types
+export interface FormData {
+  id: string;
+  categoryId: string;
+  schoolId: string;
+  data: any;
+  status: string;
+  submittedAt?: string;
+  approvedAt?: string;
+  approvedBy?: string;
+}
+
+// School related types
+export interface School {
+  id: string;
+  name: string;
+  address?: string;
+  email?: string;
+  phone?: string;
+  sectorId?: string;
+  created_at?: string;
+}
+
+// Sector related types
+export interface Sector {
+  id: string;
+  name: string;
+  regionId?: string;
+  created_at?: string;
+}
+
+// Versioning related types
+export interface TableVersion {
+  id: string;
+  tableId: string;
+  versionNumber: number;
+  schema: any;
+  isActive: boolean;
+  startedAt: string;
+  endedAt?: string;
+  createdAt: string;
+  createdBy: string;
+}
+
+export interface FormEntryVersion {
+  id: string;
+  formEntryId: string;
+  versionNumber: number;
+  data: any;
+  tableVersionId?: string;
+  createdAt: string;
+  createdBy: string;
+}
+
+export interface VersionDiff {
+  added: string[];
+  removed: string[];
+  modified: string[];
+}
+
+// Notification related types
+export interface NotificationGroup {
+  id: string;
+  name: string;
+  description?: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CreateNotificationGroupData {
+  name: string;
+  description?: string;
+}
+
+export interface UpdateNotificationGroupData {
+  name?: string;
+  description?: string;
+}
+
+export interface NotificationGroupMember {
+  id: string;
+  groupId: string;
+  memberId: string;
+  memberType: 'school' | 'sector' | 'region' | 'user';
+  createdAt: string;
+}
+
+export interface AddGroupMemberData {
+  groupId: string;
+  memberId: string;
+  memberType: 'school' | 'sector' | 'region' | 'user';
+}
+
+export interface MassNotification {
+  id: string;
+  title: string;
+  message: string;
+  notificationType: 'email' | 'sms' | 'push' | 'in-app';
+  deliveryStatus: 'pending' | 'sending' | 'completed' | 'failed';
+  sentCount?: number;
+  createdBy?: string;
+  createdAt: string;
+}
+
+export interface CreateMassNotificationData {
+  title: string;
+  message: string;
+  notificationType: 'email' | 'sms' | 'push' | 'in-app';
+  recipients: {
+    groupIds?: string[];
+    schoolIds?: string[];
+    sectorIds?: string[];
+    regionIds?: string[];
+    userIds?: string[];
+  };
+}
+
+export interface MassNotificationRecipient {
+  id: string;
+  notificationId: string;
+  recipientId: string;
+  recipientType: 'user' | 'school' | 'sector' | 'region';
+  status: 'pending' | 'sent' | 'failed' | 'read';
+  sentAt?: string;
+  readAt?: string;
+  createdAt: string;
+}
+
+export interface NotificationStats {
+  totalSent: number;
+  delivered: number;
+  read: number;
+  failed: number;
+  pending: number;
+}
+
+export interface GetMassNotificationsParams {
+  page?: number;
+  limit?: number;
+  fromDate?: string;
+  toDate?: string;
+  status?: string;
+  type?: string;
+}
+
+// Profile related types
+export interface Profile {
+  id: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  regionId?: string;
+  sectorId?: string;
+  schoolId?: string;
+  createdAt?: string;
+}
+
+// Import/Export job related types
+export interface ImportJob {
+  id: string;
+  status: 'waiting' | 'processing' | 'complete' | 'error';
+  progress: number;
+  total_rows: number;
+  processed_rows: number;
+  file_name: string;
+  table_name: string;
+  with_upsert: boolean;
+  key_field?: string;
+  errors: Array<{ row: number; message: string }>;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExportJob {
+  id: string;
+  status: 'waiting' | 'processing' | 'complete' | 'error';
+  progress: number;
+  total_rows: number;
+  processed_rows: number;
+  file_name: string;
+  query_params: any;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  file_url?: string;
+  error_message?: string;
 }

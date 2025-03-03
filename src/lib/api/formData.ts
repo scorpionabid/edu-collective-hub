@@ -1,8 +1,9 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { withCache } from '@/lib/cache/withCache';
 import { cacheService } from '@/lib/cache/cacheService';
-import { PaginatedResponse, QueryOptions } from './types';
+import { PaginatedResponse, QueryOptions, FormData } from './types';
 
 const CACHE_TAGS = {
   FORM_DATA: 'form_data',
@@ -73,8 +74,22 @@ export const formData = {
         
         if (error) throw error;
         
+        // Transform snake_case to camelCase for consistent API
+        const transformedData = data?.map(item => ({
+          id: item.id,
+          categoryId: item.category_id,
+          schoolId: item.school_id,
+          data: item.data,
+          status: item.status,
+          submittedAt: item.submitted_at,
+          approvedAt: item.approved_at,
+          approvedBy: item.approved_by,
+          categoryName: item.category?.name,
+          schoolName: item.school?.name
+        })) || [];
+        
         return {
-          data: data || [],
+          data: transformedData,
           metadata: {
             total: count || 0,
             page,
@@ -141,8 +156,22 @@ export const formData = {
         
         if (error) throw error;
         
+        // Transform snake_case to camelCase for consistent API
+        const transformedData = data?.map(item => ({
+          id: item.id,
+          categoryId: item.category_id,
+          schoolId: item.school_id,
+          data: item.data,
+          status: item.status,
+          submittedAt: item.submitted_at,
+          approvedAt: item.approved_at,
+          approvedBy: item.approved_by,
+          categoryName: item.category?.name,
+          schoolName: item.school?.name
+        })) || [];
+        
         return {
-          data: data || [],
+          data: transformedData,
           metadata: {
             total: count || 0,
             page,
@@ -188,13 +217,15 @@ export const formData = {
       
       return {
         id: data.id,
-        categoryId: data.categoryId,
-        schoolId: data.schoolId,
+        categoryId: data.category_id,
+        schoolId: data.school_id,
         data: data.data,
         status: data.status,
-        submittedAt: data.submittedAt,
-        approvedAt: data.approvedAt,
-        approvedBy: data.approvedBy
+        submittedAt: data.submitted_at,
+        approvedAt: data.approved_at,
+        approvedBy: data.approved_by,
+        categoryName: data.category?.name,
+        schoolName: data.school?.name
       };
     } catch (error) {
       console.error('Error in getById form data:', error);
@@ -228,13 +259,13 @@ export const formData = {
       if (data) {
         return {
           id: data.id,
-          categoryId: data.categoryId,
-          schoolId: data.schoolId,
+          categoryId: data.category_id,
+          schoolId: data.school_id,
           data: data.data,
           status: data.status,
-          submittedAt: data.submittedAt,
-          approvedAt: data.approvedAt,
-          approvedBy: data.approvedBy
+          submittedAt: data.submitted_at,
+          approvedAt: data.approved_at,
+          approvedBy: data.approved_by
         };
       }
       
@@ -277,13 +308,13 @@ export const formData = {
       if (data) {
         return {
           id: data.id,
-          categoryId: data.categoryId,
-          schoolId: data.schoolId,
+          categoryId: data.category_id,
+          schoolId: data.school_id,
           data: data.data,
           status: data.status,
-          submittedAt: data.submittedAt,
-          approvedAt: data.approvedAt,
-          approvedBy: data.approvedBy
+          submittedAt: data.submitted_at,
+          approvedAt: data.approved_at,
+          approvedBy: data.approved_by
         };
       }
       
@@ -373,13 +404,13 @@ export const formData = {
       if (data) {
         return {
           id: data.id,
-          categoryId: data.categoryId,
-          schoolId: data.schoolId,
+          categoryId: data.category_id,
+          schoolId: data.school_id,
           data: data.data,
           status: data.status,
-          submittedAt: data.submittedAt,
-          approvedAt: data.approvedAt,
-          approvedBy: data.approvedBy
+          submittedAt: data.submitted_at,
+          approvedAt: data.approved_at,
+          approvedBy: data.approved_by
         };
       }
       
@@ -409,13 +440,13 @@ export const formData = {
       if (data) {
         return {
           id: data.id,
-          categoryId: data.categoryId,
-          schoolId: data.schoolId,
+          categoryId: data.category_id,
+          schoolId: data.school_id,
           data: data.data,
           status: data.status,
-          submittedAt: data.submittedAt,
-          approvedAt: data.approvedAt,
-          approvedBy: data.approvedBy
+          submittedAt: data.submitted_at,
+          approvedAt: data.approved_at,
+          approvedBy: data.approved_by
         };
       }
       

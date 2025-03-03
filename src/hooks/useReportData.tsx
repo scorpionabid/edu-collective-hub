@@ -1,184 +1,287 @@
 
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/hooks/useAuth';
-import { api } from '@/lib/api';
-import { Category, Column } from '@/lib/api/types';
-import { toast } from 'sonner';
+import { useState, useEffect, useCallback } from "react";
+import { api } from "@/lib/api";
+import { toast } from "sonner";
+import { utils, writeFileXLSX } from "xlsx";
 
-export function useReportData() {
-  const { user } = useAuth();
-  
-  // Filter states
-  const [selectedRegion, setSelectedRegion] = useState('');
-  const [selectedSector, setSelectedSector] = useState('');
-  const [selectedSchool, setSelectedSchool] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
-  
-  // Data states
+export const useReportData = () => {
+  const [selectedRegion, setSelectedRegion] = useState("");
+  const [selectedSector, setSelectedSector] = useState("");
+  const [selectedSchool, setSelectedSchool] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
   const [regions, setRegions] = useState<{ id: string; name: string }[]>([]);
   const [sectors, setSectors] = useState<{ id: string; name: string }[]>([]);
   const [schools, setSchools] = useState<{ id: string; name: string }[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [columns, setColumns] = useState<Column[]>([]);
-  const [data, setData] = useState<any[]>([]);
-  
-  // Filtered states
   const [filteredSectors, setFilteredSectors] = useState<{ id: string; name: string }[]>([]);
   const [filteredSchools, setFilteredSchools] = useState<{ id: string; name: string }[]>([]);
-  
-  // UI states
-  const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState<Record<string, string>>({});
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: '', direction: 'asc' });
-  
-  // Load initial data
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [columns, setColumns] = useState<{ id: string; name: string; type: string }[]>([]);
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+  const [filters, setFilters] = useState<{ [key: string]: string }>({});
+
+  // Fetch regions on component mount
   useEffect(() => {
-    const fetchInitialData = async () => {
+    const fetchRegions = async () => {
       try {
         setLoading(true);
-        
-        // Mock data for development - in production these would be API calls
-        const regionsData = [
-          { id: '1', name: 'Bakı' },
-          { id: '2', name: 'Sumqayıt' },
-          { id: '3', name: 'Gəncə' },
-        ];
-        
-        const sectorsData = [
-          { id: '1', name: 'Sektor 1', regionId: '1' },
-          { id: '2', name: 'Sektor 2', regionId: '1' },
-          { id: '3', name: 'Sektor 3', regionId: '2' },
-        ];
-        
-        const schoolsData = [
-          { id: '1', name: 'Məktəb 1', sectorId: '1' },
-          { id: '2', name: 'Məktəb 2', sectorId: '1' },
-          { id: '3', name: 'Məktəb 3', sectorId: '2' },
-        ];
-        
-        // Set initial data
+        const regionsData = await api.regions.getAll();
         setRegions(regionsData);
-        setSectors(sectorsData);
-        setSchools(schoolsData);
-        
-        // Load categories from API
-        const categoriesData = await api.categories.getAll();
-        setCategories(categoriesData);
-        
-        // Pre-select based on user role
-        if (user) {
-          if (user.regionId) {
-            setSelectedRegion(user.regionId);
-            const userSectors = sectorsData.filter(s => s.regionId === user.regionId);
-            setFilteredSectors(userSectors);
-          }
-          
-          if (user.sectorId) {
-            setSelectedSector(user.sectorId);
-            const userSchools = schoolsData.filter(s => s.sectorId === user.sectorId);
-            setFilteredSchools(userSchools);
-          }
-          
-          if (user.schoolId) {
-            setSelectedSchool(user.schoolId);
-          }
-        }
       } catch (error) {
-        console.error('Error fetching initial data:', error);
-        toast.error('Failed to load initial data');
+        console.error("Error loading regions:", error);
+        toast.error("Failed to load regions");
       } finally {
         setLoading(false);
       }
     };
-    
-    fetchInitialData();
-  }, [user]);
-  
-  // Update filtered sectors when region changes
+
+    fetchRegions();
+  }, []);
+
+  // Fetch sectors when a region is selected
   useEffect(() => {
-    if (selectedRegion) {
-      const filtered = sectors.filter(sector => sector.regionId === selectedRegion);
-      setFilteredSectors(filtered);
-    } else {
-      setFilteredSectors([]);
-    }
-  }, [selectedRegion, sectors]);
-  
-  // Update filtered schools when sector changes
+    const fetchSectors = async () => {
+      if (!selectedRegion) {
+        setFilteredSectors([]);
+        setSectors([]);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const sectorsData = await api.sectors.getAll();
+        setSectors(sectorsData);
+        
+        const filtered = sectorsData.filter(
+          (sector) => sector.regionId === selectedRegion
+        );
+        setFilteredSectors(filtered);
+      } catch (error) {
+        console.error("Error loading sectors:", error);
+        toast.error("Failed to load sectors");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSectors();
+  }, [selectedRegion]);
+
+  // Fetch schools when a sector is selected
   useEffect(() => {
-    if (selectedSector) {
-      const filtered = schools.filter(school => school.sectorId === selectedSector);
-      setFilteredSchools(filtered);
-    } else {
-      setFilteredSchools([]);
-    }
-  }, [selectedSector, schools]);
-  
-  // Fetch category columns and data when category changes
+    const fetchSchools = async () => {
+      if (!selectedSector) {
+        setFilteredSchools([]);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const schoolsData = await api.schools.getAll();
+        setSchools(schoolsData);
+        
+        const filtered = schoolsData.filter(
+          (school) => school.sectorId === selectedSector
+        );
+        setFilteredSchools(filtered);
+      } catch (error) {
+        console.error("Error loading schools:", error);
+        toast.error("Failed to load schools");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSchools();
+  }, [selectedSector]);
+
+  // Fetch categories when a sector or school is selected
+  useEffect(() => {
+    const fetchCategories = async () => {
+      if (!selectedSector) {
+        setCategories([]);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const categoriesData = await api.categories.getAll();
+        
+        let filtered = categoriesData;
+        
+        if (selectedSchool) {
+          filtered = categoriesData.filter(
+            (cat) => cat.schoolId === selectedSchool || 
+                    (cat.sectorId === selectedSector && !cat.schoolId)
+          );
+        } else {
+          filtered = categoriesData.filter(
+            (cat) => cat.sectorId === selectedSector
+          );
+        }
+        
+        setCategories(filtered);
+      } catch (error) {
+        console.error("Error loading categories:", error);
+        toast.error("Failed to load categories");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCategories();
+  }, [selectedSector, selectedSchool]);
+
+  // Fetch columns and data when a category is selected
+  useEffect(() => {
+    const fetchColumnsAndData = async () => {
+      if (!selectedCategory) {
+        setColumns([]);
+        setData([]);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        
+        // Fetch columns for the selected category
+        const columnsData = await api.columns.getByCategory(selectedCategory);
+        setColumns(columnsData);
+        
+        // Fetch data for the selected category
+        const formDataResponse = await api.formData.getAllByCategory(selectedCategory);
+        
+        // Process data to flatten the structure
+        const processedData = formDataResponse.data.map((item) => {
+          const result = {
+            id: item.id,
+            schoolName: item.schoolName || 'Unknown School',
+            status: item.status,
+            ...item.data
+          };
+          
+          return result;
+        });
+        
+        setData(processedData);
+      } catch (error) {
+        console.error("Error loading columns and data:", error);
+        toast.error("Failed to load report data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchColumnsAndData();
+  }, [selectedCategory]);
+
+  // Function to fetch columns for a specific category
   const fetchCategoryColumns = async (categoryId: string) => {
-    if (!categoryId) return;
-    
     try {
       setLoading(true);
-      
-      // Get the category details which includes columns
-      const category = await api.categories.getById(categoryId);
-      
-      if (category && Array.isArray(category.columns)) {
-        setColumns(category.columns);
-        
-        // Fetch sample data for this category
-        // In a real app, this would use selectedRegion, selectedSector, selectedSchool
-        const formData = await api.formData.getAll();
-        
-        // Filter and transform the data
-        const filteredData = formData
-          .filter((item: any) => item.categoryId === categoryId)
-          .map((item: any) => ({
-            ...item.data,
-            id: item.id,
-            status: item.status || 'draft',
-            submittedAt: item.submittedAt || '',
-            schoolName: 'School ' + Math.floor(Math.random() * 100) // Mock data
-          }));
-        
-        setData(filteredData);
-      }
+      const columnsData = await api.columns.getByCategory(categoryId);
+      return columnsData;
     } catch (error) {
-      console.error('Error fetching category data:', error);
-      toast.error('Failed to load category data');
+      console.error("Error loading columns:", error);
+      toast.error("Failed to load columns");
+      return [];
     } finally {
       setLoading(false);
     }
   };
-  
-  // Function to update filtered sectors
-  const updateFilteredSectors = (regionId: string) => {
-    if (regionId) {
-      const filtered = sectors.filter(sector => sector.regionId === regionId);
-      setFilteredSectors(filtered);
-    } else {
-      setFilteredSectors([]);
+
+  // Filter and sort data
+  const getFilteredAndSortedData = useCallback(() => {
+    let result = [...data];
+
+    // Apply filters
+    Object.keys(filters).forEach((key) => {
+      if (filters[key]) {
+        result = result.filter((item) =>
+          String(item[key])
+            .toLowerCase()
+            .includes(filters[key].toLowerCase())
+        );
+      }
+    });
+
+    // Apply sorting
+    if (sortConfig) {
+      result.sort((a, b) => {
+        const aValue = a[sortConfig.key] || '';
+        const bValue = b[sortConfig.key] || '';
+        
+        if (aValue < bValue) {
+          return sortConfig.direction === "asc" ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === "asc" ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+
+    return result;
+  }, [data, filters, sortConfig]);
+
+  // Handle filter changes
+  const handleFilter = (columnName: string, value: string) => {
+    setFilters((prev) => ({
+      ...prev,
+      [columnName]: value,
+    }));
+  };
+
+  // Handle sort
+  const handleSort = (columnName: string) => {
+    setSortConfig((prev) => ({
+      key: columnName,
+      direction:
+        prev?.key === columnName && prev.direction === "asc" ? "desc" : "asc",
+    }));
+  };
+
+  // Update filtered sectors based on selected region
+  const updateFilteredSectors = (region: any) => {
+    const filtered = sectors.filter((sector) => sector.regionId === region);
+    setFilteredSectors(filtered);
+  };
+
+  // Update filtered schools based on selected sector
+  const updateFilteredSchools = (sector: any) => {
+    const filtered = schools.filter((school) => school.sectorId === sector);
+    setFilteredSchools(filtered);
+  };
+
+  // Export to Excel
+  const handleExportToExcel = () => {
+    try {
+      const filteredData = getFilteredAndSortedData();
+      
+      if (filteredData.length === 0) {
+        toast.error("No data to export");
+        return;
+      }
+      
+      const worksheet = utils.json_to_sheet(filteredData);
+      
+      const workbook = utils.book_new();
+      utils.book_append_sheet(workbook, worksheet, "Report Data");
+      
+      const categoryName = categories.find(c => c.id === selectedCategory)?.name || "Report";
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const fileName = `${categoryName}_${timestamp}.xlsx`;
+      
+      writeFileXLSX(workbook, fileName);
+      
+      toast.success("Report exported to Excel");
+    } catch (error) {
+      console.error("Error exporting to Excel:", error);
+      toast.error("Failed to export data to Excel");
     }
   };
 
-  // Handle export to Excel
-  const handleExportToExcel = () => {
-    console.log('Exporting to Excel:', { columns, data });
-    if (columns.length === 0 || data.length === 0) {
-      toast.error('No data to export');
-      return;
-    }
-    
-    try {
-      // In a real app, this would use a proper Excel export library
-      // For now, it's just a placeholder
-      toast.success('Export started. Your file will be ready shortly.');
-    } catch (error) {
-      toast.error('Failed to export data');
-    }
-  };
-  
   return {
     selectedRegion,
     setSelectedRegion,
@@ -189,6 +292,8 @@ export function useReportData() {
     selectedCategory,
     setSelectedCategory,
     regions,
+    sectors,
+    schools,
     filteredSectors,
     filteredSchools,
     categories,
@@ -199,7 +304,12 @@ export function useReportData() {
     setFilters,
     sortConfig,
     setSortConfig,
+    getFilteredAndSortedData,
+    handleFilter,
+    handleSort,
+    updateFilteredSectors,
+    updateFilteredSchools,
     fetchCategoryColumns,
     handleExportToExcel
   };
-}
+};
