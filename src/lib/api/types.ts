@@ -75,6 +75,8 @@ export interface UserProfile {
   schoolId?: string;
   createdAt: string;
   name?: string; // Added to fix errors where the name property is accessed
+  email?: string; // Added to fix TypeScript errors
+  profile?: any; // Added to fix TypeScript errors
 }
 
 export interface Profile {
@@ -188,6 +190,30 @@ export interface PaginatedResponse<T> {
   page: number;
   pageSize: number;
   totalPages: number;
+  metadata?: any; // Added to fix TypeScript errors
+  filter?: any; // Added to fix TypeScript errors
+}
+
+// Additional types for API request parameters
+export interface PaginationParams {
+  page?: number;
+  pageSize?: number;
+}
+
+export interface SortParams {
+  field?: string;
+  direction?: 'asc' | 'desc';
+}
+
+export interface FilterParams {
+  [key: string]: any;
+}
+
+export interface QueryOptions {
+  pagination?: PaginationParams;
+  sort?: SortParams;
+  filter?: FilterParams;
+  includes?: string[];
 }
 
 // Import/Export types
@@ -231,4 +257,48 @@ export interface ColumnDefinition {
   required: boolean;
   options: string[];
   defaultValue?: any;
+}
+
+// Notification-related types
+export interface CreateNotificationGroupData {
+  name: string;
+  description?: string;
+}
+
+export interface UpdateNotificationGroupData {
+  name?: string;
+  description?: string;
+}
+
+export interface AddGroupMemberData {
+  groupId: string;
+  memberId: string;
+  memberType: 'user' | 'role' | 'school' | 'sector' | 'region';
+}
+
+export interface CreateMassNotificationData {
+  title: string;
+  message: string;
+  notificationType: string;
+  recipients: {
+    id: string;
+    type: 'user' | 'role' | 'school' | 'sector' | 'region' | 'group';
+  }[];
+}
+
+export interface GetMassNotificationsParams extends PaginationParams {
+  status?: 'pending' | 'in_progress' | 'completed' | 'failed';
+}
+
+// Cache-related types
+export interface CacheOptions {
+  ttl?: number;
+  key?: string;
+  invalidateOn?: string[];
+}
+
+export interface CacheManager {
+  get: <T>(key: string) => Promise<T | null>;
+  set: <T>(key: string, value: T, ttl?: number) => Promise<void>;
+  invalidate: (keys: string[]) => Promise<void>;
 }

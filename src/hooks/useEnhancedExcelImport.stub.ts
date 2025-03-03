@@ -1,44 +1,42 @@
 
-// This is a stub implementation to resolve TypeScript errors
-// The actual implementation will need to be completed later with appropriate types 
-// and error handling mechanisms
-
+// This is a stub file for development that mocks the actual import functionality
+// The real implementation will be in useEnhancedExcelImport.ts
 import { useState } from 'react';
+import { useProfile } from './useProfile';
+import { ImportJob } from '@/lib/api/types';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { ImportJob } from '@/lib/api/types';
-import { PostgrestError } from '@supabase/supabase-js';
+import { getMockSupabase } from '@/lib/api/mock/importExportTables';
 
 export const useEnhancedExcelImport = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [importJobs, setImportJobs] = useState<ImportJob[]>([]);
+  const { profile } = useProfile();
+  const mockSupabase = getMockSupabase();
 
-  // This function is mocked for now to resolve TypeScript errors
-  const getImportJobs = async (userId: string) => {
+  const fetchImportJobs = async (userId: string) => {
     try {
       setIsLoading(true);
       
       // Using the mock implementation from src/lib/api/mock/importExportTables.ts
       // We need to handle this differently than a direct database call since
       // the table doesn't exist yet in the database schema
-      
-      // We're casting here because we know our mock implementation will handle this table name
-      // even though TypeScript doesn't recognize it in the database schema
-      const response = await (supabase as any).from('import_jobs')
+      const { data, error } = await mockSupabase
+        .from('import_jobs')
         .select()
         .eq('userId', userId)
         .order('created_at', { ascending: false });
       
-      if (response.error) throw response.error;
+      if (error) throw error;
       
-      const formattedJobs = response.data as ImportJob[];
+      // The type casting is safe here because our mock implementation returns ImportJob[]
+      const formattedJobs = data as ImportJob[];
       setImportJobs(formattedJobs);
       
       return formattedJobs;
     } catch (error) {
       console.error('Error fetching import jobs:', error);
-      toast.error('Failed to load import history');
+      toast.error('Failed to load import jobs');
       return [];
     } finally {
       setIsLoading(false);
@@ -50,15 +48,16 @@ export const useEnhancedExcelImport = () => {
       setIsLoading(true);
       
       // Using the mock implementation
-      const response = await (supabase as any).from('import_jobs')
+      const { data: job, error } = await mockSupabase
+        .from('import_jobs')
         .insert(data)
         .select()
         .single();
       
-      if (response.error) throw response.error;
+      if (error) throw error;
       
       toast.success('Import job created');
-      return response.data as ImportJob;
+      return job as ImportJob;
     } catch (error) {
       console.error('Error creating import job:', error);
       toast.error('Failed to create import job');
@@ -75,7 +74,8 @@ export const useEnhancedExcelImport = () => {
   ) => {
     try {
       // Using the mock implementation
-      const response = await (supabase as any).from('import_jobs')
+      const { data, error } = await mockSupabase
+        .from('import_jobs')
         .update({ 
           status: status, 
           progress: progress 
@@ -84,22 +84,72 @@ export const useEnhancedExcelImport = () => {
         .select()
         .single();
       
-      if (response.error) throw response.error;
+      if (error) throw error;
       
-      return response.data as ImportJob;
+      return data as ImportJob;
     } catch (error) {
       console.error('Error updating import job status:', error);
       return null;
     }
   };
-
+  
+  // Mock implementation of the Excel file processing
+  const processExcelFile = async (file: File, tableName: string) => {
+    try {
+      setIsLoading(true);
+      
+      // Create an import job
+      const importJob = await createImportJob({
+        userId: profile?.id || '',
+        tableName: tableName,
+        status: 'pending',
+        progress: 0,
+        total_rows: 100, // Mock value
+        processed_rows: 0,
+        failed_rows: 0,
+        file_name: file.name,
+        file_size: file.size,
+        start_time: new Date().toISOString()
+      });
+      
+      if (!importJob) {
+        throw new Error('Failed to create import job');
+      }
+      
+      // Simulate processing
+      toast.info('Processing file...');
+      
+      // Update to processing
+      await updateImportJobStatus(importJob.id, 'processing', 10);
+      
+      // Simulate processing delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      await updateImportJobStatus(importJob.id, 'processing', 50);
+      
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      await updateImportJobStatus(importJob.id, 'processing', 90);
+      
+      // Complete the job
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      await updateImportJobStatus(importJob.id, 'completed', 100);
+      
+      toast.success('File processing completed!');
+      return importJob;
+    } catch (error) {
+      console.error('Error processing file:', error);
+      toast.error('Failed to process file');
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
   return {
     isLoading,
-    progress,
     importJobs,
-    getImportJobs,
+    fetchImportJobs,
     createImportJob,
     updateImportJobStatus,
-    // Add other necessary functions
+    processExcelFile
   };
 };

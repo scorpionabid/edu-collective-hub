@@ -8,10 +8,16 @@ import { toast } from "sonner";
 const mockImportJobs: ImportJob[] = [];
 const mockExportJobs: ExportJob[] = [];
 
-// Mock the Supabase client to handle import_jobs and export_jobs tables
+// Store the original from method
 const originalFrom = supabase.from;
 
-supabase.from = (table: string) => {
+// Type assertion to avoid TypeScript errors
+type AnySupabaseClient = typeof supabase & {
+  from: (table: string) => any;
+};
+
+// Override the from method with our custom implementation
+(supabase as AnySupabaseClient).from = (table: string) => {
   // If accessing import_jobs or export_jobs, use our mock implementation
   if (table === 'import_jobs') {
     return {
@@ -168,5 +174,8 @@ supabase.from = (table: string) => {
   // Use the original implementation for all other tables
   return originalFrom(table);
 };
+
+// Helper function to properly type our mocked API calls
+export const getMockSupabase = () => supabase as AnySupabaseClient;
 
 console.log('Mock import/export tables initialized');
