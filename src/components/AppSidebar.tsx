@@ -40,13 +40,13 @@ export function AppSidebar() {
     // Super admin menu items
     if (user?.role === 'superadmin') {
       return [
-        { title: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
-        { title: "Users", icon: Users, href: "/users" },
-        { title: "Regions", icon: MapPin, href: "/regions" },
-        { title: "Sectors", icon: Building, href: "/sectors" },
-        { title: "Schools", icon: School, href: "/schools" },
-        { title: "Reports", icon: BookOpen, href: "/reports" },
-        { title: "Tables", icon: Table, href: "/tables" },
+        { title: "Dashboard", icon: LayoutDashboard, href: "/superadmin/dashboard" },
+        { title: "Users", icon: Users, href: "/superadmin/users" },
+        { title: "Regions", icon: MapPin, href: "/superadmin/regions" },
+        { title: "Sectors", icon: Building, href: "/superadmin/sectors" },
+        { title: "Schools", icon: School, href: "/superadmin/schools" },
+        { title: "Reports", icon: BookOpen, href: "/superadmin/reports" },
+        { title: "Tables", icon: Table, href: "/superadmin/tables" },
         ...defaultItems
       ];
     }
@@ -54,11 +54,11 @@ export function AppSidebar() {
     // Region admin menu items
     else if (user?.role === 'regionadmin') {
       return [
-        { title: "Dashboard", icon: LayoutDashboard, href: "/region-dashboard" },
-        { title: "Sectors", icon: Building, href: "/region-sectors" },
-        { title: "Schools", icon: School, href: "/region-schools" },
-        { title: "Tables", icon: Table, href: "/region-tables" },
-        { title: "Reports", icon: BookOpen, href: "/region-reports" },
+        { title: "Dashboard", icon: LayoutDashboard, href: "/regionadmin/dashboard" },
+        { title: "Sectors", icon: Building, href: "/regionadmin/sectors" },
+        { title: "Schools", icon: School, href: "/regionadmin/schools" },
+        { title: "Tables", icon: Table, href: "/regionadmin/tables" },
+        { title: "Reports", icon: BookOpen, href: "/regionadmin/reports" },
         ...defaultItems
       ];
     }
@@ -66,13 +66,13 @@ export function AppSidebar() {
     // Sector admin menu items
     else if (user?.role === 'sectoradmin') {
       return [
-        { title: "Dashboard", icon: LayoutDashboard, href: "/sector-dashboard" },
-        { title: "Schools", icon: School, href: "/sector-schools" },
-        { title: "School Admins", icon: Users, href: "/sector-users" },
-        { title: "Tables", icon: Table, href: "/sector-tables" }, 
-        { title: "Categories", icon: Database, href: "/sector-categories" }, 
-        { title: "Form View", icon: FileText, href: "/sector-forms" },
-        { title: "Reports", icon: BookOpen, href: "/sector-reports" },
+        { title: "Dashboard", icon: LayoutDashboard, href: "/sectoradmin/dashboard" },
+        { title: "Schools", icon: School, href: "/sectoradmin/schools" },
+        { title: "School Admins", icon: Users, href: "/sectoradmin/users" },
+        { title: "Tables", icon: Table, href: "/sectoradmin/tables" }, 
+        { title: "Categories", icon: Database, href: "/sectoradmin/categories" }, 
+        { title: "Form View", icon: FileText, href: "/sectoradmin/forms" },
+        { title: "Reports", icon: BookOpen, href: "/sectoradmin/reports" },
         ...defaultItems
       ];
     }
@@ -80,10 +80,10 @@ export function AppSidebar() {
     // School admin menu items
     else if (user?.role === 'schooladmin') {
       return [
-        { title: "Dashboard", icon: LayoutDashboard, href: "/school-dashboard" },
-        { title: "Data Entry", icon: FileText, href: "/school-data-entry" }, 
-        { title: "Import Data", icon: Database, href: "/school-import" },
-        { title: "Profile", icon: User, href: "/school-profile" },
+        { title: "Dashboard", icon: LayoutDashboard, href: "/schooladmin/dashboard" },
+        { title: "Data Entry", icon: FileText, href: "/schooladmin/data-entry" }, 
+        { title: "Import Data", icon: Database, href: "/schooladmin/import" },
+        { title: "Profile", icon: User, href: "/schooladmin/profile" },
         ...defaultItems
       ];
     }

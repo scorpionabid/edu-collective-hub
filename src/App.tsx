@@ -1,3 +1,4 @@
+
 import { Route, Routes, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import Index from "@/pages/Index";
@@ -7,12 +8,12 @@ import { useAuth } from "@/contexts/AuthContext";
 
 // SuperAdmin pages
 import SuperAdminDashboard from "@/pages/superadmin/Dashboard";
-import Users from "@/pages/Users";
-import Regions from "@/pages/Regions";
-import Sectors from "@/pages/Sectors";
-import Schools from "@/pages/Schools";
-import Reports from "@/pages/Reports";
-import Tables from "@/pages/Tables";
+import Users from "@/pages/superadmin/Users";
+import Regions from "@/pages/superadmin/Regions";
+import Sectors from "@/pages/superadmin/Sectors";
+import Schools from "@/pages/superadmin/Schools";
+import SuperAdminReports from "@/pages/superadmin/Reports";
+import Tables from "@/pages/superadmin/Tables";
 import Settings from "@/pages/Settings";
 
 // RegionAdmin pages
@@ -25,15 +26,23 @@ import RegionReports from "@/pages/regionadmin/Reports";
 // SectorAdmin pages
 import SectorDashboard from "@/pages/sectoradmin/Dashboard";
 import SectorReports from "@/pages/sectoradmin/Reports";
-import SectorTables from "@/pages/SectorTables";
-import SectorUsers from "@/pages/SectorUsers";
-import SectorCategories from "@/pages/SectorCategories";
-import SectorForms from "@/pages/SectorForms";
+import SectorTables from "@/pages/sectoradmin/Tables";
+import SectorUsers from "@/pages/sectoradmin/Users";
+import SectorCategories from "@/pages/sectoradmin/Categories";
+import SectorForms from "@/pages/sectoradmin/Forms";
 
 // SchoolAdmin pages
 import SchoolDashboard from "@/pages/schooladmin/Dashboard";
-import SchoolProfile from "@/pages/SchoolProfile";
-import SchoolImport from "@/pages/SchoolImport";
+import SchoolProfile from "@/pages/schooladmin/Profile";
+import SchoolImport from "@/pages/schooladmin/Import";
+
+// Role paths mapping for redirects
+const roleDashboardPaths = {
+  superadmin: "/superadmin/dashboard",
+  regionadmin: "/regionadmin/dashboard",
+  sectoradmin: "/sectoradmin/dashboard",
+  schooladmin: "/schooladmin/dashboard"
+};
 
 // Protected route component
 const ProtectedRoute = ({ 
@@ -54,21 +63,11 @@ const ProtectedRoute = ({
     return <Navigate to="/login" replace />;
   }
   
-  // If roles are specified and user's role is not in the allowed roles, redirect
+  // If roles are specified and user's role is not in the allowed roles, redirect to appropriate dashboard
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    // Redirect to the appropriate dashboard based on role
-    switch (user.role) {
-      case 'superadmin':
-        return <Navigate to="/dashboard" replace />;
-      case 'regionadmin':
-        return <Navigate to="/region-dashboard" replace />;
-      case 'sectoradmin':
-        return <Navigate to="/sector-dashboard" replace />;
-      case 'schooladmin':
-        return <Navigate to="/school-dashboard" replace />;
-      default:
-        return <Navigate to="/login" replace />;
-    }
+    // Get the dashboard path for the user's role
+    const redirectPath = roleDashboardPaths[user.role as keyof typeof roleDashboardPaths] || "/login";
+    return <Navigate to={redirectPath} replace />;
   }
   
   return <>{children}</>;
@@ -85,20 +84,7 @@ function App() {
           element={
             user ? (
               // Redirect to the appropriate dashboard based on user role
-              (() => {
-                switch (user.role) {
-                  case 'superadmin':
-                    return <Navigate to="/dashboard" replace />;
-                  case 'regionadmin':
-                    return <Navigate to="/region-dashboard" replace />;
-                  case 'sectoradmin':
-                    return <Navigate to="/sector-dashboard" replace />;
-                  case 'schooladmin':
-                    return <Navigate to="/school-dashboard" replace />;
-                  default:
-                    return <Navigate to="/login" replace />;
-                }
-              })()
+              <Navigate to={roleDashboardPaths[user.role as keyof typeof roleDashboardPaths] || "/login"} replace />
             ) : (
               <Navigate to="/login" replace />
             )
@@ -106,9 +92,35 @@ function App() {
         />
         <Route path="/login" element={<Login />} />
         
-        {/* SuperAdmin Routes */}
+        {/* Legacy path redirects */}
+        <Route path="/dashboard" element={<Navigate to="/superadmin/dashboard" replace />} />
+        <Route path="/users" element={<Navigate to="/superadmin/users" replace />} />
+        <Route path="/regions" element={<Navigate to="/superadmin/regions" replace />} />
+        <Route path="/sectors" element={<Navigate to="/superadmin/sectors" replace />} />
+        <Route path="/schools" element={<Navigate to="/superadmin/schools" replace />} />
+        <Route path="/reports" element={<Navigate to="/superadmin/reports" replace />} />
+        <Route path="/tables" element={<Navigate to="/superadmin/tables" replace />} />
+        
+        <Route path="/region-dashboard" element={<Navigate to="/regionadmin/dashboard" replace />} />
+        <Route path="/region-sectors" element={<Navigate to="/regionadmin/sectors" replace />} />
+        <Route path="/region-schools" element={<Navigate to="/regionadmin/schools" replace />} />
+        <Route path="/region-tables" element={<Navigate to="/regionadmin/tables" replace />} />
+        <Route path="/region-reports" element={<Navigate to="/regionadmin/reports" replace />} />
+        
+        <Route path="/sector-dashboard" element={<Navigate to="/sectoradmin/dashboard" replace />} />
+        <Route path="/sector-tables" element={<Navigate to="/sectoradmin/tables" replace />} />
+        <Route path="/sector-users" element={<Navigate to="/sectoradmin/users" replace />} />
+        <Route path="/sector-categories" element={<Navigate to="/sectoradmin/categories" replace />} />
+        <Route path="/sector-forms" element={<Navigate to="/sectoradmin/forms" replace />} />
+        <Route path="/sector-reports" element={<Navigate to="/sectoradmin/reports" replace />} />
+        
+        <Route path="/school-dashboard" element={<Navigate to="/schooladmin/dashboard" replace />} />
+        <Route path="/school-profile" element={<Navigate to="/schooladmin/profile" replace />} />
+        <Route path="/school-import" element={<Navigate to="/schooladmin/import" replace />} />
+        
+        {/* SuperAdmin Routes with new paths */}
         <Route
-          path="/dashboard"
+          path="/superadmin/dashboard"
           element={
             <ProtectedRoute allowedRoles={['superadmin']}>
               <SuperAdminDashboard />
@@ -116,7 +128,7 @@ function App() {
           }
         />
         <Route
-          path="/users"
+          path="/superadmin/users"
           element={
             <ProtectedRoute allowedRoles={['superadmin']}>
               <Users />
@@ -124,7 +136,7 @@ function App() {
           }
         />
         <Route
-          path="/regions"
+          path="/superadmin/regions"
           element={
             <ProtectedRoute allowedRoles={['superadmin']}>
               <Regions />
@@ -132,7 +144,7 @@ function App() {
           }
         />
         <Route
-          path="/sectors"
+          path="/superadmin/sectors"
           element={
             <ProtectedRoute allowedRoles={['superadmin', 'regionadmin']}>
               <Sectors />
@@ -140,7 +152,7 @@ function App() {
           }
         />
         <Route
-          path="/schools"
+          path="/superadmin/schools"
           element={
             <ProtectedRoute allowedRoles={['superadmin', 'regionadmin']}>
               <Schools />
@@ -148,15 +160,15 @@ function App() {
           }
         />
         <Route
-          path="/reports"
+          path="/superadmin/reports"
           element={
             <ProtectedRoute allowedRoles={['superadmin']}>
-              <Reports />
+              <SuperAdminReports />
             </ProtectedRoute>
           }
         />
         <Route
-          path="/tables"
+          path="/superadmin/tables"
           element={
             <ProtectedRoute allowedRoles={['superadmin']}>
               <Tables />
@@ -172,9 +184,9 @@ function App() {
           }
         />
         
-        {/* Region admin routes */}
+        {/* Region admin routes with new paths */}
         <Route
-          path="/region-dashboard"
+          path="/regionadmin/dashboard"
           element={
             <ProtectedRoute allowedRoles={['regionadmin']}>
               <RegionDashboard />
@@ -182,7 +194,7 @@ function App() {
           }
         />
         <Route
-          path="/region-sectors"
+          path="/regionadmin/sectors"
           element={
             <ProtectedRoute allowedRoles={['regionadmin']}>
               <RegionSectors />
@@ -190,7 +202,7 @@ function App() {
           }
         />
         <Route
-          path="/region-schools"
+          path="/regionadmin/schools"
           element={
             <ProtectedRoute allowedRoles={['regionadmin']}>
               <RegionSchools />
@@ -198,7 +210,7 @@ function App() {
           }
         />
         <Route
-          path="/region-tables"
+          path="/regionadmin/tables"
           element={
             <ProtectedRoute allowedRoles={['regionadmin']}>
               <RegionTables />
@@ -206,7 +218,7 @@ function App() {
           }
         />
         <Route
-          path="/region-reports"
+          path="/regionadmin/reports"
           element={
             <ProtectedRoute allowedRoles={['regionadmin']}>
               <RegionReports />
@@ -214,9 +226,9 @@ function App() {
           }
         />
         
-        {/* Sector admin routes */}
+        {/* Sector admin routes with new paths */}
         <Route
-          path="/sector-dashboard"
+          path="/sectoradmin/dashboard"
           element={
             <ProtectedRoute allowedRoles={['sectoradmin']}>
               <SectorDashboard />
@@ -224,7 +236,7 @@ function App() {
           }
         />
         <Route
-          path="/sector-tables"
+          path="/sectoradmin/tables"
           element={
             <ProtectedRoute allowedRoles={['sectoradmin']}>
               <SectorTables />
@@ -232,7 +244,7 @@ function App() {
           }
         />
         <Route
-          path="/sector-users"
+          path="/sectoradmin/users"
           element={
             <ProtectedRoute allowedRoles={['sectoradmin']}>
               <SectorUsers />
@@ -240,7 +252,7 @@ function App() {
           }
         />
         <Route
-          path="/sector-categories"
+          path="/sectoradmin/categories"
           element={
             <ProtectedRoute allowedRoles={['sectoradmin']}>
               <SectorCategories />
@@ -248,7 +260,7 @@ function App() {
           }
         />
         <Route
-          path="/sector-forms"
+          path="/sectoradmin/forms"
           element={
             <ProtectedRoute allowedRoles={['sectoradmin']}>
               <SectorForms />
@@ -256,7 +268,7 @@ function App() {
           }
         />
         <Route
-          path="/sector-reports"
+          path="/sectoradmin/reports"
           element={
             <ProtectedRoute allowedRoles={['sectoradmin']}>
               <SectorReports />
@@ -264,9 +276,9 @@ function App() {
           }
         />
         
-        {/* School admin routes */}
+        {/* School admin routes with new paths */}
         <Route
-          path="/school-dashboard"
+          path="/schooladmin/dashboard"
           element={
             <ProtectedRoute allowedRoles={['schooladmin']}>
               <SchoolDashboard />
@@ -274,7 +286,7 @@ function App() {
           }
         />
         <Route
-          path="/school-profile"
+          path="/schooladmin/profile"
           element={
             <ProtectedRoute allowedRoles={['schooladmin']}>
               <SchoolProfile />
@@ -282,7 +294,7 @@ function App() {
           }
         />
         <Route
-          path="/school-import"
+          path="/schooladmin/import"
           element={
             <ProtectedRoute allowedRoles={['schooladmin']}>
               <SchoolImport />

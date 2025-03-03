@@ -55,16 +55,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const redirectBasedOnRole = (role: UserRole) => {
     switch (role) {
       case 'superadmin':
-        navigate('/dashboard');
+        navigate('/superadmin/dashboard');
         break;
       case 'regionadmin':
-        navigate('/region-dashboard');
+        navigate('/regionadmin/dashboard');
         break;
       case 'sectoradmin':
-        navigate('/sector-dashboard');
+        navigate('/sectoradmin/dashboard');
         break;
       case 'schooladmin':
-        navigate('/school-dashboard');
+        navigate('/schooladmin/dashboard');
         break;
       default:
         navigate('/login');
