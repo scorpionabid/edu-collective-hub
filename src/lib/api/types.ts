@@ -42,6 +42,7 @@ export interface ExportJob {
   createdAt: string;
   completedAt: string | null;
   filters: FilterParams;
+  downloadUrl?: string;
 }
 
 export interface Column {
@@ -84,6 +85,8 @@ export interface Sector {
   name: string;
   regionId: string;
   createdAt: string;
+  regionName?: string;
+  schoolCount?: number;
 }
 
 export interface Region {
@@ -105,6 +108,7 @@ export interface FormData {
   updatedAt: string;
   categoryName?: string;
   schoolName?: string;
+  createdBy?: string;
 }
 
 export interface PaginatedResponse<T> {
@@ -115,6 +119,9 @@ export interface PaginatedResponse<T> {
     pageSize: number;
     pageCount: number;
   };
+  totalPages?: number;
+  total?: number;
+  filter?: any;
 }
 
 export interface PaginationParams {
@@ -152,6 +159,7 @@ export interface UserProfile {
   firstName: string;
   lastName: string;
   role: string;
+  email?: string;
   regionId?: string | null;
   sectorId?: string | null;
   schoolId?: string | null;
@@ -183,6 +191,9 @@ export interface ValidationRule {
   categoryId: string;
   createdAt: string;
   updatedAt: string;
+  roles?: string[];
+  validationFn?: string;
+  expression?: string;
 }
 
 export interface FormEntryVersion {
@@ -212,6 +223,9 @@ export interface VersionDiff {
   oldValue: any;
   newValue: any;
   changeType: 'added' | 'modified' | 'removed';
+  added?: string[];
+  removed?: string[];
+  modified?: string[];
 }
 
 export interface NotificationGroup {
@@ -250,4 +264,38 @@ export interface ColumnDefinition {
   required: boolean;
   options: string[];
   defaultValue: any;
+}
+
+// Add interfaces for notification-related hooks
+export interface AddGroupMemberData {
+  groupId: string;
+  memberIds: string[];
+  memberType: string;
+}
+
+export interface CreateNotificationGroupData {
+  name: string;
+  description?: string;
+}
+
+export interface UpdateNotificationGroupData {
+  id: string;
+  name?: string;
+  description?: string;
+}
+
+export interface CreateMassNotificationData {
+  title: string;
+  message: string;
+  notificationType: string;
+  recipients: {
+    type: string;
+    ids: string[];
+  }[];
+}
+
+export interface GetMassNotificationsParams {
+  page?: number;
+  pageSize?: number;
+  search?: string;
 }

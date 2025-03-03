@@ -151,7 +151,15 @@ export const tableVersions = {
         keys2.includes(k) && JSON.stringify(schema1[k]) !== JSON.stringify(schema2[k])
       );
 
-      return { added, removed, modified };
+      return {
+        field: '', // This is a placeholder
+        oldValue: schema1,
+        newValue: schema2,
+        changeType: 'modified',
+        added,
+        removed,
+        modified
+      };
     } catch (error) {
       console.error('Error comparing versions:', error);
       toast.error('Failed to compare versions');

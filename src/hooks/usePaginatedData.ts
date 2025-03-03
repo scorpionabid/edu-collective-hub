@@ -1,109 +1,90 @@
 
-import { useQuery } from '@tanstack/react-query';
-import { useCallback, useState } from 'react';
-import { PaginationParams, SortParams, FilterParams, QueryOptions, PaginatedResponse } from '@/lib/api/types';
+import { useState, useCallback, useEffect } from 'react';
+import { QueryOptions, PaginationParams, SortParams, FilterParams, PaginatedResponse } from '@/lib/api/types';
+import { useQuery, UseQueryOptions, RefetchOptions } from '@tanstack/react-query';
 
-interface UsePaginatedDataOptions<T> {
-  queryKey: string | Array<string | number>;
-  queryFn: (options: QueryOptions) => Promise<PaginatedResponse<T>>;
+interface UsePaginatedDataOptions<T> extends UseQueryOptions<PaginatedResponse<T>, Error> {
   initialPagination?: PaginationParams;
   initialSort?: SortParams;
-  initialFilter?: FilterParams;
-  enabled?: boolean;
-  staleTime?: number;
-  onSuccess?: (data: PaginatedResponse<T>) => void;
-  onError?: (error: Error) => void;
+  initialFilters?: FilterParams;
+  queryKey: string[];
+  fetchFn: (options: QueryOptions) => Promise<PaginatedResponse<T>>;
 }
 
-export function usePaginatedData<T>({
-  queryKey,
-  queryFn,
-  initialPagination = { page: 1, pageSize: 10 },
-  initialSort,
-  initialFilter,
-  enabled = true,
-  staleTime = 5 * 60 * 1000, // 5 minutes
-  onSuccess,
-  onError
-}: UsePaginatedDataOptions<T>) {
+/**
+ * A hook for paginated data with sorting and filtering
+ */
+export function usePaginatedData<T>(options: UsePaginatedDataOptions<T>) {
+  const { 
+    initialPagination = { page: 1, pageSize: 10 },
+    initialSort = { column: "createdAt", direction: "desc" },
+    initialFilters = {},
+    queryKey,
+    fetchFn,
+    ...queryOptions
+  } = options;
+
   const [pagination, setPagination] = useState<PaginationParams>(initialPagination);
-  const [sort, setSort] = useState<SortParams | undefined>(initialSort);
-  const [filter, setFilter] = useState<FilterParams | undefined>(initialFilter);
+  const [sort, setSort] = useState<SortParams>(initialSort);
+  const [filters, setFilters] = useState<FilterParams>(initialFilters);
 
-  // Combine all query options
-  const queryOptions: QueryOptions = {
-    pagination,
-    sort,
-    filter
-  };
-
-  // Create a stable query key that includes all parameters
-  const fullQueryKey = Array.isArray(queryKey) 
-    ? [...queryKey, pagination, sort, filter] 
-    : [queryKey, pagination, sort, filter];
-
-  // The main query
-  const { data, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: fullQueryKey,
-    queryFn: () => queryFn(queryOptions),
-    staleTime,
-    enabled: !!enabled,
-    meta: {
-      onSuccess: onSuccess as (data: any) => void,
-      onError: onError as (error: any) => void
-    }
+  // Set up the query
+  const query = useQuery({
+    queryKey: [...queryKey, pagination, sort, filters],
+    queryFn: () => fetchFn({ 
+      pagination, 
+      sort, 
+      filters,
+      cache: { enabled: true }
+    }),
+    ...queryOptions
   });
 
-  // Helper to change page
-  const goToPage = useCallback((page: number) => {
+  // Handle changing page
+  const handlePageChange = useCallback((page: number) => {
     setPagination(prev => ({ ...prev, page }));
   }, []);
 
-  // Helper to change page size
-  const setPageSize = useCallback((pageSize: number) => {
-    setPagination(prev => ({ ...prev, pageSize, page: 1 }));
+  // Handle changing page size
+  const handlePageSizeChange = useCallback((pageSize: number) => {
+    setPagination({ page: 1, pageSize });
   }, []);
 
-  // Helper to change sorting
-  const setSorting = useCallback((field: string, direction: 'asc' | 'desc') => {
-    setSort({ field, direction });
+  // Handle changing sort
+  const handleSortChange = useCallback((column: string, direction?: 'asc' | 'desc') => {
+    setSort({ 
+      column, 
+      direction: direction || (sort.column === column && sort.direction === 'asc' ? 'desc' : 'asc')
+    });
+  }, [sort]);
+
+  // Handle changing filters
+  const handleFilterChange = useCallback((newFilters: FilterParams) => {
+    setFilters(newFilters);
+    setPagination(prev => ({ ...prev, page: 1 })); // Reset to first page
   }, []);
 
-  // Helper to reset to initial values
-  const reset = useCallback(() => {
-    setPagination(initialPagination);
-    setSort(initialSort);
-    setFilter(initialFilter);
-  }, [initialPagination, initialSort, initialFilter]);
-
-  // Helper for filter changing
-  const updateFilter = useCallback((newFilter: FilterParams) => {
-    setFilter(prev => ({ ...prev, ...newFilter }));
-    // Reset to first page when filter changes
-    setPagination(prev => ({ ...prev, page: 1 }));
-  }, []);
+  // Expose data and metadata in a nice format
+  const paginationData = {
+    totalPages: query.data?.metadata.pageCount || 0,
+    total: query.data?.metadata.total || 0,
+    page: pagination.page,
+    pageSize: pagination.pageSize
+  };
 
   return {
-    data: data?.data || [],
-    pagination: {
-      ...pagination,
-      totalPages: data?.totalPages || 0,
-      total: data?.total || 0
-    },
-    metadata: data?.metadata,
-    filter: data?.filter,
+    data: query.data?.data || [],
+    pagination: paginationData,
+    metadata: query.data?.metadata || { total: 0, page: 1, pageSize: 10, pageCount: 0 },
+    filters,
     sort,
-    isLoading,
-    isRefetching,
-    error,
-    goToPage,
-    setPageSize,
-    setSorting,
-    updateFilter,
-    setFilter,
-    reset,
-    refetch
+    isLoading: query.isLoading,
+    isError: query.isError,
+    error: query.error,
+    refetch: query.refetch,
+    handlePageChange,
+    handlePageSizeChange,
+    handleSortChange,
+    handleFilterChange
   };
 }
-
-export default usePaginatedData;

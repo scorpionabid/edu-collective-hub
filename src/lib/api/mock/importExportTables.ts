@@ -1,6 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { ImportJob, ExportJob } from "../types";
+import { ImportJob, ExportJob, ImportError } from "../types";
 import { toast } from "sonner";
 
 // Create a mock implementation of the import_jobs table
@@ -14,7 +14,7 @@ interface EnhancedImportJobInterface {
   progress: number;
   totalRows: number;
   processedRows: number;
-  errors: { row: number; message: string }[];
+  errors: ImportError[];
   importJobs: ImportJob[];
   isLoading: boolean;
   fetchImportJobs: (userId: string) => Promise<ImportJob[]>;
@@ -94,15 +94,14 @@ const createImportJobsMock = (): MockQueryBuilder => ({
           tableName: newJob.tableName || '',
           status: newJob.status || 'pending',
           progress: newJob.progress || 0,
-          total_rows: newJob.total_rows || 0,
-          processed_rows: newJob.processed_rows || 0,
-          failed_rows: newJob.failed_rows || 0,
-          start_time: newJob.start_time || new Date().toISOString(),
-          end_time: newJob.end_time,
-          error_message: newJob.error_message,
-          file_name: newJob.file_name || '',
-          file_size: newJob.file_size || 0,
-          created_at: new Date().toISOString()
+          totalRows: newJob.totalRows || 0,
+          processedRows: newJob.processedRows || 0,
+          startedAt: newJob.startedAt || new Date().toISOString(),
+          completedAt: newJob.completedAt,
+          fileName: newJob.fileName || '',
+          fileSize: newJob.fileSize || 0,
+          createdAt: new Date().toISOString(),
+          errors: newJob.errors || []
         };
         mockImportJobs.push(job);
         return { data: job, error: null };
@@ -170,14 +169,11 @@ const createExportJobsMock = (): any => ({
           userId: newJob.userId || '',
           tableName: newJob.tableName || '',
           status: newJob.status || 'pending',
-          filters: newJob.filters,
-          start_time: newJob.start_time || new Date().toISOString(),
-          end_time: newJob.end_time,
-          error_message: newJob.error_message,
-          file_name: newJob.file_name || '',
-          file_size: newJob.file_size,
-          download_url: newJob.download_url,
-          created_at: new Date().toISOString()
+          filters: newJob.filters || {},
+          createdAt: new Date().toISOString(),
+          completedAt: newJob.completedAt,
+          fileName: newJob.fileName || '',
+          downloadUrl: newJob.downloadUrl
         };
         mockExportJobs.push(job);
         return { data: job, error: null };
@@ -232,15 +228,14 @@ export const createMockImportExportInterface = (): EnhancedImportJobInterface =>
         tableName: data.tableName || '',
         status: data.status || 'pending',
         progress: data.progress || 0,
-        total_rows: data.total_rows || 0,
-        processed_rows: data.processed_rows || 0,
-        failed_rows: data.failed_rows || 0,
-        start_time: data.start_time || new Date().toISOString(),
-        end_time: data.end_time,
-        error_message: data.error_message,
-        file_name: data.file_name || '',
-        file_size: data.file_size || 0,
-        created_at: new Date().toISOString()
+        totalRows: data.totalRows || 0,
+        processedRows: data.processedRows || 0,
+        startedAt: data.startedAt || new Date().toISOString(),
+        completedAt: data.completedAt,
+        fileName: data.fileName || '',
+        fileSize: data.fileSize || 0,
+        createdAt: new Date().toISOString(),
+        errors: []
       };
       mockImportJobs.push(job);
       return job;
@@ -252,7 +247,7 @@ export const createMockImportExportInterface = (): EnhancedImportJobInterface =>
           ...mockImportJobs[index], 
           status, 
           progress,
-          end_time: (status === 'completed' || status === 'failed') ? new Date().toISOString() : mockImportJobs[index].end_time
+          completedAt: (status === 'completed' || status === 'failed') ? new Date().toISOString() : mockImportJobs[index].completedAt
         };
         return mockImportJobs[index];
       }
