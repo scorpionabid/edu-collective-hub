@@ -873,6 +873,53 @@ export type Database = {
         }
         Relationships: []
       }
+      schema_definitions: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          schema_json: Json
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          schema_json: Json
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          schema_json?: Json
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schema_definitions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       school_types: {
         Row: {
           created_at: string
@@ -1046,6 +1093,110 @@ export type Database = {
             columns: ["region_id"]
             isOneToOne: false
             referencedRelation: "regions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      validation_errors: {
+        Row: {
+          component_name: string
+          context: Json | null
+          error_message: string
+          field_name: string
+          form_id: string | null
+          id: string
+          input_value: Json | null
+          timestamp: string
+          user_id: string | null
+          validation_rule: string | null
+        }
+        Insert: {
+          component_name: string
+          context?: Json | null
+          error_message: string
+          field_name: string
+          form_id?: string | null
+          id?: string
+          input_value?: Json | null
+          timestamp?: string
+          user_id?: string | null
+          validation_rule?: string | null
+        }
+        Update: {
+          component_name?: string
+          context?: Json | null
+          error_message?: string
+          field_name?: string
+          form_id?: string | null
+          id?: string
+          input_value?: Json | null
+          timestamp?: string
+          user_id?: string | null
+          validation_rule?: string | null
+        }
+        Relationships: []
+      }
+      validation_rules: {
+        Row: {
+          category_id: string | null
+          condition: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          expression: string | null
+          id: string
+          message: string
+          name: string
+          roles: string[] | null
+          source_field: string | null
+          target_field: string
+          type: string
+          updated_at: string
+          validation_fn: string | null
+          value: Json | null
+        }
+        Insert: {
+          category_id?: string | null
+          condition: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          expression?: string | null
+          id?: string
+          message: string
+          name: string
+          roles?: string[] | null
+          source_field?: string | null
+          target_field: string
+          type: string
+          updated_at?: string
+          validation_fn?: string | null
+          value?: Json | null
+        }
+        Update: {
+          category_id?: string | null
+          condition?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          expression?: string | null
+          id?: string
+          message?: string
+          name?: string
+          roles?: string[] | null
+          source_field?: string | null
+          target_field?: string
+          type?: string
+          updated_at?: string
+          validation_fn?: string | null
+          value?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "validation_rules_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
             referencedColumns: ["id"]
           },
         ]
