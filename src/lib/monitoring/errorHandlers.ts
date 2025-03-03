@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { logger } from './logger';
 import * as Sentry from '@sentry/react';
 import React from 'react';
+import { ErrorLog } from './types';
 
 interface TrackErrorOptions {
   errorMessage: string;
