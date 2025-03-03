@@ -3,12 +3,7 @@ import React, { lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import './index.css';
-
-// Import initialization first
-import { initializeApplication } from './lib/init';
-
-// Import error boundary
-import { GlobalErrorBoundary } from './components/monitoring/ErrorBoundary';
+import { BrowserWarning } from '@/components/browser/BrowserWarning';
 
 // Import pages
 import Home from './pages/Index';
@@ -19,12 +14,10 @@ import SuperAdminTables from './pages/superadmin/Tables';
 // Lazy load Monitoring page
 const Monitoring = lazy(() => import('./pages/superadmin/Monitoring'));
 
-// Initialize the application
-initializeApplication();
-
 const App = () => {
   return (
-    <GlobalErrorBoundary>
+    <>
+      <BrowserWarning />
       <Routes>
         {/* Define your routes here */}
         <Route path="/" element={<Home />} />
@@ -42,7 +35,7 @@ const App = () => {
         {/* Add other routes as needed */}
       </Routes>
       <Toaster />
-    </GlobalErrorBoundary>
+    </>
   );
 };
 
