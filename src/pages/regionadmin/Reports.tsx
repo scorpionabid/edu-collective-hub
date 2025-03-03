@@ -41,8 +41,11 @@ const RegionReports = () => {
     const loadSectors = async () => {
       try {
         if (user?.regionId) {
-          const sectorsData = await api.sectors.getAll(user.regionId);
-          setSectors(sectorsData);
+          const sectorsData = await api.sectors.getAll();
+          const regionSectors = sectorsData.filter(
+            sector => sector.region_id === user.regionId
+          );
+          setSectors(regionSectors);
         }
       } catch (error) {
         console.error("Error loading sectors:", error);
@@ -64,7 +67,7 @@ const RegionReports = () => {
         setIsLoading(true);
         const categoriesData = await api.categories.getAll();
         const sectorCategories = categoriesData.filter(
-          (cat: any) => cat.sectorId === selectedSector
+          (cat: Category) => cat.sectorId === selectedSector
         );
         setCategories(sectorCategories);
       } catch (error) {
@@ -92,7 +95,10 @@ const RegionReports = () => {
         const categoryDetails = await api.categories.getById(selectedCategory);
         
         if (categoryDetails && categoryDetails.columns) {
-          setColumns(categoryDetails.columns);
+          const validColumns = Array.isArray(categoryDetails.columns) 
+            ? categoryDetails.columns.filter(col => col && typeof col === 'object' && 'id' in col)
+            : [];
+          setColumns(validColumns as Column[]);
           
           const formData = await api.formData.getAll();
           

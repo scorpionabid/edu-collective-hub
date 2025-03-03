@@ -3,26 +3,22 @@ import { auth } from './auth';
 import { categories } from './categories';
 import { columns } from './columns';
 import { formData } from './formData';
-import { regions } from './regions';
-import { sectors } from './sectors';
-import { schools } from './schools';
 import { profiles } from './profiles';
-import { realtime } from './realtime';
+import { regions } from './regions';
+import { schools } from './schools';
+import { sectors } from './sectors';
 import { versions } from './versions';
+import { realtime } from './realtime';
 
-// Export all API modules as a unified API object
 export const api = {
   auth,
   categories,
   columns,
   formData,
-  regions,
-  sectors,
-  schools,
   profiles,
-  realtime,
-  versions
+  regions,
+  schools,
+  sectors,
+  versions,
+  realtime
 };
-
-// Re-export types for convenience
-export * from './types';

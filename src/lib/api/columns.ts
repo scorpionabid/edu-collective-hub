@@ -71,12 +71,13 @@ export const columns = {
   
   update: async (id: string, column: Partial<Column>) => {
     try {
+      const updateData: any = {};
+      if (column.name) updateData.name = column.name;
+      if (column.type) updateData.type = column.type;
+      
       const { data, error } = await supabase
         .from('columns')
-        .update({
-          name: column.name,
-          type: column.type
-        })
+        .update(updateData)
         .eq('id', id)
         .select('*')
         .single();

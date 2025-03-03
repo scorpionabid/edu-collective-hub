@@ -6,7 +6,8 @@ import { Category } from "./types";
 export const categories = {
   getAll: async () => {
     try {
-      // Using regular table query instead of RPC to avoid type issues
+      // Use RPC function call with explicit typing if available
+      // If not, explicitly cast the return type
       const { data, error } = await supabase
         .from('categories')
         .select('*, columns(*)');
@@ -22,7 +23,12 @@ export const categories = {
         regionId: category.region_id,
         sectorId: category.sector_id,
         schoolId: category.school_id,
-        columns: category.columns || []
+        columns: category.columns?.map(column => ({
+          id: column.id,
+          name: column.name,
+          type: column.type,
+          categoryId: column.category_id
+        })) || []
       })) || [];
     } catch (error) {
       console.error('Error in getAll categories:', error);
@@ -32,7 +38,6 @@ export const categories = {
   
   getById: async (id: string) => {
     try {
-      // Using regular table query instead of RPC
       const { data, error } = await supabase
         .from('categories')
         .select('*, columns(*)')
@@ -50,11 +55,23 @@ export const categories = {
         regionId: data.region_id,
         sectorId: data.sector_id,
         schoolId: data.school_id,
-        columns: data.columns || []
+        columns: data.columns?.map(column => ({
+          id: column.id,
+          name: column.name,
+          type: column.type,
+          categoryId: column.category_id
+        })) || []
       } : null;
     } catch (error) {
       console.error('Error in getById category:', error);
-      return { id, name: "Category", columns: [] };
+      return { 
+        id, 
+        name: "Category", 
+        columns: [],
+        regionId: "",
+        sectorId: "",
+        schoolId: "" 
+      };
     }
   },
   
@@ -84,21 +101,39 @@ export const categories = {
         sectorId: data.sector_id,
         schoolId: data.school_id,
         columns: [] 
-      } : { id: "0", name: category.name, columns: [] };
+      } : { 
+        id: "0", 
+        name: category.name, 
+        columns: [],
+        regionId: category.regionId || "",
+        sectorId: category.sectorId || "",
+        schoolId: category.schoolId || "" 
+      };
     } catch (error) {
       console.error('Error in create category:', error);
       toast.error('Failed to create category');
-      return { id: "0", name: category.name, columns: [] };
+      return { 
+        id: "0", 
+        name: category.name, 
+        columns: [],
+        regionId: category.regionId || "",
+        sectorId: category.sectorId || "",
+        schoolId: category.schoolId || "" 
+      };
     }
   },
   
   update: async (id: string, category: Partial<Category>) => {
     try {
+      const updateData: any = {};
+      if (category.name) updateData.name = category.name;
+      if (category.regionId) updateData.region_id = category.regionId;
+      if (category.sectorId) updateData.sector_id = category.sectorId;
+      if (category.schoolId) updateData.school_id = category.schoolId;
+
       const { data, error } = await supabase
         .from('categories')
-        .update({
-          name: category.name
-        })
+        .update(updateData)
         .eq('id', id)
         .select('*')
         .single();
@@ -116,11 +151,25 @@ export const categories = {
         sectorId: data.sector_id,
         schoolId: data.school_id,
         columns: [] 
-      } : { id, name: category.name || "Category", columns: [] };
+      } : { 
+        id, 
+        name: category.name || "Category", 
+        columns: [],
+        regionId: category.regionId || "",
+        sectorId: category.sectorId || "",
+        schoolId: category.schoolId || "" 
+      };
     } catch (error) {
       console.error('Error in update category:', error);
       toast.error('Failed to update category');
-      return { id, name: category.name || "Category", columns: [] };
+      return { 
+        id, 
+        name: category.name || "Category", 
+        columns: [],
+        regionId: category.regionId || "",
+        sectorId: category.sectorId || "",
+        schoolId: category.schoolId || "" 
+      };
     }
   },
   

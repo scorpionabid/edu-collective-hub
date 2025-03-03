@@ -34,7 +34,11 @@ export const useReportData = () => {
     try {
       const category = await api.categories.getById(categoryId);
       if (category && category.columns) {
-        setColumns(category.columns);
+        // Ensure we get an array of valid Column objects
+        const validColumns = Array.isArray(category.columns) 
+          ? category.columns.filter(col => col && typeof col === 'object' && 'id' in col)
+          : [];
+        setColumns(validColumns as Column[]);
       }
     } catch (error) {
       console.error('Error fetching category columns:', error);

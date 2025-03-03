@@ -119,13 +119,18 @@ export const formData = {
   
   update: async (id: string, formData: Partial<FormData>) => {
     try {
+      const updateData: any = {};
+      if (formData.data) updateData.data = formData.data;
+      if (formData.status) {
+        updateData.status = formData.status;
+        if (formData.status === 'submitted') {
+          updateData.submitted_at = new Date().toISOString();
+        }
+      }
+      
       const { data, error } = await supabase
         .from('form_data')
-        .update({
-          data: formData.data,
-          status: formData.status,
-          submitted_at: formData.status === 'submitted' ? new Date().toISOString() : null
-        })
+        .update(updateData)
         .eq('id', id)
         .select('*')
         .single();
