@@ -8,7 +8,7 @@ export const schools = {
     try {
       const { data, error } = await supabase
         .from('schools')
-        .select('*')
+        .select('*, sectors(name), sectors:sectors(regions:regions(name))')
         .order('name');
       
       if (error) {
@@ -16,7 +16,17 @@ export const schools = {
         throw error;
       }
       
-      return data || [];
+      return data?.map(school => ({
+        id: school.id,
+        name: school.name,
+        address: school.address,
+        email: school.email,
+        phone: school.phone,
+        sectorId: school.sector_id,
+        createdAt: school.created_at,
+        sectorName: school.sectors?.name,
+        regionName: school.sectors?.regions?.name
+      })) || [];
     } catch (error) {
       console.error('Error in getAll schools:', error);
       return [];
@@ -27,7 +37,7 @@ export const schools = {
     try {
       const { data, error } = await supabase
         .from('schools')
-        .select('*')
+        .select('*, sectors(name), sectors:sectors(regions:regions(name))')
         .eq('id', id)
         .single();
       
@@ -36,7 +46,17 @@ export const schools = {
         throw error;
       }
       
-      return data;
+      return data ? {
+        id: data.id,
+        name: data.name,
+        address: data.address,
+        email: data.email,
+        phone: data.phone,
+        sectorId: data.sector_id,
+        createdAt: data.created_at,
+        sectorName: data.sectors?.name,
+        regionName: data.sectors?.regions?.name
+      } : null;
     } catch (error) {
       console.error('Error in getById school:', error);
       return null;
@@ -47,7 +67,7 @@ export const schools = {
     try {
       const { data, error } = await supabase
         .from('schools')
-        .select('*')
+        .select('*, sectors(name), sectors:sectors(regions:regions(name))')
         .eq('sector_id', sectorId)
         .order('name');
       
@@ -56,7 +76,17 @@ export const schools = {
         throw error;
       }
       
-      return data || [];
+      return data?.map(school => ({
+        id: school.id,
+        name: school.name,
+        address: school.address,
+        email: school.email,
+        phone: school.phone,
+        sectorId: school.sector_id,
+        createdAt: school.created_at,
+        sectorName: school.sectors?.name,
+        regionName: school.sectors?.regions?.name
+      })) || [];
     } catch (error) {
       console.error('Error in getBySector schools:', error);
       return [];
@@ -65,9 +95,17 @@ export const schools = {
   
   create: async (schoolData: Omit<School, 'id'>) => {
     try {
+      const dbSchoolData = {
+        name: schoolData.name,
+        sector_id: schoolData.sectorId,
+        address: schoolData.address,
+        email: schoolData.email,
+        phone: schoolData.phone
+      };
+      
       const { data, error } = await supabase
         .from('schools')
-        .insert(schoolData)
+        .insert(dbSchoolData)
         .select()
         .single();
       
@@ -77,14 +115,22 @@ export const schools = {
       }
       
       toast.success('School created successfully');
-      return data;
+      return {
+        id: data.id,
+        name: data.name,
+        sectorId: data.sector_id,
+        address: data.address,
+        email: data.email,
+        phone: data.phone,
+        createdAt: data.created_at
+      };
     } catch (error) {
       console.error('Error in create school:', error);
       toast.error('Failed to create school');
       return { 
         id: "0", 
         name: schoolData.name,
-        sector_id: schoolData.sector_id,
+        sectorId: schoolData.sectorId,
         address: schoolData.address,
         email: schoolData.email,
         phone: schoolData.phone
@@ -94,9 +140,22 @@ export const schools = {
   
   update: async (id: string, schoolData: Partial<School>) => {
     try {
+      const dbSchoolData = {
+        name: schoolData.name,
+        sector_id: schoolData.sectorId,
+        address: schoolData.address,
+        email: schoolData.email,
+        phone: schoolData.phone
+      };
+      
+      // Remove undefined fields
+      Object.keys(dbSchoolData).forEach(key => 
+        dbSchoolData[key] === undefined && delete dbSchoolData[key]
+      );
+      
       const { data, error } = await supabase
         .from('schools')
-        .update(schoolData)
+        .update(dbSchoolData)
         .eq('id', id)
         .select()
         .single();
@@ -107,14 +166,22 @@ export const schools = {
       }
       
       toast.success('School updated successfully');
-      return data;
+      return {
+        id: data.id,
+        name: data.name,
+        sectorId: data.sector_id,
+        address: data.address,
+        email: data.email,
+        phone: data.phone,
+        createdAt: data.created_at
+      };
     } catch (error) {
       console.error('Error in update school:', error);
       toast.error('Failed to update school');
       return { 
         id, 
         name: schoolData.name || "Unknown",
-        sector_id: schoolData.sector_id || "",
+        sectorId: schoolData.sectorId || "",
         address: schoolData.address || "",
         email: schoolData.email || "",
         phone: schoolData.phone || ""

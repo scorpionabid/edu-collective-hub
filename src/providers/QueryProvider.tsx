@@ -16,7 +16,7 @@ export const QueryProvider = ({ children }: QueryProviderProps) => {
         refetchOnReconnect: false,
         retry: 1,
         staleTime: 5 * 60 * 1000, // 5 minutes
-        gcTime: 10 * 60 * 1000, // 10 minutes
+        gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
         networkMode: 'always',
       },
       mutations: {
@@ -31,7 +31,7 @@ export const QueryProvider = ({ children }: QueryProviderProps) => {
       {children}
       <ReactQueryDevtools 
         initialIsOpen={false} 
-        position="bottom-right" 
+        position="bottom" 
       />
     </QueryClientProvider>
   );

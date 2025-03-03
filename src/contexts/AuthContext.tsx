@@ -88,10 +88,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     try {
       setLoading(true);
-      const result = await auth.signIn(email, password);
+      const result = await auth.login(email, password);
       
-      if (!result || !result.user) {
-        return handleAuthError(new Error("Sign in failed"), "Giriş alınmadı");
+      if (!result || !result.success) {
+        return handleAuthError(result.error, "Giriş alınmadı");
       }
       
       toast.success("Uğurla daxil oldunuz");
@@ -154,6 +154,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Update the updatePassword function to match the return type expected
+  const updatePassword = async (password: string): Promise<void> => {
+    try {
+      setLoading(true);
+      const result = await auth.updatePassword(password);
+      
+      if (!result.success) {
+        toast.error("Şifrə yenilənmədi");
+        throw result.error;
+      }
+      
+      toast.success("Şifrə uğurla yeniləndi");
+    } catch (error) {
+      toast.error("Şifrə yenilənmədi");
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const isAuthenticated = !!user && !!session;
   const contextLoading = loading || profileLoading;
 
@@ -175,7 +195,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logout,
         isAuthenticated,
         resetPassword,
-        updatePassword: auth.updatePassword,
+        updatePassword,
         updateProfile
       }}
     >

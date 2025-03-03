@@ -15,7 +15,7 @@ interface SchoolFormProps {
 
 export const SchoolForm = ({ school, onSubmit, sectors, regions }: SchoolFormProps) => {
   const [name, setName] = useState(school?.name || "");
-  const [sectorId, setSectorId] = useState(school?.sector_id || "");
+  const [sectorId, setSectorId] = useState(school?.sectorId || "");
   const [address, setAddress] = useState(school?.address || "");
   const [email, setEmail] = useState(school?.email || "");
   const [phone, setPhone] = useState(school?.phone || "");
@@ -24,8 +24,8 @@ export const SchoolForm = ({ school, onSubmit, sectors, regions }: SchoolFormPro
 
   // Set initial region based on sector
   useEffect(() => {
-    if (school?.sector_id) {
-      const sector = sectors.find(s => s.id === school.sector_id);
+    if (school?.sectorId) {
+      const sector = sectors.find(s => s.id === school.sectorId);
       if (sector && sector.region_id) {
         setRegionId(sector.region_id);
       }
@@ -48,7 +48,7 @@ export const SchoolForm = ({ school, onSubmit, sectors, regions }: SchoolFormPro
     e.preventDefault();
     onSubmit({
       name,
-      sector_id: sectorId,
+      sectorId,
       address,
       email,
       phone

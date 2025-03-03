@@ -1,58 +1,47 @@
 
 import { cacheService } from './cacheService';
-import { CacheOptions } from '@/lib/api/types';
+import { CacheOptions } from '../api/types';
 
 /**
  * Higher-order function to wrap API calls with caching
+ * 
  * @param cacheKey Unique key for the cache entry
- * @param fetchFn Function to fetch data if not in cache
- * @param options Cache options including ttl and invalidation tags
- * @returns The data from cache or from the fetch function
+ * @param fn API function to cache
+ * @param options Caching options
+ * @returns Result of the API call
  */
-export const withCache = async <T>(
+export async function withCache<T>(
   cacheKey: string,
-  fetchFn: () => Promise<T>,
+  fn: () => Promise<T>,
   options?: CacheOptions
-): Promise<T> => {
-  // Default options
-  const defaultOptions: CacheOptions = {
-    enabled: true,
-    ttl: 300, // 5 minutes
-    invalidationTags: []
-  };
-  
-  const mergedOptions = { ...defaultOptions, ...options };
+): Promise<T> {
+  const { enabled = true, ttl, invalidationTags } = options || {};
   
   // Skip cache if disabled
-  if (!mergedOptions.enabled) {
-    return fetchFn();
+  if (!enabled) {
+    return fn();
   }
   
   try {
-    // Try to get from cache first
+    // Try to get from cache
     const cachedData = await cacheService.get<T>(cacheKey);
     
     if (cachedData !== null) {
-      console.log(`Cache hit for key: ${cacheKey}`);
       return cachedData;
     }
     
-    // Cache miss, fetch data
-    console.log(`Cache miss for key: ${cacheKey}`);
-    const data = await fetchFn();
+    // Cache miss, call function
+    const data = await fn();
     
     // Store in cache
-    await cacheService.set(
-      cacheKey, 
-      data, 
-      mergedOptions.ttl,
-      mergedOptions.invalidationTags
-    );
+    if (data !== null && data !== undefined) {
+      await cacheService.set(cacheKey, data, ttl);
+    }
     
     return data;
   } catch (error) {
-    console.error(`Cache error for key ${cacheKey}:`, error);
-    // Fallback to fetching data directly on cache error
-    return fetchFn();
+    console.error('Cache error:', error);
+    // Fallback to direct function call
+    return fn();
   }
-};
+}

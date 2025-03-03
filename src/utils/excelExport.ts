@@ -1,315 +1,300 @@
 
 import * as XLSX from 'xlsx';
-import { supabase } from '@/integrations/supabase/client';
-import { Column } from '@/lib/api/types';
+import { saveAs } from 'file-saver';
+import { nanoid } from 'nanoid';
+import { Column, ExportOptions } from '@/lib/api/types';
+import '../lib/api/mock/importExportTables';  // Make sure our mock tables are loaded
 
-export interface ExportOptions {
-  fileName?: string;
-  sheetName?: string;
-  headers?: boolean;
-  format?: 'xlsx' | 'csv';
-}
-
-const defaultOptions: ExportOptions = {
-  fileName: `export-${new Date().toISOString().substring(0, 10)}`,
-  sheetName: 'Sheet1',
-  headers: true,
-  format: 'xlsx'
-};
-
-export function exportToExcel(
+// Generic function to export data to Excel
+export const exportToExcel = (
   data: any[],
+  columns: Column[] | string[],
+  fileName: string = 'export',
   options?: ExportOptions
-): { success: boolean; fileName?: string; error?: any } {
+) => {
+  if (!data || !data.length) {
+    console.error('No data to export');
+    return;
+  }
+
   try {
-    const mergedOptions = { ...defaultOptions, ...options };
-    const fileName = `${mergedOptions.fileName}.${mergedOptions.format}`;
+    // If array of objects, prepare for Excel format
+    let excelData = data;
+    let headers: string[] = [];
     
-    // Create workbook and worksheet
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(data, {
-      skipHeader: !mergedOptions.headers
-    });
+    if (typeof columns[0] === 'object') {
+      // Column is Column[] type
+      const columnObjects = columns as Column[];
+      headers = columnObjects.map(col => col.name);
+      
+      // Map data to include only the specified columns
+      excelData = data.map(row => {
+        const newRow: Record<string, any> = {};
+        columnObjects.forEach(col => {
+          newRow[col.name] = row[col.id] || '';
+        });
+        return newRow;
+      });
+    } else {
+      // Column is string[] type
+      headers = columns as string[];
+      
+      // Map data to include only the specified columns
+      excelData = data.map(row => {
+        const newRow: Record<string, any> = {};
+        headers.forEach(header => {
+          newRow[header] = row[header] || '';
+        });
+        return newRow;
+      });
+    }
+
+    // Create worksheet
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
     
-    // Add the worksheet to the workbook
-    XLSX.utils.book_append_sheet(wb, ws, mergedOptions.sheetName);
+    // Create workbook
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, options?.sheetName || 'Sheet1');
     
-    // Write the workbook and save the file
-    XLSX.writeFile(wb, fileName);
+    // Generate Excel file
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8' });
     
-    return {
-      success: true,
-      fileName
-    };
+    // Save file
+    saveAs(blob, `${fileName}.xlsx`);
+    
+    return { success: true, fileName: `${fileName}.xlsx` };
   } catch (error) {
     console.error('Error exporting to Excel:', error);
-    return {
-      success: false,
-      error
-    };
+    return { success: false, error };
   }
-}
+};
 
-export async function exportLargeDataset(
-  data: any[] | (() => Promise<any[]>),
-  options?: ExportOptions & { batchSize?: number }
-): Promise<{ success: boolean; fileName?: string; error?: any }> {
-  try {
-    const mergedOptions = { ...defaultOptions, ...options, batchSize: options?.batchSize || 5000 };
-    const fileName = `${mergedOptions.fileName}.${mergedOptions.format}`;
-    
-    // Get data if it's a function
-    const dataArray = typeof data === 'function' ? await data() : data;
-    
-    // Create workbook and worksheet
-    const wb = XLSX.utils.book_new();
-    
-    // Process in batches
-    for (let i = 0; i < dataArray.length; i += mergedOptions.batchSize) {
-      const batch = dataArray.slice(i, i + mergedOptions.batchSize);
-      
-      if (i === 0) {
-        // First batch, create the sheet
-        const ws = XLSX.utils.json_to_sheet(batch, {
-          skipHeader: !mergedOptions.headers
-        });
-        XLSX.utils.book_append_sheet(wb, ws, mergedOptions.sheetName);
-      } else {
-        // Append to existing sheet
-        const ws = wb.Sheets[mergedOptions.sheetName!];
-        XLSX.utils.sheet_add_json(ws, batch, {
-          skipHeader: true,
-          origin: -1 // -1 means append to the end
-        });
-      }
-    }
-    
-    // Write the workbook and save the file
-    XLSX.writeFile(wb, fileName);
-    
-    return {
-      success: true,
-      fileName
-    };
-  } catch (error) {
-    console.error('Error exporting large dataset:', error);
-    return {
-      success: false,
-      error
-    };
-  }
-}
-
-export function exportFromTemplate(
-  data: any[],
-  template: any,
+// Enhanced version for large datasets that exports in the background
+export const startExcelExport = async (
+  getDataFn: (page: number, pageSize: number) => Promise<any>,
+  columns: Column[] | string[],
+  totalRows: number,
+  fileName: string = 'export',
+  batchSize: number = 1000,
   options?: ExportOptions
-): { success: boolean; fileName?: string; error?: any } {
+) => {
   try {
-    const mergedOptions = { ...defaultOptions, ...options };
-    const fileName = `${mergedOptions.fileName}.${mergedOptions.format}`;
+    const id = nanoid();
+    const userId = (await supabase.auth.getUser()).data.user?.id;
     
-    // Create a copy of the template
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet(template.header || []);
-    
-    // Add the data rows
-    XLSX.utils.sheet_add_json(ws, data, {
-      skipHeader: true,
-      origin: template.dataStartRow || 'A2'
+    // Create export job record
+    await supabase.from('export_jobs').insert({
+      id,
+      status: 'waiting',
+      progress: 0,
+      total_rows: totalRows,
+      processed_rows: 0,
+      file_name: `${fileName}.xlsx`,
+      query_params: { columns, options },
+      created_by: userId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     });
     
-    // Apply styling if provided
-    if (template.styling) {
-      // Apply column widths
-      if (template.styling.columnWidths) {
-        ws['!cols'] = template.styling.columnWidths.map((width: number) => ({ wch: width }));
-      }
-      
-      // Apply row heights
-      if (template.styling.rowHeights) {
-        ws['!rows'] = template.styling.rowHeights.map((height: number) => ({ hpt: height }));
-      }
-    }
-    
-    // Add the worksheet to the workbook
-    XLSX.utils.book_append_sheet(wb, ws, mergedOptions.sheetName);
-    
-    // Write the workbook and save the file
-    XLSX.writeFile(wb, fileName);
-    
-    return {
-      success: true,
-      fileName
-    };
-  } catch (error) {
-    console.error('Error exporting with template:', error);
-    return {
-      success: false,
-      error
-    };
-  }
-}
-
-export function generateExcelFromColumns(data: any[], columns: string | Column[]): { success: boolean; fileName?: string; error?: any } {
-  try {
-    // If columns is a string, treat it as a JSON string and parse it
-    let columnArray: any[] = [];
-    
-    if (typeof columns === 'string') {
+    // Start background processing
+    setTimeout(async () => {
       try {
-        columnArray = JSON.parse(columns);
-      } catch (e) {
-        console.error('Failed to parse columns string:', e);
-        columnArray = [];
+        // Update status to processing
+        await supabase.from('export_jobs').update({
+          status: 'processing',
+          updated_at: new Date().toISOString()
+        }).eq('id', id);
+        
+        // Create workbook and worksheet
+        const workbook = XLSX.utils.book_new();
+        const sheetName = options?.sheetName || 'Sheet1';
+        
+        // Process in batches
+        let processedRows = 0;
+        let page = 1;
+        let hasCreatedSheet = false;
+        
+        while (processedRows < totalRows) {
+          // Fetch batch of data
+          const batchData = await getDataFn(page, batchSize);
+          
+          if (!batchData || !batchData.length) {
+            break;
+          }
+          
+          // Process the data
+          let excelData = batchData;
+          let headers: string[] = [];
+          
+          if (typeof columns[0] === 'object') {
+            // Column is Column[] type
+            const columnObjects = columns as Column[];
+            headers = columnObjects.map(col => col.name);
+            
+            // Map data to include only the specified columns
+            excelData = batchData.map(row => {
+              const newRow: Record<string, any> = {};
+              columnObjects.forEach(col => {
+                newRow[col.name] = row[col.id] || '';
+              });
+              return newRow;
+            });
+          } else {
+            // Column is string[] type
+            headers = columns as string[];
+            
+            // Map data to include only the specified columns
+            excelData = batchData.map(row => {
+              const newRow: Record<string, any> = {};
+              headers.forEach(header => {
+                newRow[header] = row[header] || '';
+              });
+              return newRow;
+            });
+          }
+          
+          // Create or append to worksheet
+          if (!hasCreatedSheet) {
+            const worksheet = XLSX.utils.json_to_sheet(excelData);
+            XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+            hasCreatedSheet = true;
+          } else {
+            const worksheet = workbook.Sheets[sheetName];
+            XLSX.utils.sheet_add_json(worksheet, excelData, { skipHeader: true, origin: -1 });
+          }
+          
+          // Update progress
+          processedRows += batchData.length;
+          const progress = Math.min(100, Math.round((processedRows / totalRows) * 100));
+          
+          await supabase.from('export_jobs').update({
+            progress,
+            processed_rows: processedRows,
+            updated_at: new Date().toISOString()
+          }).eq('id', id);
+          
+          page++;
+        }
+        
+        // Generate Excel file
+        const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8' });
+        
+        // In a real app, you would upload this blob to Supabase storage
+        // For our mock implementation, we'll just update the job
+        const fileUrl = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${Buffer.from(excelBuffer).toString('base64')}`;
+        
+        // Mark as complete
+        await supabase.from('export_jobs').update({
+          status: 'complete',
+          progress: 100,
+          file_url: fileUrl,
+          updated_at: new Date().toISOString()
+        }).eq('id', id);
+        
+        // In a real app, you would trigger a notification here
+        
+      } catch (error) {
+        console.error('Error processing export job:', error);
+        
+        // Update job with error
+        await supabase.from('export_jobs').update({
+          status: 'error',
+          error_message: error.message,
+          updated_at: new Date().toISOString()
+        }).eq('id', id);
       }
-    } else {
-      // Assume columns is already an array of Column objects
-      columnArray = columns;
-    }
+    }, 100);
     
-    // Transform data based on columns
-    const transformedData = data.map(item => {
-      const transformed: any = {};
-      
-      columnArray.forEach(col => {
-        const colName = typeof col === 'string' ? col : col.name;
-        transformed[colName] = item[colName] || '';
-      });
-      
-      return transformed;
-    });
-    
-    // Export the transformed data
-    return exportToExcel(transformedData, {
-      fileName: `data-export-${new Date().toISOString().substring(0, 10)}`
-    });
+    return { success: true, jobId: id, message: 'Export started' };
   } catch (error) {
-    console.error('Error generating Excel from columns:', error);
-    return {
-      success: false,
-      error
-    };
+    console.error('Error starting export:', error);
+    return { success: false, error };
   }
-}
+};
 
-export async function initiateServerSideExport(
-  query: any,
-  options?: { 
-    fileName?: string;
-    columns?: string[];
-    filters?: any;
-    jobName?: string;
-  }
-): Promise<{ success: boolean; jobId?: string; message?: string; error?: any }> {
+// Function to check export status
+export const checkExportStatus = async (jobId: string) => {
   try {
-    // Create an export job in the database
-    const jobId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-    
-    const { error } = await supabase
-      .from('export_jobs')
-      .insert({
-        id: jobId,
-        status: 'waiting',
-        progress: 0,
-        file_name: options?.fileName || `export-${new Date().toISOString().substring(0, 10)}`,
-        query_params: {
-          query: query,
-          columns: options?.columns,
-          filters: options?.filters,
-          jobName: options?.jobName
-        },
-        created_by: (await supabase.auth.getUser()).data.user?.id
-      });
-      
-    if (error) throw error;
-    
-    // Trigger the edge function to handle the export
-    const { error: functionError } = await supabase.functions.invoke('process-export', {
-      body: { jobId }
-    });
-    
-    if (functionError) throw functionError;
-    
-    return {
-      success: true,
-      jobId,
-      message: 'Export job initiated successfully. You will be notified when it completes.'
-    };
-  } catch (error) {
-    console.error('Error initiating server-side export:', error);
-    return {
-      success: false,
-      error
-    };
-  }
-}
-
-export async function getExportJobStatus(jobId: string): Promise<any> {
-  try {
-    const { data, error } = await supabase
+    const { data: job, error } = await supabase
       .from('export_jobs')
       .select('*')
       .eq('id', jobId)
       .single();
-      
-    if (error) throw error;
+    
+    if (error) {
+      throw error;
+    }
     
     return {
       success: true,
-      job: data
+      status: job.status,
+      progress: job.progress,
+      fileUrl: job.file_url
     };
   } catch (error) {
-    console.error('Error getting export job status:', error);
-    return {
-      success: false,
-      error
-    };
+    console.error('Error checking export status:', error);
+    return { success: false, error };
   }
-}
+};
 
-export async function downloadExportFile(jobId: string): Promise<{ success: boolean; url?: string; error?: any }> {
+// Function to download an exported file
+export const downloadExportedFile = async (jobId: string) => {
   try {
-    const { data, error } = await supabase
+    const { data: job, error } = await supabase
       .from('export_jobs')
-      .select('file_url, file_name')
+      .select('*')
       .eq('id', jobId)
       .single();
-      
-    if (error) throw error;
     
-    if (!data.file_url) {
-      return {
-        success: false,
-        error: 'File not ready yet'
-      };
+    if (error) {
+      throw error;
     }
     
-    // For storage files, generate a signed URL
-    if (data.file_url.startsWith('exports/')) {
-      const { data: signedUrlData, error: signedUrlError } = await supabase
-        .storage
-        .from('exports')
-        .createSignedUrl(data.file_url.replace('exports/', ''), 60);
-        
-      if (signedUrlError) throw signedUrlError;
-      
-      return {
-        success: true,
-        url: signedUrlData.signedUrl
-      };
+    if (job.status !== 'complete') {
+      throw new Error('Export is not complete yet');
     }
     
-    // For public URLs, just return the URL
-    return {
-      success: true,
-      url: data.file_url
-    };
+    if (!job.file_url) {
+      throw new Error('File URL not found');
+    }
+    
+    // In a real app, this would be a storage URL
+    // For our mock implementation, we'll handle the data URL directly
+    if (job.file_url.startsWith('data:')) {
+      const link = document.createElement('a');
+      link.href = job.file_url;
+      link.download = job.file_name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return { success: true };
+    }
+    
+    const { data, error: downloadError } = await supabase.storage
+      .from('exports')
+      .download(job.file_url);
+    
+    if (downloadError) {
+      throw downloadError;
+    }
+    
+    saveAs(data, job.file_name);
+    return { success: true };
   } catch (error) {
-    console.error('Error downloading export file:', error);
-    return {
-      success: false,
-      error
-    };
+    console.error('Error downloading exported file:', error);
+    return { success: false, error };
   }
-}
+};
+
+// Function to convert data for Excel export
+export const convertToExcelData = (data: any[], columns: Column[]) => {
+  return data.map(item => {
+    const row: Record<string, any> = {};
+    columns.forEach(column => {
+      row[column.name] = item[column.id] || '';
+    });
+    return row;
+  });
+};

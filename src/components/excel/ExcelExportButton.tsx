@@ -1,132 +1,173 @@
 
 import React, { useState, useEffect } from 'react';
-import { FileDown, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
-import { exportToExcel } from '@/utils/enhancedExcelExport';
+import { startExcelExport, checkExportStatus, downloadExportedFile } from '@/utils/excelExport';
 import { Column } from '@/lib/api/types';
+import { Progress } from '@/components/ui/progress';
 
 interface ExcelExportButtonProps {
-  data: any[];
-  columns: Column[] | string[];
-  fileName: string;
-  isLoading?: boolean;
+  data: any[] | null;
+  columns: Column[];
+  totalCount: number;
+  fetchData: (page: number, pageSize: number) => Promise<any[]>;
+  fileName?: string;
+  disabled?: boolean;
   variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
-  size?: 'default' | 'sm' | 'lg';
-  className?: string;
-  onExportStart?: () => void;
-  onExportComplete?: () => void;
+  size?: 'default' | 'sm' | 'lg' | 'icon';
+  showProgress?: boolean;
 }
 
-export function ExcelExportButton({
+export const ExcelExportButton: React.FC<ExcelExportButtonProps> = ({
   data,
   columns,
-  fileName,
-  isLoading = false,
-  variant = 'default',
-  size = 'default',
-  className = '',
-  onExportStart,
-  onExportComplete
-}: ExcelExportButtonProps) {
-  const [exporting, setExporting] = useState(false);
+  totalCount,
+  fetchData,
+  fileName = 'export',
+  disabled = false,
+  variant = 'outline',
+  size = 'sm',
+  showProgress = true
+}) => {
+  const [isExporting, setIsExporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [jobId, setJobId] = useState<string | null>(null);
-  
-  // Listen for export job status updates
+  const [isChecking, setIsChecking] = useState(false);
+
+  // Poll for export status when we have a job ID
   useEffect(() => {
-    if (!jobId) return;
-    
-    const channel = supabase
-      .channel(`export-job-${jobId}`)
-      .on('postgres_changes', 
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'export_jobs',
-          filter: `id=eq.${jobId}`
-        }, 
-        (payload) => {
-          const status = payload.new as any;
+    if (!jobId || !isExporting) return;
+
+    const intervalId = setInterval(async () => {
+      try {
+        setIsChecking(true);
+        const result = await checkExportStatus(jobId);
+        
+        if (!result.success) {
+          toast.error('Failed to check export status');
+          setIsExporting(false);
+          setIsChecking(false);
+          return;
+        }
+        
+        setProgress(result.progress);
+        
+        if (result.status === 'complete') {
+          setIsExporting(false);
+          toast.success('Export completed successfully');
           
-          if (status.status === 'processing') {
-            setProgress(status.progress);
-          } else if (status.status === 'complete') {
-            setExporting(false);
-            setProgress(100);
-            
-            if (onExportComplete) {
-              onExportComplete();
-            }
-            
-            // If there's a download URL, open it
-            if (status.download_url) {
-              window.location.href = status.download_url;
-            }
-          } else if (status.status === 'error') {
-            setExporting(false);
-            toast.error(`Export failed: ${status.errors?.[0]?.message || 'Unknown error'}`);
-          }
-        })
-      .subscribe();
-      
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [jobId, onExportComplete]);
-  
+          // Auto download the file
+          await downloadExportedFile(jobId);
+          setJobId(null);
+        } else if (result.status === 'error') {
+          setIsExporting(false);
+          toast.error('Export failed');
+          setJobId(null);
+        }
+      } catch (error) {
+        console.error('Error checking export status:', error);
+        toast.error('Failed to check export status');
+        setIsExporting(false);
+      } finally {
+        setIsChecking(false);
+      }
+    }, 2000);
+    
+    return () => clearInterval(intervalId);
+  }, [jobId, isExporting]);
+
   const handleExport = async () => {
-    if (exporting || isLoading || !data.length) return;
+    if (!data || data.length === 0) {
+      toast.error('No data to export');
+      return;
+    }
+    
+    if (isExporting) {
+      toast.info('Export is already in progress');
+      return;
+    }
+    
+    setIsExporting(true);
+    setProgress(0);
     
     try {
-      setExporting(true);
-      
-      if (onExportStart) {
-        onExportStart();
+      // If totalCount is smaller than initial data, just export directly
+      if (totalCount <= data.length) {
+        const directExport = await startExcelExport(
+          () => Promise.resolve(data),
+          columns,
+          data.length,
+          fileName,
+          data.length
+        );
+        
+        if (directExport.success) {
+          // Direct export might not have a jobId, handle both cases
+          if (directExport.jobId) {
+            setJobId(directExport.jobId);
+          } else {
+            setIsExporting(false);
+            toast.success('Export completed successfully');
+          }
+        } else {
+          setIsExporting(false);
+          toast.error('Export failed');
+        }
+        return;
       }
       
-      const result = await exportToExcel(data, columns, fileName);
+      // For larger data sets, start background export
+      const result = await startExcelExport(
+        fetchData,
+        columns,
+        totalCount,
+        fileName,
+        1000
+      );
       
-      if (result.jobId) {
-        setJobId(result.jobId);
-        toast.success('Export started. You will be notified when it completes.');
-      } else if (result.success) {
-        setExporting(false);
-        
-        if (onExportComplete) {
-          onExportComplete();
+      if (result.success) {
+        if (result.jobId) {
+          setJobId(result.jobId);
+          toast.success('Export started');
+        } else {
+          // If we got success but no jobId, the export was handled directly
+          setIsExporting(false);
+          toast.success('Export completed successfully');
         }
       } else {
-        setExporting(false);
-        toast.error(`Export failed: ${result.error || 'Unknown error'}`);
+        setIsExporting(false);
+        toast.error('Failed to start export');
       }
     } catch (error) {
-      setExporting(false);
-      console.error('Error in export handler:', error);
-      toast.error(`Export failed: ${error.message}`);
+      console.error('Error starting export:', error);
+      setIsExporting(false);
+      toast.error('Failed to start export');
     }
   };
 
   return (
-    <Button
-      variant={variant}
-      size={size}
-      className={className}
-      onClick={handleExport}
-      disabled={exporting || isLoading || !data.length}
-    >
-      {exporting ? (
-        <>
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          {progress > 0 ? `Exporting ${progress}%` : 'Starting Export...'}
-        </>
-      ) : (
-        <>
-          <FileDown className="mr-2 h-4 w-4" />
-          Export Excel
-        </>
+    <div className="space-y-2">
+      <Button
+        variant={variant}
+        size={size}
+        onClick={handleExport}
+        disabled={disabled || isExporting || !data || data.length === 0}
+      >
+        {isExporting ? (
+          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+        ) : (
+          <Download className="w-4 h-4 mr-2" />
+        )}
+        {isExporting ? 'Exporting...' : 'Export to Excel'}
+      </Button>
+      
+      {isExporting && showProgress && (
+        <div className="space-y-1">
+          <Progress value={progress} className="h-2" />
+          <p className="text-xs text-gray-500">{progress}% complete</p>
+        </div>
       )}
-    </Button>
+    </div>
   );
-}
+};

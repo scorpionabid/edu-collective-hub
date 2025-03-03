@@ -25,6 +25,7 @@ export interface UserProfile {
   sectorId?: string;
   schoolId?: string;
   createdAt: string;
+  email?: string;
 }
 
 // Redis cache related types
@@ -96,7 +97,10 @@ export interface School {
   email?: string;
   phone?: string;
   sectorId?: string;
-  created_at?: string;
+  createdAt?: string;
+  // Additional properties for UI display
+  sectorName?: string;
+  regionName?: string;
 }
 
 // Sector related types
@@ -104,7 +108,10 @@ export interface Sector {
   id: string;
   name: string;
   regionId?: string;
-  created_at?: string;
+  createdAt?: string;
+  // Additional properties for UI display
+  regionName?: string;
+  schoolCount?: number;
 }
 
 // Versioning related types
@@ -222,47 +229,15 @@ export interface GetMassNotificationsParams {
   type?: string;
 }
 
-// Profile related types
-export interface Profile {
-  id: string;
-  userId: string;
-  firstName: string;
-  lastName: string;
-  role: string;
-  regionId?: string;
-  sectorId?: string;
-  schoolId?: string;
-  createdAt?: string;
-}
+// Import and export jobs (re-exported from specialized files)
+export { ImportJob, ExportJob } from './types/jobs';
 
-// Import/Export job related types
-export interface ImportJob {
-  id: string;
-  status: 'waiting' | 'processing' | 'complete' | 'error';
-  progress: number;
-  total_rows: number;
-  processed_rows: number;
-  file_name: string;
-  table_name: string;
-  with_upsert: boolean;
-  key_field?: string;
-  errors: Array<{ row: number; message: string }>;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface ExportJob {
-  id: string;
-  status: 'waiting' | 'processing' | 'complete' | 'error';
-  progress: number;
-  total_rows: number;
-  processed_rows: number;
-  file_name: string;
-  query_params: any;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-  file_url?: string;
-  error_message?: string;
+// Export options
+export interface ExportOptions {
+  fileName?: string;
+  sheetName?: string;
+  dateFormat?: string;
+  includeHeaders?: boolean;
+  headerStyle?: any;
+  cellStyle?: any;
 }

@@ -1,5 +1,6 @@
 
-// This file is being kept for backwards compatibility
-// It re-exports all the API functionality from the new modular structure
+// Import mock implementations for import/export tables
+import './api/mock/importExportTables';
 
+// Re-export the API from the modular structure
 export * from './api/index';

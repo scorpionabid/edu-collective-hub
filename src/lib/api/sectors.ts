@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { withCache } from '@/lib/cache/withCache';
 import { cacheService } from '@/lib/cache/cacheService';
+import { Sector } from './types';
 
 // Cache tags
 const CACHE_TAGS = {
@@ -22,7 +23,16 @@ export const sectors = {
         
         if (error) throw error;
         
-        return data || [];
+        // Map database fields to TypeScript interface fields
+        return (data || []).map(sector => ({
+          id: sector.id,
+          name: sector.name,
+          regionId: sector.region_id,
+          createdAt: sector.created_at,
+          regionName: sector.regions?.name,
+          // Add a computed property for UI display
+          schoolCount: 0 // This would be populated in a real app
+        }));
       } catch (error) {
         console.error('Error in getAll sectors:', error);
         return [];
@@ -39,13 +49,22 @@ export const sectors = {
       try {
         const { data, error } = await supabase
           .from('sectors')
-          .select('*')
+          .select('*, regions(name)')
           .eq('region_id', regionId)
           .order('name', { ascending: true });
         
         if (error) throw error;
         
-        return data || [];
+        // Map database fields to TypeScript interface fields
+        return (data || []).map(sector => ({
+          id: sector.id,
+          name: sector.name,
+          regionId: sector.region_id,
+          createdAt: sector.created_at,
+          regionName: sector.regions?.name,
+          // Add a computed property for UI display
+          schoolCount: 0 // This would be populated in a real app
+        }));
       } catch (error) {
         console.error('Error in getByRegion sectors:', error);
         return [];
@@ -68,7 +87,18 @@ export const sectors = {
         
         if (error) throw error;
         
-        return data;
+        if (!data) return null;
+        
+        // Map database fields to TypeScript interface fields
+        return {
+          id: data.id,
+          name: data.name,
+          regionId: data.region_id,
+          createdAt: data.created_at,
+          regionName: data.regions?.name,
+          // Add a computed property for UI display
+          schoolCount: 0 // This would be populated in a real app
+        };
       } catch (error) {
         console.error('Error in getById sector:', error);
         return null;
@@ -105,7 +135,13 @@ export const sectors = {
         CACHE_TAGS.REGION_SECTORS
       ]);
       
-      return data;
+      // Map database fields to TypeScript interface fields
+      return data ? {
+        id: data.id,
+        name: data.name,
+        regionId: data.region_id,
+        createdAt: data.created_at
+      } : null;
     } catch (error) {
       console.error('Error in create sector:', error);
       toast.error('Failed to create sector');
@@ -139,7 +175,13 @@ export const sectors = {
         CACHE_TAGS.REGION_SECTORS
       ]);
       
-      return data;
+      // Map database fields to TypeScript interface fields
+      return data ? {
+        id: data.id,
+        name: data.name,
+        regionId: data.region_id,
+        createdAt: data.created_at
+      } : null;
     } catch (error) {
       console.error('Error in update sector:', error);
       toast.error('Failed to update sector');

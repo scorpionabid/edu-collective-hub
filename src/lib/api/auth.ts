@@ -1,7 +1,10 @@
 
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { UserProfile } from './types';
+
+// Make sure we export UserProfile for other parts of the code
+export { UserProfile };
 
 export const auth = {
   login: async (email: string, password: string) => {
@@ -11,41 +14,24 @@ export const auth = {
         password
       });
       
-      if (error) throw error;
+      if (error) {
+        return { success: false, error };
+      }
       
-      return {
-        success: true,
-        user: data.user,
-        session: data.session
+      return { 
+        success: true, 
+        user: data.user, 
+        session: data.session 
       };
     } catch (error) {
-      console.error('Login error:', error);
-      return {
-        success: false,
-        error: error.message
-      };
+      console.error('Error signing in:', error);
+      return { success: false, error };
     }
   },
   
-  logout: async () => {
+  signUp: async (email: string, password: string, userData: { firstName: string; lastName: string; role: string; regionId?: string; sectorId?: string; schoolId?: string }) => {
     try {
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) throw error;
-      
-      return { success: true };
-    } catch (error) {
-      console.error('Logout error:', error);
-      return {
-        success: false,
-        error: error.message
-      };
-    }
-  },
-  
-  register: async (email: string, password: string, userData: any) => {
-    try {
-      // First, create auth user
+      // Create auth user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -53,46 +39,62 @@ export const auth = {
           data: {
             first_name: userData.firstName,
             last_name: userData.lastName,
-            role: userData.role || 'user'
+            role: userData.role
           }
         }
       });
       
-      if (authError) throw authError;
-      
-      if (!authData.user) {
-        throw new Error('Failed to create user');
+      if (authError) {
+        return { success: false, error: authError };
       }
       
-      // Then, create profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          user_id: authData.user.id,
-          first_name: userData.firstName,
-          last_name: userData.lastName,
-          role: userData.role || 'user',
-          region_id: userData.regionId,
-          sector_id: userData.sectorId,
-          school_id: userData.schoolId
-        });
+      if (authData.user) {
+        // Create profile for the user
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            user_id: authData.user.id,
+            first_name: userData.firstName,
+            last_name: userData.lastName,
+            role: userData.role,
+            region_id: userData.regionId,
+            sector_id: userData.sectorId,
+            school_id: userData.schoolId
+          })
+          .select()
+          .single();
         
-      if (profileError) {
-        // If profile creation fails, try to delete the auth user
-        await supabase.auth.admin.deleteUser(authData.user.id);
-        throw profileError;
+        if (profileError) {
+          console.error('Error creating profile:', profileError);
+          return { success: false, error: profileError };
+        }
+        
+        return { 
+          success: true, 
+          user: authData.user,
+          profile: mapDbProfileToUserProfile(profileData)
+        };
       }
       
-      return {
-        success: true,
-        user: authData.user
-      };
+      return { success: false, error: new Error('Failed to create user') };
     } catch (error) {
-      console.error('Registration error:', error);
-      return {
-        success: false,
-        error: error.message
-      };
+      console.error('Error signing up:', error);
+      return { success: false, error };
+    }
+  },
+  
+  signOut: async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        return { success: false, error };
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error signing out:', error);
+      return { success: false, error };
     }
   },
   
@@ -102,108 +104,90 @@ export const auth = {
         redirectTo: `${window.location.origin}/reset-password`
       });
       
-      if (error) throw error;
+      if (error) {
+        return { success: false, error };
+      }
       
       return { success: true };
     } catch (error) {
-      console.error('Reset password error:', error);
-      return {
-        success: false,
-        error: error.message
-      };
+      console.error('Error resetting password:', error);
+      return { success: false, error };
     }
   },
   
   updatePassword: async (password: string) => {
     try {
-      const { error } = await supabase.auth.updateUser({
-        password
-      });
+      const { error } = await supabase.auth.updateUser({ password });
       
-      if (error) throw error;
+      if (error) {
+        return { success: false, error };
+      }
       
       return { success: true };
     } catch (error) {
-      console.error('Update password error:', error);
-      return {
-        success: false,
-        error: error.message
-      };
+      console.error('Error updating password:', error);
+      return { success: false, error };
     }
   },
   
-  getProfile: async (): Promise<UserProfile | null> => {
+  updateProfile: async (profileData: Partial<UserProfile>) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      // First ensure we have the user's ID
+      const { data: userData } = await supabase.auth.getUser();
       
-      if (!user) return null;
+      if (!userData?.user) {
+        return { success: false, error: 'User not authenticated' };
+      }
       
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-        
-      if (error) throw error;
-      
-      if (!data) return null;
-      
-      return {
-        id: data.id,
-        userId: data.user_id,
-        firstName: data.first_name,
-        lastName: data.last_name,
-        role: data.role,
-        regionId: data.region_id,
-        sectorId: data.sector_id,
-        schoolId: data.school_id,
-        createdAt: data.created_at
+      // Map profile data to database fields
+      const dbProfileData: any = {
+        first_name: profileData.firstName,
+        last_name: profileData.lastName,
+        role: profileData.role,
+        region_id: profileData.regionId,
+        sector_id: profileData.sectorId,
+        school_id: profileData.schoolId
       };
-    } catch (error) {
-      console.error('Get profile error:', error);
-      return null;
-    }
-  },
-  
-  updateProfile: async (profileData: Partial<UserProfile>): Promise<UserProfile | null> => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
       
-      if (!user) throw new Error('User not authenticated');
+      // Remove undefined fields
+      Object.keys(dbProfileData).forEach(key => 
+        dbProfileData[key] === undefined && delete dbProfileData[key]
+      );
       
-      const updateData: any = {};
-      
-      if (profileData.firstName !== undefined) updateData.first_name = profileData.firstName;
-      if (profileData.lastName !== undefined) updateData.last_name = profileData.lastName;
-      if (profileData.regionId !== undefined) updateData.region_id = profileData.regionId;
-      if (profileData.sectorId !== undefined) updateData.sector_id = profileData.sectorId;
-      if (profileData.schoolId !== undefined) updateData.school_id = profileData.schoolId;
-      
+      // Update the profile in the database
       const { data, error } = await supabase
         .from('profiles')
-        .update(updateData)
-        .eq('user_id', user.id)
+        .update(dbProfileData)
+        .eq('user_id', userData.user.id)
         .select()
         .single();
-        
-      if (error) throw error;
       
-      if (!data) return null;
+      if (error) {
+        return { success: false, error };
+      }
       
-      return {
-        id: data.id,
-        userId: data.user_id,
-        firstName: data.first_name,
-        lastName: data.last_name,
-        role: data.role,
-        regionId: data.region_id,
-        sectorId: data.sector_id,
-        schoolId: data.school_id,
-        createdAt: data.created_at
+      return { 
+        success: true, 
+        profile: mapDbProfileToUserProfile(data)
       };
     } catch (error) {
-      console.error('Update profile error:', error);
-      return null;
+      console.error('Error updating profile:', error);
+      return { success: false, error };
     }
   }
 };
+
+// Helper function to map database profile to UserProfile
+function mapDbProfileToUserProfile(dbProfile: any): UserProfile {
+  return {
+    id: dbProfile.id,
+    userId: dbProfile.user_id,
+    firstName: dbProfile.first_name,
+    lastName: dbProfile.last_name,
+    role: dbProfile.role,
+    regionId: dbProfile.region_id,
+    sectorId: dbProfile.sector_id,
+    schoolId: dbProfile.school_id,
+    createdAt: dbProfile.created_at
+  };
+}

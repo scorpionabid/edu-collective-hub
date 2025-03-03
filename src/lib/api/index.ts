@@ -9,7 +9,6 @@ import { schools } from './schools';
 import { profiles } from './profiles';
 import { versions } from './versions';
 import { notifications } from './notifications';
-import { Column, Category } from './types';
 
 export const api = {
   categories,
@@ -24,4 +23,6 @@ export const api = {
   notifications
 };
 
-export { Column, Category };
+// Re-export types - using `export type` to comply with isolatedModules
+export type { Column, Category } from './types';
+export type * from './types';

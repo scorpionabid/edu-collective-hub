@@ -1,25 +1,21 @@
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import { QueryProvider } from './providers/QueryProvider';
+import { AuthProvider } from './contexts/AuthContext';
+import './index.css';
 
-import React from "react";
-import ReactDOM from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
-import App from "./App";
-import "./index.css";
-import { QueryProvider } from "./providers/QueryProvider";
-import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/contexts/AuthContext";
+// Import initialization first
+import './lib/init';
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
+// Then continue with normal imports
+const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
+root.render(
   <React.StrictMode>
-    <BrowserRouter>
-      <TooltipProvider>
-        <QueryProvider>
-          <AuthProvider>
-            <App />
-            <Toaster />
-          </AuthProvider>
-        </QueryProvider>
-      </TooltipProvider>
-    </BrowserRouter>
+    <QueryProvider>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </QueryProvider>
   </React.StrictMode>
 );
