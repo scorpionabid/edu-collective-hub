@@ -1,18 +1,34 @@
 
 import { useState } from 'react';
-import { api } from '@/lib/api';
-import { z } from 'zod';
+import { ZodType, ZodTypeDef } from 'zod';
+import { formData } from '@/lib/api';
 import * as sanitization from '@/lib/validation/sanitization';
 
-export function useValidatedFormSubmission() {
+export const useValidatedFormSubmission = () => {
+  const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Submit sanitized and validated form data
+  // Clear error state
+  const clearError = () => setError(null);
+
+  // Sanitize form data before submission to prevent XSS
+  const sanitizeFormData = <T extends Record<string, any>>(data: T): T => {
+    const sanitizedData = { ...data };
+    
+    for (const key in sanitizedData) {
+      // Only sanitize string values
+      if (typeof sanitizedData[key] === 'string') {
+        sanitizedData[key] = sanitization.sanitizeHTML(sanitizedData[key] as string);
+      }
+    }
+    
+    return sanitizedData;
+  };
+
+  // Submit form data with validation
   const submitFormData = async <T extends Record<string, any>>(
     data: T,
-    schema: z.ZodType<any>,
+    schema: ZodType<any, ZodTypeDef, any>,
     options: {
       categoryId: string;
       schoolId?: string;
@@ -22,63 +38,44 @@ export function useValidatedFormSubmission() {
   ) => {
     setIsSubmitting(true);
     setError(null);
-    setSuccessMessage(null);
 
     try {
-      // Sanitize all string data
-      const sanitizedData = { ...data };
-      Object.keys(sanitizedData).forEach(key => {
-        const value = sanitizedData[key];
-        if (typeof value === 'string') {
-          sanitizedData[key] = sanitization.sanitizeText(value);
-        }
-      });
-
-      // Validate the sanitized data
-      const parseResult = schema.safeParse(sanitizedData);
-      if (!parseResult.success) {
-        throw new Error(`Validation failed: ${parseResult.error.message}`);
+      // Validate with Zod schema
+      const validationResult = schema.safeParse(data);
+      if (!validationResult.success) {
+        throw new Error('Validation failed: ' + JSON.stringify(validationResult.error));
       }
 
-      // Submit the validated data
-      let result;
-      
+      // Sanitize data to prevent XSS attacks
+      const sanitizedData = sanitizeFormData(data);
+
+      // Prepare form data structure
+      const formDataPayload = {
+        categoryId: options.categoryId,
+        schoolId: options.schoolId || '',
+        data: sanitizedData,
+        status: 'draft'
+      };
+
+      // Update or create
       if (options.isUpdate && options.id) {
-        // Update existing form data
-        result = await api.formData.update(options.id, {
-          categoryId: options.categoryId,
-          schoolId: options.schoolId || '',
-          data: sanitizedData,
-          status: 'draft'
-        });
-        setSuccessMessage('Form data updated successfully.');
+        return await formData.updateFormData(options.id, formDataPayload);
       } else {
-        // Create new form data
-        result = await api.formData.create({
-          categoryId: options.categoryId,
-          schoolId: options.schoolId || '',
-          data: sanitizedData,
-          status: 'draft'
-        });
-        setSuccessMessage('Form data submitted successfully.');
+        return await formData.createFormData(formDataPayload);
       }
-
+    } catch (error) {
+      console.error('Form submission error:', error);
+      setError(error instanceof Error ? error.message : 'An unknown error occurred');
+      throw error;
+    } finally {
       setIsSubmitting(false);
-      return result;
-    } catch (err) {
-      console.error('Error submitting form data:', err);
-      setError(err instanceof Error ? err : new Error('Failed to submit form'));
-      setIsSubmitting(false);
-      throw err;
     }
   };
 
   return {
     submitFormData,
-    isSubmitting,
     error,
-    successMessage,
-    clearSuccessMessage: () => setSuccessMessage(null),
-    clearError: () => setError(null)
+    isSubmitting,
+    clearError
   };
-}
+};

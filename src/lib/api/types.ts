@@ -1,3 +1,4 @@
+
 // Only updating the Category interface and NotificationStats to match the required properties
 export interface Category {
   id: string;
@@ -10,6 +11,24 @@ export interface Category {
   updatedAt: string;
   createdBy: string | null;
   columns?: Column[];
+}
+
+// Define the missing ValidationRule interface
+export interface ValidationRule {
+  id: string;
+  name: string;
+  type: string;
+  targetField: string;
+  sourceField?: string;
+  condition?: string;
+  value?: any;
+  message: string;
+  categoryId: string;
+  createdAt: string;
+  updatedAt: string;
+  roles?: string[];
+  validationFn?: string;
+  expression?: string;
 }
 
 // Update NotificationStats to include all required properties
@@ -131,11 +150,12 @@ export interface Column {
   name: string;
   type: string;
   categoryId: string;
-  required: boolean;
-  options: string[] | null;
-  description: string | null;
-  createdAt: string;
-  updatedAt: string;
+  required?: boolean;
+  options?: string[] | null;
+  description?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  label?: string;
 }
 
 export interface School {
@@ -285,12 +305,15 @@ export interface MassNotification {
   createdBy?: string;
 }
 
-export interface CacheManager {
-  get: <T>(key: string) => Promise<T | null>;
-  set: <T>(key: string, value: T, ttl?: number) => Promise<void>;
-  invalidate: (keys: string[]) => Promise<void>;
-  invalidateByTags: (tags: string[]) => Promise<void>;
-  clearAll: () => Promise<void>;
+// Extending ValidationTextOptions to include label
+export interface ValidationTextOptions {
+  required?: boolean;
+  minLength?: number;
+  maxLength?: number;
+  errorMessage?: string;
+  isHtml?: boolean;
+  htmlProfile?: 'basic' | 'strict' | 'medium' | 'rich' | 'custom';
+  label?: string;
 }
 
 // Type definition for column definition in schema builder

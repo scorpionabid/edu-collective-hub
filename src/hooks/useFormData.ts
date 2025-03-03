@@ -1,51 +1,52 @@
 
 import { useState, useEffect, useCallback } from 'react';
+import { formData } from '@/lib/api';
 import { FormData } from '@/lib/api/types';
-import { api } from '@/lib/api';
 
-export const useFormData = (options = {}) => {
-  const [formData, setFormData] = useState<FormData[]>([]);
-  const [loading, setLoading] = useState(false);
+export const useFormData = () => {
+  const [data, setData] = useState<FormData[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
 
-  // Fetch form data
+  // Fetch all form data for the user
   const fetchFormData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // Use the new api method structure
-      const response = await api.formData.getFormData();
-      setFormData(response.data);
+      const result = await formData.getAllFormData();
+      setData(result);
     } catch (err) {
-      setError(err as Error);
+      setError(err instanceof Error ? err : new Error('An unknown error occurred'));
       console.error('Error fetching form data:', err);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchFormData();
-  }, [fetchFormData]);
-
-  // Submit form data
-  const submitFormData = useCallback(async (data: Omit<FormData, 'id'>) => {
+  // Submit new form data
+  const submitFormData = async (formDataToSubmit: Omit<FormData, 'id'>) => {
     setLoading(true);
+    setError(null);
     try {
-      // Use the renamed method
-      const result = await api.formData.createFormData(data);
-      await fetchFormData(); // Refresh data
+      const result = await formData.createFormData(formDataToSubmit);
+      setData(prevData => [...prevData, result]);
       return result;
     } catch (err) {
+      setError(err instanceof Error ? err : new Error('An unknown error occurred'));
       console.error('Error submitting form data:', err);
       throw err;
     } finally {
       setLoading(false);
     }
+  };
+
+  // Fetch form data on component mount
+  useEffect(() => {
+    fetchFormData();
   }, [fetchFormData]);
 
   return {
-    formData,
+    formData: data,
     loading,
     error,
     fetchFormData,

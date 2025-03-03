@@ -47,7 +47,7 @@ export async function withCache<T>(
       cacheEntry.expires_at &&
       new Date(cacheEntry.expires_at) > new Date()
     ) {
-      return cacheEntry.cache_value as T;
+      return cacheEntry.cache_value as unknown as T;
     }
 
     // If we have a cache miss or the cache is expired, execute the function
@@ -60,14 +60,13 @@ export async function withCache<T>(
     const jsonResult = JSON.parse(JSON.stringify(result));
     
     // Make sure jsonResult is a valid Json type for Supabase
-    const cacheValue = jsonResult as Json;
     
     await supabase
       .from('cache_entries')
       .upsert(
         {
           cache_key: cacheKey,
-          cache_value: cacheValue,
+          cache_value: jsonResult as Json,
           expires_at: expiresAt.toISOString(),
         },
         { onConflict: 'cache_key' }

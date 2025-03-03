@@ -29,5 +29,5 @@ export const api = {
 export { categories, columns, formData, auth, regions, sectors, schools, profiles, versions, notifications, categoryValidation };
 
 // Re-export types - using `export type` to comply with isolatedModules
-export type { Column, Category } from './types';
+export type { Column, Category, ValidationRule, FormData, Region, Sector, School } from './types';
 export type * from './types';

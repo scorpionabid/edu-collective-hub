@@ -1,105 +1,108 @@
 
-import * as z from 'zod';
 import DOMPurify from 'dompurify';
+import { z } from 'zod';
 
-// Define HTML profile configurations
-const htmlProfiles = {
+/**
+ * Configuration profiles for HTML sanitization
+ */
+const sanitizationProfiles = {
+  // Extremely restrictive - almost no tags allowed
   strict: {
-    allowedTags: ['p', 'b', 'i', 'em', 'strong'],
-    strip: true
+    ALLOWED_TAGS: ['p', 'b', 'i', 'em', 'strong', 'span', 'br'],
+    ALLOWED_ATTR: [],
   },
+  // Basic formatting only
   basic: {
-    allowedTags: ['p', 'b', 'i', 'em', 'strong', 'a', 'ul', 'ol', 'li'],
-    strip: true
+    ALLOWED_TAGS: ['p', 'b', 'i', 'em', 'strong', 'span', 'br', 'ul', 'ol', 'li', 'a', 'hr'],
+    ALLOWED_ATTR: ['href', 'target', 'rel'],
   },
+  // Medium level - common formatting + tables
   medium: {
-    allowedTags: ['p', 'b', 'i', 'em', 'strong', 'a', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote'],
-    strip: true
-  },
-  rich: {
-    allowedTags: [
-      'p', 'b', 'i', 'em', 'strong', 'a', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote',
-      'hr', 'br', 'div', 'span', 'code', 'pre', 'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'
+    ALLOWED_TAGS: [
+      'p', 'b', 'i', 'em', 'strong', 'span', 'br', 'ul', 'ol', 'li', 'a', 'hr',
+      'table', 'thead', 'tbody', 'tr', 'th', 'td', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+      'blockquote', 'pre', 'code', 'img'
     ],
-    strip: true
+    ALLOWED_ATTR: ['href', 'target', 'rel', 'src', 'alt', 'width', 'height', 'style'],
   },
+  // Rich text - more permissive for admin usage
+  rich: {
+    ALLOWED_TAGS: [
+      'p', 'b', 'i', 'em', 'strong', 'span', 'br', 'ul', 'ol', 'li', 'a', 'hr',
+      'table', 'thead', 'tbody', 'tr', 'th', 'td', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+      'blockquote', 'pre', 'code', 'img', 'div', 'section', 'article', 'header', 'footer',
+      'sub', 'sup', 'dl', 'dt', 'dd', 'figure', 'figcaption'
+    ],
+    ALLOWED_ATTR: ['href', 'target', 'rel', 'src', 'alt', 'width', 'height', 'style', 'class', 'id'],
+  },
+  // Custom profiles can be created by the caller
   custom: {
-    allowedTags: [],
-    strip: true
-  }
+    ALLOWED_TAGS: [],
+    ALLOWED_ATTR: [],
+  },
 };
 
-// Singleton sanitization service
-const sanitizationService = {
-  // Sanitize HTML content
-  sanitizeHtml: (html: string, profile: keyof typeof htmlProfiles = 'basic'): string => {
-    if (!html) return '';
-    
-    const config = htmlProfiles[profile];
-    
-    // DOMPurify doesn't have sanitize property directly on the imported module
-    // It has the 'sanitize' method
-    return DOMPurify.sanitize(html, {
-      ALLOWED_TAGS: config.allowedTags,
-      KEEP_CONTENT: config.strip
-    });
-  },
-  
-  // Simple text sanitization for plain text
-  sanitizeText: (text: string): string => {
-    if (!text) return '';
-    // Use DOMPurify with all tags stripped
-    return DOMPurify.sanitize(text, {
-      ALLOWED_TAGS: [],
-      KEEP_CONTENT: true
-    });
-  },
-  
-  // Create a Zod schema with sanitization for strings
-  createSanitizedStringSchema: (options?: {
-    required?: boolean;
-    minLength?: number;
-    maxLength?: number;
-    errorMessage?: string;
-    isHtml?: boolean;
-    htmlProfile?: keyof typeof htmlProfiles;
-  }): z.ZodType<string> => {
-    const {
-      required = true,
-      minLength,
-      maxLength,
-      errorMessage = 'Invalid input',
-      isHtml = false,
-      htmlProfile = 'basic'
-    } = options || {};
-    
-    // Start with a base string schema
-    let schema = z.string().transform(val => {
-      return isHtml 
-        ? sanitizationService.sanitizeHtml(val, htmlProfile)
-        : sanitizationService.sanitizeText(val);
-    });
-    
-    // Add validation constraints
-    if (minLength !== undefined) {
-      schema = schema.refine((val) => val.length >= minLength, {
-        message: `Must be at least ${minLength} characters`
-      });
-    }
-    
-    if (maxLength !== undefined) {
-      schema = schema.refine((val) => val.length <= maxLength, {
-        message: `Must be at most ${maxLength} characters`
-      });
-    }
-    
-    // Handle optional fields
-    if (!required) {
-      return z.optional(schema);
-    }
-    
+/**
+ * Sanitize HTML string to prevent XSS attacks
+ * @param dirtyHtml Input HTML that might contain malicious code
+ * @param profile Sanitization profile to use
+ * @returns Sanitized HTML string
+ */
+export const sanitizeHTML = (
+  dirtyHtml: string,
+  profile: keyof typeof sanitizationProfiles = 'basic'
+): string => {
+  if (typeof dirtyHtml !== 'string') {
+    return '';
+  }
+
+  const config = sanitizationProfiles[profile];
+  return DOMPurify.sanitize(dirtyHtml, config);
+};
+
+/**
+ * Zod transformer that sanitizes HTML
+ * @param profile Sanitization profile to use 
+ */
+export const createSanitizedString = (
+  profile: keyof typeof sanitizationProfiles = 'basic'
+) => {
+  return z.string().transform((val) => sanitizeHTML(val, profile));
+};
+
+// Create Zod schemas for text with various sanitization levels
+export const sanitizedText = {
+  strict: createSanitizedString('strict'),
+  basic: createSanitizedString('basic'),
+  medium: createSanitizedString('medium'),
+  rich: createSanitizedString('rich'),
+  custom: (config: typeof sanitizationProfiles.custom) => {
+    // Store the custom config temporarily
+    const originalConfig = { ...sanitizationProfiles.custom };
+    sanitizationProfiles.custom = config;
+    const schema = createSanitizedString('custom');
+    // Restore original empty custom config
+    sanitizationProfiles.custom = originalConfig;
     return schema;
-  }
+  },
 };
 
-export default sanitizationService;
+// Function to sanitize a record of string values
+export const sanitizeObject = <T extends Record<string, unknown>>(
+  obj: T,
+  profile: keyof typeof sanitizationProfiles = 'basic'
+): T => {
+  const result = { ...obj };
+  for (const key in result) {
+    if (typeof result[key] === 'string') {
+      result[key] = sanitizeHTML(result[key] as string, profile) as unknown;
+    }
+  }
+  return result;
+};
+
+export default {
+  sanitizeHTML,
+  sanitizeObject,
+  sanitizedText
+};

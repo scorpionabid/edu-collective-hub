@@ -1,6 +1,7 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Category } from "./types";
+import { Category, Column } from "./types";
 
 interface RPCResponse<T> {
   data: T;
@@ -24,6 +25,10 @@ export const categories = {
         regionId: category.region_id,
         sectorId: category.sector_id,
         schoolId: category.school_id,
+        description: category.description || null,
+        createdAt: category.created_at,
+        updatedAt: category.updated_at,
+        createdBy: category.created_by || null,
         columns: Array.isArray(category.columns) 
           ? category.columns.map((column: any) => ({
               id: column.id,
@@ -31,11 +36,7 @@ export const categories = {
               type: column.type,
               categoryId: column.category_id
             })) 
-          : [],
-        description: category.description || null,
-        createdAt: category.created_at,
-        updatedAt: category.updated_at,
-        createdBy: category.created_by || null
+          : []
       })) : [];
     } catch (error) {
       console.error('Error in getAll categories:', error);
@@ -64,6 +65,10 @@ export const categories = {
         regionId: category.region_id,
         sectorId: category.sector_id,
         schoolId: category.school_id,
+        description: category.description || null,
+        createdAt: category.created_at,
+        updatedAt: category.updated_at,
+        createdBy: category.created_by || null,
         columns: Array.isArray(category.columns)
           ? category.columns.map((column: any) => ({
               id: column.id,
@@ -71,21 +76,21 @@ export const categories = {
               type: column.type,
               categoryId: column.category_id
             }))
-          : [],
-        description: category.description || null,
-        createdAt: category.created_at,
-        updatedAt: category.updated_at,
-        createdBy: category.created_by || null
+          : []
       };
     } catch (error) {
       console.error('Error in getById category:', error);
       return { 
         id, 
         name: "Category", 
-        columns: [],
         regionId: "",
         sectorId: "",
-        schoolId: "" 
+        schoolId: "",
+        description: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdBy: null,
+        columns: []
       };
     }
   },
@@ -141,20 +146,28 @@ export const categories = {
         return {
           id: data.id, 
           name: data.name, 
-          columns: [],
           regionId: data.region_id || "",
           sectorId: data.sector_id || "",
-          schoolId: data.school_id || "" 
+          schoolId: data.school_id || "",
+          description: data.description || null,
+          createdAt: data.created_at || new Date().toISOString(),
+          updatedAt: data.updated_at || new Date().toISOString(),
+          createdBy: data.created_by || null,
+          columns: []
         };
       }
       
       return { 
         id: "0", 
         name: category.name, 
-        columns: [],
         regionId: category.regionId || "",
         sectorId: category.sectorId || "",
-        schoolId: category.schoolId || "" 
+        schoolId: category.schoolId || "",
+        description: category.description || null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdBy: null,
+        columns: []
       };
     } catch (error) {
       console.error('Error in create category:', error);
@@ -162,10 +175,14 @@ export const categories = {
       return { 
         id: "0", 
         name: category.name, 
-        columns: [],
         regionId: category.regionId || "",
         sectorId: category.sectorId || "",
-        schoolId: category.schoolId || "" 
+        schoolId: category.schoolId || "",
+        description: category.description || null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdBy: null,
+        columns: []
       };
     }
   },
@@ -192,20 +209,28 @@ export const categories = {
         return { 
           id: data.id, 
           name: data.name, 
-          columns: [],
           regionId: data.region_id || "",
           sectorId: data.sector_id || "",
-          schoolId: data.school_id || "" 
+          schoolId: data.school_id || "",
+          description: data.description || null,
+          createdAt: data.created_at || new Date().toISOString(),
+          updatedAt: data.updated_at || new Date().toISOString(),
+          createdBy: data.created_by || null,
+          columns: []
         };
       }
       
       return { 
         id, 
         name: category.name || "Category", 
-        columns: [],
         regionId: category.regionId || "",
         sectorId: category.sectorId || "",
-        schoolId: category.schoolId || "" 
+        schoolId: category.schoolId || "",
+        description: category.description || null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdBy: null,
+        columns: []
       };
     } catch (error) {
       console.error('Error in update category:', error);
@@ -213,10 +238,14 @@ export const categories = {
       return { 
         id, 
         name: category.name || "Category", 
-        columns: [],
         regionId: category.regionId || "",
         sectorId: category.sectorId || "",
-        schoolId: category.schoolId || "" 
+        schoolId: category.schoolId || "",
+        description: category.description || null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdBy: null,
+        columns: []
       };
     }
   },
@@ -235,6 +264,64 @@ export const categories = {
     } catch (error) {
       console.error('Error in delete category:', error);
       toast.error('Failed to delete category');
+    }
+  },
+  
+  // Add the missing method for validation rules
+  getCategoryValidationRules: async (categoryId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('validation_rules')
+        .select('*')
+        .eq('category_id', categoryId);
+        
+      if (error) throw error;
+      
+      return data.map((rule: any) => ({
+        id: rule.id,
+        name: rule.name,
+        type: rule.type,
+        targetField: rule.target_field,
+        sourceField: rule.source_field,
+        condition: rule.condition,
+        value: rule.value,
+        message: rule.message,
+        categoryId: rule.category_id,
+        createdAt: rule.created_at,
+        updatedAt: rule.updated_at,
+        roles: rule.roles,
+        validationFn: rule.validation_fn,
+        expression: rule.expression
+      }));
+    } catch (error) {
+      console.error('Error fetching validation rules:', error);
+      return [];
+    }
+  },
+  
+  // Add the saveValidationSchema method
+  saveValidationSchema: async (categoryId: string, schema: any) => {
+    try {
+      // For now, we'll save the schema in the validation_rules table as a special type of rule
+      const { error } = await supabase
+        .from('validation_rules')
+        .upsert({
+          category_id: categoryId,
+          name: 'Schema Definition',
+          type: 'schema',
+          target_field: '*',
+          message: 'Schema validation',
+          condition: 'schema',
+          value: schema,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'name,category_id,type' });
+      
+      if (error) throw error;
+      
+      return true;
+    } catch (error) {
+      console.error('Error saving validation schema:', error);
+      return false;
     }
   }
 };
