@@ -1,75 +1,38 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { AuthError, Session, User, UserAttributes } from '@supabase/supabase-js';
-import { handleAuthError } from '@/utils/authUtils';
+import { toast } from 'sonner';
 
 export interface UserProfile {
   id: string;
   userId: string;
   firstName: string;
   lastName: string;
-  email: string; // Add email field
   role: string;
   regionId?: string;
   sectorId?: string;
   schoolId?: string;
-  createdAt?: string;
+  createdAt: string;
 }
 
-// Export all auth functions in an object
 export const auth = {
-  /**
-   * Get the current user's profile information
-   */
-  getUserProfile: async (userId: string): Promise<UserProfile | null> => {
+  signIn: async (email: string, password: string) => {
     try {
-      if (!userId) {
-        return null;
-      }
-      
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-      
-      if (error) {
-        console.error('Error fetching user profile:', error);
-        return null;
-      }
-      
-      if (!data) {
-        return null;
-      }
-      
-      // Get user email from auth
-      const { data: userData } = await supabase.auth.admin.getUserById(userId);
-      const email = userData?.user?.email || '';
-      
-      return {
-        id: data.id,
-        userId: data.user_id,
-        firstName: data.first_name,
-        lastName: data.last_name,
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        role: data.role,
-        regionId: data.region_id,
-        sectorId: data.sector_id,
-        schoolId: data.school_id,
-        createdAt: data.created_at
-      };
+        password
+      });
+      
+      if (error) throw error;
+      return data;
     } catch (error) {
-      console.error('Error in getUserProfile:', error);
-      return null;
+      console.error('Login error:', error);
+      throw error;
     }
   },
-
-  /**
-   * Sign up a new user
-   */
+  
   signUp: async (
-    email: string,
-    password: string,
+    email: string, 
+    password: string, 
     userData: { 
       firstName: string; 
       lastName: string; 
@@ -78,207 +41,101 @@ export const auth = {
       sectorId?: string; 
       schoolId?: string 
     }
-  ): Promise<void> => {
+  ) => {
     try {
       const { data, error } = await supabase.auth.signUp({
-        email: email,
-        password: password,
+        email,
+        password,
         options: {
           data: {
-            ...userData
+            firstName: userData.firstName,
+            lastName: userData.lastName,
+            role: userData.role,
+            regionId: userData.regionId,
+            sectorId: userData.sectorId,
+            schoolId: userData.schoolId
           }
         }
       });
-
-      if (error) {
-        handleAuthError(error, "Signup failed");
-        throw error;
-      }
-
-      if (data.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([
-            { 
-              user_id: data.user.id, 
-              first_name: userData.firstName, 
-              last_name: userData.lastName, 
-              role: userData.role,
-              region_id: userData.regionId,
-              sector_id: userData.sectorId,
-              school_id: userData.schoolId
-            }
-          ]);
-
-        if (profileError) {
-          handleAuthError(profileError, "Failed to create user profile");
-          throw profileError;
-        }
-      }
-    } catch (error: any) {
-      handleAuthError(error, "Signup failed");
-      throw error;
-    }
-  },
-
-  /**
-   * Log in an existing user
-   */
-  signIn: async (email: string, password: string) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email,
-        password: password,
-      });
-
-      if (error) {
-        handleAuthError(error, "Login failed");
-        throw error;
-      }
       
+      if (error) throw error;
       return data;
-    } catch (error: any) {
-      handleAuthError(error, "Login failed");
+    } catch (error) {
+      console.error('Signup error:', error);
       throw error;
     }
   },
-
-  /**
-   * Log out the current user
-   */
-  signOut: async (): Promise<void> => {
+  
+  signOut: async () => {
     try {
       const { error } = await supabase.auth.signOut();
-
-      if (error) {
-        handleAuthError(error, "Logout failed");
-        throw error;
-      }
-    } catch (error: any) {
-      handleAuthError(error, "Logout failed");
+      if (error) throw error;
+    } catch (error) {
+      console.error('Signout error:', error);
       throw error;
     }
   },
-
-  /**
-   * Reset a user's password
-   */
-  resetPassword: async (email: string): Promise<void> => {
+  
+  resetPassword: async (email: string) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/update-password`,
+        redirectTo: `${window.location.origin}/reset-password`
       });
-
-      if (error) {
-        handleAuthError(error, "Password reset failed");
-        throw error;
-      }
-    } catch (error: any) {
-      handleAuthError(error, "Password reset failed");
-      throw error;
-    }
-  },
-
-  /**
-   * Update a user's password
-   */
-  updatePassword: async (password: string): Promise<void> => {
-    try {
-      const { error } = await supabase.auth.updateUser({ password: password });
-
-      if (error) {
-        handleAuthError(error, "Password update failed");
-        throw error;
-      }
-    } catch (error: any) {
-      handleAuthError(error, "Password update failed");
-      throw error;
-    }
-  },
-
-  /**
-   * Get the current session
-   */
-  getSession: async (): Promise<{ session: Session | null; user: User | null }> => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
       
-      return {
-        session: session,
-        user: session?.user || null,
-      };
-    } catch (error: any) {
-      handleAuthError(error, "Failed to get session");
-      return { session: null, user: null };
+      if (error) throw error;
+      toast.success("Password reset link sent to your email");
+    } catch (error) {
+      console.error('Reset password error:', error);
+      throw error;
     }
   },
-
-  /**
-   * Update a user's profile information
-   */
-  updateUserProfile: async (
-    userId: string,
+  
+  updatePassword: async (password: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password
+      });
+      
+      if (error) throw error;
+      toast.success("Password has been updated");
+    } catch (error) {
+      console.error('Update password error:', error);
+      throw error;
+    }
+  },
+  
+  getProfile: async (userId: string): Promise<UserProfile | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('userId', userId)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Get profile error:', error);
+      return null;
+    }
+  },
+  
+  updateProfile: async (
+    userId: string, 
     profileData: Partial<Omit<UserProfile, 'id' | 'userId' | 'createdAt'>>
   ): Promise<UserProfile | null> => {
     try {
-      if (!userId) {
-        throw new Error('User ID is required');
-      }
-      
-      // Get the user profile
-      const { data: profileRecord, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-      
-      if (profileError) {
-        throw profileError;
-      }
-      
-      if (!profileRecord) {
-        throw new Error('Profile not found');
-      }
-      
-      // Convert camelCase to snake_case for the database
-      const dbData: Record<string, any> = {};
-      if (profileData.firstName) dbData.first_name = profileData.firstName;
-      if (profileData.lastName) dbData.last_name = profileData.lastName;
-      if (profileData.role) dbData.role = profileData.role;
-      if (profileData.regionId) dbData.region_id = profileData.regionId;
-      if (profileData.sectorId) dbData.sector_id = profileData.sectorId;
-      if (profileData.schoolId) dbData.school_id = profileData.schoolId;
-      
-      // Update the profile
       const { data, error } = await supabase
         .from('profiles')
-        .update(dbData)
-        .eq('id', profileRecord.id)
+        .update(profileData)
+        .eq('userId', userId)
         .select()
         .single();
       
-      if (error) {
-        throw error;
-      }
-      
-      // Get user email from auth
-      const { data: userData } = await supabase.auth.admin.getUserById(userId);
-      const email = userData?.user?.email || '';
-      
-      return {
-        id: data.id,
-        userId: data.user_id,
-        firstName: data.first_name,
-        lastName: data.last_name,
-        email,
-        role: data.role,
-        regionId: data.region_id,
-        sectorId: data.sector_id,
-        schoolId: data.school_id,
-        createdAt: data.created_at
-      };
+      if (error) throw error;
+      return data;
     } catch (error) {
-      console.error('Error updating profile:', error);
+      console.error('Update profile error:', error);
       return null;
     }
   }

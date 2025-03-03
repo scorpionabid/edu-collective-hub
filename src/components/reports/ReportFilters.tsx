@@ -1,31 +1,24 @@
 
-import React, { useEffect, useState } from "react";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Column } from "@/lib/api/types";
+import React from 'react';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Category } from '@/lib/api/types';
 
 export interface ReportFiltersProps {
   selectedRegion: string;
-  setSelectedRegion: React.Dispatch<React.SetStateAction<string>>;
+  setSelectedRegion: (value: string) => void;
   selectedSector: string;
-  setSelectedSector: React.Dispatch<React.SetStateAction<string>>;
+  setSelectedSector: (value: string) => void;
   selectedSchool: string;
-  setSelectedSchool: React.Dispatch<React.SetStateAction<string>>;
+  setSelectedSchool: (value: string) => void;
   selectedCategory: string;
-  setSelectedCategory: React.Dispatch<React.SetStateAction<string>>;
-  categories: any[];
-  filteredSectors: any[];
-  filteredSchools: any[];
-  fetchRegions: () => Promise<any[]>;
-  fetchSectors: (regionId?: string) => Promise<any[]>;
-  fetchSchools: (sectorId?: string) => Promise<any[]>;
-  fetchCategoryColumns: (categoryId: string) => Promise<void>;
+  setSelectedCategory: (value: string) => void;
+  regions: { id: string; name: string }[];
+  filteredSectors: { id: string; name: string }[];
+  filteredSchools: { id: string; name: string }[];
+  categories: Category[];
+  fetchCategoryColumns: (categoryId: string) => void;
+  updateFilteredSectors: (region: string) => void;
 }
 
 export const ReportFilters: React.FC<ReportFiltersProps> = ({
@@ -37,169 +30,109 @@ export const ReportFilters: React.FC<ReportFiltersProps> = ({
   setSelectedSchool,
   selectedCategory,
   setSelectedCategory,
-  categories,
+  regions,
   filteredSectors,
   filteredSchools,
-  fetchRegions,
-  fetchSectors,
-  fetchSchools,
+  categories,
   fetchCategoryColumns,
+  updateFilteredSectors
 }) => {
-  const [regions, setRegions] = useState<any[]>([]);
-  const [sectors, setSectors] = useState<any[]>([]);
-  const [schools, setSchools] = useState<any[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-
-  useEffect(() => {
-    const loadInitialData = async () => {
-      setLoading(true);
-      const regionsData = await fetchRegions();
-      setRegions(regionsData);
-      
-      if (selectedRegion) {
-        const sectorsData = await fetchSectors(selectedRegion);
-        setSectors(sectorsData);
-      }
-      
-      if (selectedSector) {
-        const schoolsData = await fetchSchools(selectedSector);
-        setSchools(schoolsData);
-      }
-      
-      setLoading(false);
-    };
-    
-    loadInitialData();
-  }, []);
-
-  useEffect(() => {
-    const loadSectors = async () => {
-      if (selectedRegion) {
-        setLoading(true);
-        const sectorsData = await fetchSectors(selectedRegion);
-        setSectors(sectorsData);
-        setSelectedSector("");
-        setSelectedSchool("");
-        setLoading(false);
-      } else {
-        setSectors([]);
-        setSelectedSector("");
-        setSelectedSchool("");
-      }
-    };
-    
-    loadSectors();
-  }, [selectedRegion]);
-
-  useEffect(() => {
-    const loadSchools = async () => {
-      if (selectedSector) {
-        setLoading(true);
-        const schoolsData = await fetchSchools(selectedSector);
-        setSchools(schoolsData);
-        setSelectedSchool("");
-        setLoading(false);
-      } else {
-        setSchools([]);
-        setSelectedSchool("");
-      }
-    };
-    
-    loadSchools();
-  }, [selectedSector]);
-
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-      <div className="space-y-2">
-        <Label>Region</Label>
-        <Select 
-          value={selectedRegion} 
-          onValueChange={setSelectedRegion}
-          disabled={loading}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select Region" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">All Regions</SelectItem>
-            {regions.map((region) => (
-              <SelectItem key={region.id} value={region.id}>
-                {region.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-2">
-        <Label>Sector</Label>
-        <Select
-          value={selectedSector}
-          onValueChange={setSelectedSector}
-          disabled={loading || sectors.length === 0}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select Sector" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">All Sectors</SelectItem>
-            {sectors.map((sector) => (
-              <SelectItem key={sector.id} value={sector.id}>
-                {sector.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-2">
-        <Label>School</Label>
-        <Select
-          value={selectedSchool}
-          onValueChange={setSelectedSchool}
-          disabled={loading || schools.length === 0}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select School" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">All Schools</SelectItem>
-            {schools.map((school) => (
-              <SelectItem key={school.id} value={school.id}>
-                {school.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-2">
-        <Label>Category</Label>
-        <Select
-          value={selectedCategory}
-          onValueChange={(value) => {
-            setSelectedCategory(value);
-            if (value) {
-              fetchCategoryColumns(value);
-            }
-          }}
-          disabled={loading}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select Category" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">Select Category</SelectItem>
-            {categories.map((category) => (
-              <SelectItem key={category.id} value={category.id}>
-                {category.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+    <div className="bg-white rounded-lg p-6 mb-6 shadow">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="region">Region</Label>
+          <Select 
+            value={selectedRegion} 
+            onValueChange={(value) => {
+              setSelectedRegion(value);
+              updateFilteredSectors(value);
+              setSelectedSector('');
+              setSelectedSchool('');
+            }}
+          >
+            <SelectTrigger id="region">
+              <SelectValue placeholder="Select region" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Regions</SelectItem>
+              {regions.map((region) => (
+                <SelectItem key={region.id} value={region.id}>
+                  {region.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="sector">Sector</Label>
+          <Select 
+            value={selectedSector} 
+            onValueChange={(value) => {
+              setSelectedSector(value);
+              setSelectedSchool('');
+            }}
+            disabled={!selectedRegion}
+          >
+            <SelectTrigger id="sector">
+              <SelectValue placeholder="Select sector" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Sectors</SelectItem>
+              {filteredSectors.map((sector) => (
+                <SelectItem key={sector.id} value={sector.id}>
+                  {sector.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="school">School</Label>
+          <Select 
+            value={selectedSchool} 
+            onValueChange={setSelectedSchool}
+            disabled={!selectedSector}
+          >
+            <SelectTrigger id="school">
+              <SelectValue placeholder="Select school" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Schools</SelectItem>
+              {filteredSchools.map((school) => (
+                <SelectItem key={school.id} value={school.id}>
+                  {school.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="category">Category</Label>
+          <Select 
+            value={selectedCategory} 
+            onValueChange={(value) => {
+              setSelectedCategory(value);
+              if (value) fetchCategoryColumns(value);
+            }}
+          >
+            <SelectTrigger id="category">
+              <SelectValue placeholder="Select category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Select Category</SelectItem>
+              {categories.map((category) => (
+                <SelectItem key={category.id} value={category.id}>
+                  {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
     </div>
   );
 };
-
-export default ReportFilters;

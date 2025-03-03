@@ -1,77 +1,45 @@
 
-import * as XLSX from 'xlsx';
+import { Column } from '@/lib/api/types';
 
-// Xüsusi tip tərifləri
-interface TableData {
-  schoolId: string;
-  schoolName?: string;
-  categoryId: string;
-  categoryName?: string;
-  columnId: number;
-  columnName?: string;
-  value: string;
-}
-
-// Məlumatları Excel formatına çevirmək
-export const convertToExcelData = (
-  tableData: TableData[],
-  categories: { id: string; name: string }[],
-  columns: { id: number; name: string; categoryId: string }[],
-  schools: { id: string; name: string }[]
-) => {
-  // Məlumatları strukturlaşdıraq - məktəblər sətirlərdə, kategoriya və sütunlar başlıqlarda
-  const excelData: any[] = [];
+export const exportToExcel = (data: any[], columns: Column[] | string, fileName: string = 'export') => {
+  // This is a simplified placeholder function
+  // In a real app, we'd use a proper Excel export library like xlsx
   
-  schools.forEach(school => {
-    const row: any = { 'Məktəb': school.name };
-    
-    categories.forEach(category => {
-      const categoryColumns = columns.filter(col => col.categoryId === category.id);
-      
-      categoryColumns.forEach(column => {
-        const headerName = `${category.name} - ${column.name}`;
-        const dataCell = tableData.find(
-          data => data.schoolId === school.id && 
-                 data.categoryId === category.id && 
-                 data.columnId === column.id
-        );
-        
-        row[headerName] = dataCell ? dataCell.value : '';
-      });
-    });
-    
-    excelData.push(row);
+  console.log('Exporting data:', data);
+  console.log('Columns:', columns);
+  console.log('Filename:', fileName);
+  
+  // Here we would normally transform the data and generate the Excel file
+  
+  // For now, just create a CSV string for demonstration
+  let csv = '';
+  
+  // Add headers
+  if (Array.isArray(columns)) {
+    // If columns is an array of Column objects
+    csv += columns.map(col => `"${col.name}"`).join(',') + '\n';
+  } else {
+    // If columns is a string
+    csv += columns + '\n';
+  }
+  
+  // Add rows
+  data.forEach(row => {
+    if (Array.isArray(columns)) {
+      // If columns is an array of Column objects
+      csv += columns.map(col => `"${row[col.name] || ''}"`).join(',') + '\n';
+    } else {
+      // If columns is a string
+      csv += row[columns] + '\n';
+    }
   });
   
-  return excelData;
-};
-
-// Məlumatları Excel faylına çevirmək və yükləmək
-export const exportToExcel = (
-  data: any[],
-  fileName: string = 'məlumatlar',
-  sheetName: string = 'Cədvəl1'
-) => {
-  const worksheet = XLSX.utils.json_to_sheet(data);
-  const workbook = XLSX.utils.book_new();
+  // In a real app, we would create a download link and trigger it
+  console.log('Generated CSV:', csv);
   
-  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+  // Mock download behavior
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const fullFileName = `${fileName}_${timestamp}.csv`;
   
-  // Faylı yükləmək
-  XLSX.writeFile(workbook, `${fileName}.xlsx`);
-};
-
-// Struktursuz məlumatları Excel faylına çevirmək (məsələn, admin siyahısı)
-export const exportListToExcel = (
-  data: any[],
-  fileName: string = 'siyahı',
-  sheetName: string = 'Cədvəl1'
-) => {
-  const worksheet = XLSX.utils.json_to_sheet(data);
-  const workbook = XLSX.utils.book_new();
-  
-  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-  
-  // Faylı yükləmək
-  XLSX.writeFile(workbook, `${fileName}.xlsx`);
-};
+  console.log(`File "${fullFileName}" would be downloaded in a real application.`);
+}
