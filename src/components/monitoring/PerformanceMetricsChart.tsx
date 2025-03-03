@@ -3,15 +3,7 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { format } from 'date-fns';
-
-interface PerformanceMetric {
-  timestamp: string;
-  load_time_ms: number;
-  ttfb_ms?: number;
-  lcp_ms?: number;
-  fid_ms?: number;
-  cls_score?: number;
-}
+import { PerformanceMetric } from '@/lib/monitoring/types';
 
 interface PerformanceMetricsChartProps {
   data: PerformanceMetric[];
@@ -27,12 +19,12 @@ const PerformanceMetricsChart: React.FC<PerformanceMetricsChartProps> = ({
   // Format data for the chart
   const chartData = data.map(metric => ({
     ...metric,
-    timestamp: format(new Date(metric.timestamp), 'HH:mm'),
-    loadTime: metric.load_time_ms,
-    ttfb: metric.ttfb_ms,
-    lcp: metric.lcp_ms,
-    fid: metric.fid_ms,
-    cls: metric.cls_score ? Math.round(metric.cls_score * 1000) / 1000 : undefined,
+    timestamp: metric.timestamp ? format(new Date(metric.timestamp), 'HH:mm') : '',
+    loadTime: metric.loadTimeMs,
+    ttfb: metric.ttfbMs,
+    lcp: metric.lcpMs,
+    fid: metric.fidMs,
+    cls: metric.clsScore ? Math.round(metric.clsScore * 1000) / 1000 : undefined,
   }));
 
   return (

@@ -4,7 +4,24 @@ import { toast } from 'sonner';
 import { UserProfile } from './types';
 
 // Make sure we export UserProfile for other parts of the code
-export { UserProfile };
+export type { UserProfile };
+
+// Auth API interface
+interface AuthCredentials {
+  email: string;
+  password: string;
+}
+
+interface SignUpData extends AuthCredentials {
+  userData: {
+    firstName: string;
+    lastName: string;
+    role: string;
+    regionId?: string;
+    sectorId?: string;
+    schoolId?: string;
+  };
+}
 
 export const auth = {
   login: async (email: string, password: string) => {
@@ -15,7 +32,7 @@ export const auth = {
       });
       
       if (error) {
-        return { success: false, error };
+        return { success: false, error: error.message };
       }
       
       return { 
@@ -23,13 +40,13 @@ export const auth = {
         user: data.user, 
         session: data.session 
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error signing in:', error);
-      return { success: false, error };
+      return { success: false, error: error.message };
     }
   },
   
-  signUp: async (email: string, password: string, userData: { firstName: string; lastName: string; role: string; regionId?: string; sectorId?: string; schoolId?: string }) => {
+  signUp: async ({ email, password, userData }: SignUpData) => {
     try {
       // Create auth user
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -45,7 +62,7 @@ export const auth = {
       });
       
       if (authError) {
-        return { success: false, error: authError };
+        return { success: false, error: authError.message };
       }
       
       if (authData.user) {
@@ -66,7 +83,7 @@ export const auth = {
         
         if (profileError) {
           console.error('Error creating profile:', profileError);
-          return { success: false, error: profileError };
+          return { success: false, error: profileError.message };
         }
         
         return { 
@@ -76,10 +93,10 @@ export const auth = {
         };
       }
       
-      return { success: false, error: new Error('Failed to create user') };
-    } catch (error) {
+      return { success: false, error: 'Failed to create user' };
+    } catch (error: any) {
       console.error('Error signing up:', error);
-      return { success: false, error };
+      return { success: false, error: error.message };
     }
   },
   
@@ -88,13 +105,13 @@ export const auth = {
       const { error } = await supabase.auth.signOut();
       
       if (error) {
-        return { success: false, error };
+        return { success: false, error: error.message };
       }
       
       return { success: true };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error signing out:', error);
-      return { success: false, error };
+      return { success: false, error: error.message };
     }
   },
   
@@ -105,13 +122,13 @@ export const auth = {
       });
       
       if (error) {
-        return { success: false, error };
+        return { success: false, error: error.message };
       }
       
       return { success: true };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error resetting password:', error);
-      return { success: false, error };
+      return { success: false, error: error.message };
     }
   },
   
@@ -120,13 +137,13 @@ export const auth = {
       const { error } = await supabase.auth.updateUser({ password });
       
       if (error) {
-        return { success: false, error };
+        return { success: false, error: error.message };
       }
       
       return { success: true };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating password:', error);
-      return { success: false, error };
+      return { success: false, error: error.message };
     }
   },
   
@@ -163,16 +180,44 @@ export const auth = {
         .single();
       
       if (error) {
-        return { success: false, error };
+        return { success: false, error: error.message };
       }
       
       return { 
         success: true, 
         profile: mapDbProfileToUserProfile(data)
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating profile:', error);
-      return { success: false, error };
+      return { success: false, error: error.message };
+    }
+  },
+  
+  getProfile: async () => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      
+      if (!userData?.user) {
+        return { success: false, error: 'User not authenticated' };
+      }
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', userData.user.id)
+        .single();
+      
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      
+      return { 
+        success: true, 
+        profile: mapDbProfileToUserProfile(data)
+      };
+    } catch (error: any) {
+      console.error('Error fetching profile:', error);
+      return { success: false, error: error.message };
     }
   }
 };

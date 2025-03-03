@@ -28,7 +28,7 @@ import { Link, useLocation } from "react-router-dom";
 import { getUserDisplayName } from "@/utils/authUtils";
 
 export function AppSidebar() {
-  const { user, profile, logout } = useAuth();
+  const auth = useAuth();
   const location = useLocation();
 
   // Menu items based on user role
@@ -39,7 +39,7 @@ export function AppSidebar() {
     ];
 
     // Super admin menu items
-    if (profile?.role === 'superadmin') {
+    if (auth.user?.role === 'superadmin') {
       return [
         { title: "Dashboard", icon: LayoutDashboard, href: "/superadmin/dashboard" },
         { title: "Users", icon: Users, href: "/superadmin/users" },
@@ -48,12 +48,13 @@ export function AppSidebar() {
         { title: "Schools", icon: School, href: "/superadmin/schools" },
         { title: "Reports", icon: BookOpen, href: "/superadmin/reports" },
         { title: "Tables", icon: Table, href: "/superadmin/tables" },
+        { title: "Monitoring", icon: Activity, href: "/superadmin/monitoring" },
         ...defaultItems
       ];
     }
     
     // Region admin menu items
-    else if (profile?.role === 'regionadmin') {
+    else if (auth.user?.role === 'regionadmin') {
       return [
         { title: "Dashboard", icon: LayoutDashboard, href: "/regionadmin/dashboard" },
         { title: "Sectors", icon: Building, href: "/regionadmin/sectors" },
@@ -65,7 +66,7 @@ export function AppSidebar() {
     }
     
     // Sector admin menu items
-    else if (profile?.role === 'sectoradmin') {
+    else if (auth.user?.role === 'sectoradmin') {
       return [
         { title: "Dashboard", icon: LayoutDashboard, href: "/sectoradmin/dashboard" },
         { title: "Schools", icon: School, href: "/sectoradmin/schools" },
@@ -79,7 +80,7 @@ export function AppSidebar() {
     }
     
     // School admin menu items
-    else if (profile?.role === 'schooladmin') {
+    else if (auth.user?.role === 'schooladmin') {
       return [
         { title: "Dashboard", icon: LayoutDashboard, href: "/schooladmin/dashboard" },
         { title: "Data Entry", icon: FileText, href: "/schooladmin/data-entry" }, 
@@ -94,14 +95,14 @@ export function AppSidebar() {
   };
 
   const menuItems = getMenuItems();
-  const displayName = profile ? getUserDisplayName(profile) : '';
+  const displayName = auth.user ? getUserDisplayName(auth.user) : '';
 
   return (
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>
-            {profile ? `${displayName} (${profile.role})` : 'Menu'}
+            {auth.user ? `${displayName} (${auth.user.role})` : 'Menu'}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -119,7 +120,7 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               ))}
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={logout} className="flex items-center gap-2 w-full">
+                <SidebarMenuButton onClick={auth.logout} className="flex items-center gap-2 w-full">
                   <LogOut className="w-4 h-4" />
                   <span>Log Out</span>
                 </SidebarMenuButton>

@@ -20,7 +20,7 @@ interface AuthContextType {
   updateProfile: (profileData: Partial<Omit<UserProfile, 'id' | 'userId' | 'createdAt'>>) => Promise<UserProfile>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -39,23 +39,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             logger.info('Auth state changed', { event, userId: session.user.id });
             
             // Get user profile
-            const { data: profile, error } = await api.auth.getProfile();
+            const response = await api.auth.getProfile();
             
-            if (error) {
-              throw error;
+            if (!response.success) {
+              throw new Error(response.error);
             }
 
-            if (profile) {
-              setUser(profile);
+            if (response.profile) {
+              setUser(response.profile);
               
               // Set user ID for logging
-              logger.setUserId(profile.id);
+              logger.setUserId(response.profile.id);
               
               // Set user identity in Sentry
               setSentryUser({
-                id: profile.id,
+                id: response.profile.id,
                 email: session.user.email,
-                role: profile.role
+                role: response.profile.role
               });
             }
           } catch (error) {
@@ -110,13 +110,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const startTime = performance.now();
     try {
       const result = await trackApiCall(
         'auth/login',
         'POST',
-        async () => await api.auth.login(email, password),
-        { email }
+        async () => await api.auth.login(email, password)
       );
       
       if (!result.success) {
@@ -134,13 +132,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signUp = async (email: string, password: string, firstName: string, lastName: string) => {
-    const startTime = performance.now();
     try {
       const result = await trackApiCall(
         'auth/signUp',
         'POST',
-        async () => await api.auth.register(email, password, firstName, lastName),
-        { email, firstName, lastName }
+        async () => await api.auth.signUp({ 
+          email, 
+          password, 
+          userData: { 
+            firstName, 
+            lastName, 
+            role: 'user' 
+          } 
+        })
       );
       
       if (!result.success) {
@@ -171,7 +175,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await trackApiCall(
         'auth/logout',
         'POST',
-        async () => await api.auth.logout()
+        async () => await api.auth.signOut()
       );
     } catch (error: any) {
       logger.error('Logout failed', { 
@@ -186,8 +190,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const result = await trackApiCall(
         'auth/resetPassword',
         'POST',
-        async () => await api.auth.resetPassword(email),
-        { email }
+        async () => await api.auth.resetPassword(email)
       );
       
       if (!result.success) {
@@ -231,8 +234,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const result = await trackApiCall(
         'auth/updateProfile',
         'PUT',
-        async () => await api.auth.updateProfile(profileData),
-        { profileData }
+        async () => await api.auth.updateProfile(profileData)
       );
       
       if (!result.success) {
@@ -272,12 +274,4 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       {children}
     </AuthContext.Provider>
   );
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 };

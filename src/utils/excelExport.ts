@@ -1,300 +1,238 @@
 
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
-import { nanoid } from 'nanoid';
-import { Column, ExportOptions } from '@/lib/api/types';
-import '../lib/api/mock/importExportTables';  // Make sure our mock tables are loaded
+import { ExportOptions } from '@/lib/api/types';
+import { format } from 'date-fns';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
-// Generic function to export data to Excel
+// Default options for Excel export
+const DEFAULT_OPTIONS: ExportOptions = {
+  fileName: `export-${format(new Date(), 'yyyy-MM-dd')}`,
+  sheetName: 'Data',
+  dateFormat: 'yyyy-MM-dd',
+  includeHeaders: true,
+  headerStyle: {
+    font: { bold: true, color: { rgb: '000000' } },
+    fill: { fgColor: { rgb: 'EEEEEE' } }
+  },
+  cellStyle: {}
+};
+
+/**
+ * Export data to Excel file
+ * @param data Array of objects to export
+ * @param options Export options
+ */
 export const exportToExcel = (
   data: any[],
-  columns: Column[] | string[],
-  fileName: string = 'export',
-  options?: ExportOptions
-) => {
-  if (!data || !data.length) {
-    console.error('No data to export');
-    return;
-  }
-
+  options: Partial<ExportOptions> = {}
+): void => {
   try {
-    // If array of objects, prepare for Excel format
-    let excelData = data;
-    let headers: string[] = [];
+    const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
     
-    if (typeof columns[0] === 'object') {
-      // Column is Column[] type
-      const columnObjects = columns as Column[];
-      headers = columnObjects.map(col => col.name);
-      
-      // Map data to include only the specified columns
-      excelData = data.map(row => {
-        const newRow: Record<string, any> = {};
-        columnObjects.forEach(col => {
-          newRow[col.name] = row[col.id] || '';
-        });
-        return newRow;
-      });
-    } else {
-      // Column is string[] type
-      headers = columns as string[];
-      
-      // Map data to include only the specified columns
-      excelData = data.map(row => {
-        const newRow: Record<string, any> = {};
-        headers.forEach(header => {
-          newRow[header] = row[header] || '';
-        });
-        return newRow;
-      });
+    // Create workbook and worksheet
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(data);
+    
+    // Add headers style if needed
+    if (mergedOptions.includeHeaders && mergedOptions.headerStyle) {
+      const headerRange = XLSX.utils.decode_range(ws['!ref'] || 'A1:Z1');
+      for (let col = headerRange.s.c; col <= headerRange.e.c; col++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+        if (!ws[cellAddress]) continue;
+        
+        ws[cellAddress].s = mergedOptions.headerStyle;
+      }
     }
-
-    // Create worksheet
-    const worksheet = XLSX.utils.json_to_sheet(excelData);
     
-    // Create workbook
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, options?.sheetName || 'Sheet1');
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(wb, ws, mergedOptions.sheetName || 'Data');
     
     // Generate Excel file
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8' });
+    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     
     // Save file
-    saveAs(blob, `${fileName}.xlsx`);
+    saveAs(blob, `${mergedOptions.fileName}.xlsx`);
     
-    return { success: true, fileName: `${fileName}.xlsx` };
+    toast.success('Export completed successfully');
   } catch (error) {
-    console.error('Error exporting to Excel:', error);
-    return { success: false, error };
+    console.error('Export to Excel failed:', error);
+    toast.error('Failed to export data');
   }
 };
 
-// Enhanced version for large datasets that exports in the background
-export const startExcelExport = async (
-  getDataFn: (page: number, pageSize: number) => Promise<any>,
-  columns: Column[] | string[],
-  totalRows: number,
-  fileName: string = 'export',
-  batchSize: number = 1000,
-  options?: ExportOptions
-) => {
+/**
+ * Export query data to Excel (with server-side processing)
+ * @param tableName Table to query
+ * @param queryParams Query parameters
+ * @param options Export options
+ */
+export const exportQueryToExcel = async (
+  tableName: string,
+  queryParams: any = {},
+  options: Partial<ExportOptions> = {}
+): Promise<void> => {
   try {
-    const id = nanoid();
-    const userId = (await supabase.auth.getUser()).data.user?.id;
-    
-    // Create export job record
-    await supabase.from('export_jobs').insert({
-      id,
-      status: 'waiting',
-      progress: 0,
-      total_rows: totalRows,
-      processed_rows: 0,
-      file_name: `${fileName}.xlsx`,
-      query_params: { columns, options },
-      created_by: userId,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    });
-    
-    // Start background processing
-    setTimeout(async () => {
-      try {
-        // Update status to processing
-        await supabase.from('export_jobs').update({
-          status: 'processing',
-          updated_at: new Date().toISOString()
-        }).eq('id', id);
-        
-        // Create workbook and worksheet
-        const workbook = XLSX.utils.book_new();
-        const sheetName = options?.sheetName || 'Sheet1';
-        
-        // Process in batches
-        let processedRows = 0;
-        let page = 1;
-        let hasCreatedSheet = false;
-        
-        while (processedRows < totalRows) {
-          // Fetch batch of data
-          const batchData = await getDataFn(page, batchSize);
-          
-          if (!batchData || !batchData.length) {
-            break;
-          }
-          
-          // Process the data
-          let excelData = batchData;
-          let headers: string[] = [];
-          
-          if (typeof columns[0] === 'object') {
-            // Column is Column[] type
-            const columnObjects = columns as Column[];
-            headers = columnObjects.map(col => col.name);
-            
-            // Map data to include only the specified columns
-            excelData = batchData.map(row => {
-              const newRow: Record<string, any> = {};
-              columnObjects.forEach(col => {
-                newRow[col.name] = row[col.id] || '';
-              });
-              return newRow;
-            });
-          } else {
-            // Column is string[] type
-            headers = columns as string[];
-            
-            // Map data to include only the specified columns
-            excelData = batchData.map(row => {
-              const newRow: Record<string, any> = {};
-              headers.forEach(header => {
-                newRow[header] = row[header] || '';
-              });
-              return newRow;
-            });
-          }
-          
-          // Create or append to worksheet
-          if (!hasCreatedSheet) {
-            const worksheet = XLSX.utils.json_to_sheet(excelData);
-            XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-            hasCreatedSheet = true;
-          } else {
-            const worksheet = workbook.Sheets[sheetName];
-            XLSX.utils.sheet_add_json(worksheet, excelData, { skipHeader: true, origin: -1 });
-          }
-          
-          // Update progress
-          processedRows += batchData.length;
-          const progress = Math.min(100, Math.round((processedRows / totalRows) * 100));
-          
-          await supabase.from('export_jobs').update({
-            progress,
-            processed_rows: processedRows,
-            updated_at: new Date().toISOString()
-          }).eq('id', id);
-          
-          page++;
+    // Create an export job
+    const { data: job, error } = await supabase
+      .from('export_jobs')
+      .insert({
+        status: 'waiting',
+        progress: 0,
+        total_rows: 0,
+        processed_rows: 0,
+        file_name: options.fileName || `${tableName}-export-${format(new Date(), 'yyyy-MM-dd')}`,
+        query_params: {
+          table: tableName,
+          ...queryParams
         }
-        
-        // Generate Excel file
-        const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-        const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8' });
-        
-        // In a real app, you would upload this blob to Supabase storage
-        // For our mock implementation, we'll just update the job
-        const fileUrl = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${Buffer.from(excelBuffer).toString('base64')}`;
-        
-        // Mark as complete
-        await supabase.from('export_jobs').update({
-          status: 'complete',
-          progress: 100,
-          file_url: fileUrl,
-          updated_at: new Date().toISOString()
-        }).eq('id', id);
-        
-        // In a real app, you would trigger a notification here
-        
-      } catch (error) {
-        console.error('Error processing export job:', error);
-        
-        // Update job with error
-        await supabase.from('export_jobs').update({
-          status: 'error',
-          error_message: error.message,
-          updated_at: new Date().toISOString()
-        }).eq('id', id);
-      }
-    }, 100);
-    
-    return { success: true, jobId: id, message: 'Export started' };
-  } catch (error) {
-    console.error('Error starting export:', error);
-    return { success: false, error };
-  }
-};
-
-// Function to check export status
-export const checkExportStatus = async (jobId: string) => {
-  try {
-    const { data: job, error } = await supabase
-      .from('export_jobs')
-      .select('*')
-      .eq('id', jobId)
+      })
+      .select()
       .single();
     
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     
-    return {
-      success: true,
-      status: job.status,
-      progress: job.progress,
-      fileUrl: job.file_url
-    };
-  } catch (error) {
-    console.error('Error checking export status:', error);
-    return { success: false, error };
-  }
-};
-
-// Function to download an exported file
-export const downloadExportedFile = async (jobId: string) => {
-  try {
-    const { data: job, error } = await supabase
-      .from('export_jobs')
-      .select('*')
-      .eq('id', jobId)
-      .single();
-    
-    if (error) {
-      throw error;
-    }
-    
-    if (job.status !== 'complete') {
-      throw new Error('Export is not complete yet');
-    }
-    
-    if (!job.file_url) {
-      throw new Error('File URL not found');
-    }
-    
-    // In a real app, this would be a storage URL
-    // For our mock implementation, we'll handle the data URL directly
-    if (job.file_url.startsWith('data:')) {
-      const link = document.createElement('a');
-      link.href = job.file_url;
-      link.download = job.file_name;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      return { success: true };
-    }
-    
-    const { data, error: downloadError } = await supabase.storage
-      .from('exports')
-      .download(job.file_url);
-    
-    if (downloadError) {
-      throw downloadError;
-    }
-    
-    saveAs(data, job.file_name);
-    return { success: true };
-  } catch (error) {
-    console.error('Error downloading exported file:', error);
-    return { success: false, error };
-  }
-};
-
-// Function to convert data for Excel export
-export const convertToExcelData = (data: any[], columns: Column[]) => {
-  return data.map(item => {
-    const row: Record<string, any> = {};
-    columns.forEach(column => {
-      row[column.name] = item[column.id] || '';
+    toast.info('Export job created. Processing will begin shortly.', {
+      duration: 5000
     });
-    return row;
-  });
+    
+    // Poll for job status
+    const intervalId = setInterval(async () => {
+      const { data: updatedJob, error: pollError } = await supabase
+        .from('export_jobs')
+        .select('*')
+        .eq('id', job.id)
+        .single();
+      
+      if (pollError) {
+        clearInterval(intervalId);
+        throw pollError;
+      }
+      
+      switch (updatedJob.status) {
+        case 'complete':
+          clearInterval(intervalId);
+          
+          if (updatedJob.file_url) {
+            // Download the file
+            window.open(updatedJob.file_url, '_blank');
+            toast.success('Export completed successfully');
+          } else {
+            toast.error('Export completed but file URL is missing');
+          }
+          break;
+          
+        case 'error':
+          clearInterval(intervalId);
+          toast.error(`Export failed: ${updatedJob.error_message || 'Unknown error'}`);
+          break;
+          
+        case 'processing':
+          // Update progress
+          const progress = Math.round((updatedJob.processed_rows / Math.max(updatedJob.total_rows, 1)) * 100);
+          toast.info(`Export in progress: ${progress}%`, {
+            id: `export-${job.id}`,
+            duration: 3000
+          });
+          break;
+      }
+    }, 2000);
+    
+    // Cleanup after 10 minutes (prevent infinite polling)
+    setTimeout(() => {
+      clearInterval(intervalId);
+    }, 10 * 60 * 1000);
+    
+  } catch (error) {
+    console.error('Starting export job failed:', error);
+    toast.error('Failed to start export process');
+  }
+};
+
+/**
+ * Export paginated data with multiple queries
+ * @param fetchFunction Function to fetch a page of data
+ * @param totalPages Total number of pages
+ * @param options Export options
+ */
+export const exportPaginatedData = async (
+  fetchFunction: (page: number) => Promise<any[]>,
+  totalPages: number,
+  options: Partial<ExportOptions> = {}
+): Promise<void> => {
+  try {
+    let allData: any[] = [];
+    let progress = 0;
+    
+    // Show progress toast
+    const toastId = 'export-progress';
+    toast.info(`Export started: 0%`, { id: toastId, duration: 5000 });
+    
+    // Fetch all pages
+    for (let page = 1; page <= totalPages; page++) {
+      const pageData = await fetchFunction(page);
+      allData = [...allData, ...pageData];
+      
+      progress = Math.round((page / totalPages) * 100);
+      toast.info(`Export in progress: ${progress}%`, { id: toastId });
+    }
+    
+    // Export the collected data
+    exportToExcel(allData, options);
+    
+  } catch (error) {
+    console.error('Export paginated data failed:', error);
+    toast.error('Failed to export paginated data');
+  }
+};
+
+/**
+ * Export data with transformer function
+ * @param data Raw data to export
+ * @param transformFunction Function to transform data before export
+ * @param options Export options
+ */
+export const exportTransformedData = (
+  data: any[],
+  transformFunction: (item: any) => any,
+  options: Partial<ExportOptions> = {}
+): void => {
+  try {
+    const transformedData = data.map(transformFunction);
+    exportToExcel(transformedData, options);
+  } catch (error) {
+    console.error('Export transformed data failed:', error);
+    toast.error('Failed to transform and export data');
+  }
+};
+
+/**
+ * Export a subset of columns from the data
+ * @param data Raw data to export
+ * @param columns Array of column keys to include
+ * @param options Export options
+ */
+export const exportColumns = (
+  data: any[],
+  columns: string[],
+  options: Partial<ExportOptions> = {}
+): void => {
+  try {
+    const filteredData = data.map(item => {
+      const newItem: any = {};
+      columns.forEach(col => {
+        if (item.hasOwnProperty(col)) {
+          newItem[col] = item[col];
+        }
+      });
+      return newItem;
+    });
+    
+    exportToExcel(filteredData, options);
+  } catch (error) {
+    console.error('Export columns failed:', error);
+    toast.error('Failed to export selected columns');
+  }
 };

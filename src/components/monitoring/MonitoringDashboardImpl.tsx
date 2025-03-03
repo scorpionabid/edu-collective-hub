@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
@@ -89,7 +88,23 @@ const MonitoringDashboardImpl = () => {
         .order('timestamp', { ascending: false });
 
       if (perfError) throw perfError;
-      setPerformanceMetrics(perfData || []);
+      
+      // Map database fields to our TypeScript types
+      const mappedPerfData: PerformanceMetric[] = (perfData || []).map(item => ({
+        id: item.id,
+        userId: item.user_id,
+        pagePath: item.page_path,
+        loadTimeMs: item.load_time_ms,
+        ttfbMs: item.ttfb_ms,
+        lcpMs: item.lcp_ms,
+        fidMs: item.fid_ms,
+        clsScore: item.cls_score,
+        deviceInfo: item.device_info,
+        networkInfo: item.network_info,
+        timestamp: item.timestamp
+      }));
+      
+      setPerformanceMetrics(mappedPerfData);
 
       // Fetch error logs
       const { data: errorData, error: errorError } = await supabase
@@ -99,7 +114,24 @@ const MonitoringDashboardImpl = () => {
         .order('timestamp', { ascending: false });
 
       if (errorError) throw errorError;
-      setErrorLogs(errorData || []);
+      
+      // Map error logs
+      const mappedErrorData: ErrorLog[] = (errorData || []).map(item => ({
+        id: item.id,
+        userId: item.user_id,
+        errorMessage: item.error_message,
+        errorStack: item.error_stack,
+        errorContext: item.error_context,
+        component: item.component,
+        pagePath: item.page_path,
+        severity: item.severity as 'low' | 'medium' | 'high' | 'critical',
+        browserInfo: item.browser_info,
+        timestamp: item.timestamp,
+        resolved: item.resolved,
+        resolutionNotes: item.resolution_notes
+      }));
+      
+      setErrorLogs(mappedErrorData);
 
       // Fetch API metrics
       const { data: apiData, error: apiError } = await supabase
@@ -109,7 +141,23 @@ const MonitoringDashboardImpl = () => {
         .order('timestamp', { ascending: false });
 
       if (apiError) throw apiError;
-      setApiMetrics(apiData || []);
+      
+      // Map API metrics
+      const mappedApiData: ApiMetric[] = (apiData || []).map(item => ({
+        id: item.id,
+        endpoint: item.endpoint,
+        method: item.method,
+        statusCode: item.status_code,
+        durationMs: item.duration_ms,
+        requestSize: item.request_size,
+        responseSize: item.response_size,
+        userId: item.user_id,
+        timestamp: item.timestamp,
+        requestParams: item.request_params,
+        responseSummary: item.response_summary
+      }));
+      
+      setApiMetrics(mappedApiData);
 
       // Fetch audit logs
       const { data: auditData, error: auditError } = await supabase
@@ -119,7 +167,25 @@ const MonitoringDashboardImpl = () => {
         .order('created_at', { ascending: false });
 
       if (auditError) throw auditError;
-      setAuditLogs(auditData || []);
+      
+      // Map audit logs
+      const mappedAuditData: AuditLogEntry[] = (auditData || []).map(item => ({
+        action: item.action,
+        tableName: item.table_name,
+        recordId: item.record_id,
+        userId: item.user_id,
+        oldData: item.old_data,
+        newData: item.new_data,
+        ipAddress: item.ip_address,
+        userAgent: item.user_agent,
+        component: item.component,
+        durationMs: item.duration_ms,
+        success: item.success,
+        metadata: item.metadata,
+        timestamp: item.created_at
+      }));
+      
+      setAuditLogs(mappedAuditData);
 
     } catch (error) {
       console.error('Error fetching monitoring data:', error);

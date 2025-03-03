@@ -13,6 +13,14 @@ export interface PerformanceMetric {
   deviceInfo?: Record<string, any>;
   networkInfo?: Record<string, any>;
   timestamp?: string;
+  // Add DB column mappings
+  page_path?: string;
+  load_time_ms?: number;
+  ttfb_ms?: number;
+  lcp_ms?: number;
+  fid_ms?: number;
+  cls_score?: number;
+  user_id?: string;
 }
 
 export interface ErrorLog {
@@ -28,6 +36,13 @@ export interface ErrorLog {
   timestamp?: string;
   resolved?: boolean;
   resolutionNotes?: string;
+  // DB column mappings
+  user_id?: string;
+  error_message?: string;
+  error_stack?: string;
+  error_context?: Json;
+  page_path?: string;
+  browser_info?: Json;
 }
 
 export interface ApiMetric {
@@ -42,16 +57,14 @@ export interface ApiMetric {
   timestamp?: string;
   requestParams?: Record<string, any>;
   responseSummary?: Record<string, any>;
-}
-
-export interface MonitoringMetric {
-  id?: string;
-  metricName: string;
-  metricValue: number;
-  metricType: 'counter' | 'gauge' | 'histogram' | 'summary';
-  component?: string;
-  timestamp?: string;
-  tags?: Record<string, any>;
+  // DB column mappings
+  status_code?: number;
+  duration_ms?: number;
+  request_size?: number;
+  response_size?: number;
+  user_id?: string;
+  request_params?: Json;
+  response_summary?: Json;
 }
 
 export interface AuditLogEntry {
@@ -67,6 +80,17 @@ export interface AuditLogEntry {
   durationMs?: number;
   success?: boolean;
   metadata?: Record<string, any>;
+  timestamp?: string;
+  // DB column mappings
+  table_name?: string;
+  record_id?: string;
+  user_id?: string;
+  old_data?: Json;
+  new_data?: Json;
+  ip_address?: string;
+  user_agent?: string;
+  duration_ms?: number;
+  created_at?: string;
 }
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
