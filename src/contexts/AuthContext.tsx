@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
+import { auth } from '@/lib/api/auth';
 
 type UserRole = 'superadmin' | 'regionadmin' | 'sectoradmin' | 'schooladmin';
 
@@ -34,22 +35,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Check if user is logged in
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
+    const checkUserAuth = async () => {
+      const storedUser = localStorage.getItem('user');
       
-      // If we're on the login page or root and already logged in, redirect to appropriate dashboard
-      if (location.pathname === '/login' || location.pathname === '/') {
-        const role = JSON.parse(storedUser).role;
-        redirectBasedOnRole(role);
+      if (storedUser) {
+        // Check if we have a valid session with Supabase
+        try {
+          const user = await auth.getUser();
+          if (user) {
+            setUser(JSON.parse(storedUser));
+            
+            // If we're on the login page or root and already logged in, redirect to appropriate dashboard
+            if (location.pathname === '/login' || location.pathname === '/') {
+              const role = JSON.parse(storedUser).role;
+              redirectBasedOnRole(role);
+            }
+          } else {
+            // Session expired, log user out
+            localStorage.removeItem('user');
+            if (location.pathname !== '/login' && location.pathname !== '/reset-password') {
+              navigate('/login');
+            }
+          }
+        } catch (error) {
+          console.error('Error checking authentication:', error);
+          localStorage.removeItem('user');
+          if (location.pathname !== '/login' && location.pathname !== '/reset-password') {
+            navigate('/login');
+          }
+        }
+      } else {
+        // If not logged in and not on login page, redirect to login
+        if (location.pathname !== '/login' && location.pathname !== '/reset-password') {
+          navigate('/login');
+        }
       }
-    } else {
-      // If not logged in and not on login page, redirect to login
-      if (location.pathname !== '/login' && location.pathname !== '/reset-password') {
-        navigate('/login');
-      }
-    }
-    setLoading(false);
+      setLoading(false);
+    };
+    
+    checkUserAuth();
   }, [location.pathname]);
 
   const redirectBasedOnRole = (role: UserRole) => {
@@ -73,20 +97,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
-      // Simulate API call - Replace with actual authentication
-      // For demonstration, we'll set different user roles based on email
+      const result = await auth.signIn(email, password);
+      
+      if (!result || !result.user) {
+        toast.error("Daxil olmaq alınmadı");
+        return;
+      }
+      
+      // Extract user role and other information from the session
+      // This is a simplified version; in a real app, you'd get this from your user profiles table
       let mockUser: User;
       
       if (email.includes('super')) {
         mockUser = {
-          id: '1',
+          id: result.user.id || '1',
           name: 'Super Admin',
           email: email,
           role: 'superadmin',
         };
       } else if (email.includes('region')) {
         mockUser = {
-          id: '2',
+          id: result.user.id || '2',
           name: 'Region Admin',
           email: email,
           role: 'regionadmin',
@@ -94,7 +125,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
       } else if (email.includes('sector')) {
         mockUser = {
-          id: '3',
+          id: result.user.id || '3',
           name: 'Sector Admin',
           email: email,
           role: 'sectoradmin',
@@ -103,7 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
       } else {
         mockUser = {
-          id: '4',
+          id: result.user.id || '4',
           name: 'School Admin',
           email: email,
           role: 'schooladmin',
@@ -125,11 +156,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('user');
-    navigate('/login');
-    toast.success("Uğurla çıxış etdiniz");
+  const logout = async () => {
+    try {
+      await auth.signOut();
+      setUser(null);
+      localStorage.removeItem('user');
+      navigate('/login');
+      toast.success("Uğurla çıxış etdiniz");
+    } catch (error) {
+      console.error('Error during logout:', error);
+      // Force logout even if API call fails
+      setUser(null);
+      localStorage.removeItem('user');
+      navigate('/login');
+    }
   };
   
   const resetPassword = async (email: string) => {

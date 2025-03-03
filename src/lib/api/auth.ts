@@ -16,9 +16,9 @@ export const auth = {
       }
       
       return data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in signIn:', error);
-      return null;
+      throw error;
     }
   },
   
@@ -36,9 +36,9 @@ export const auth = {
       
       toast.success('Sign up successful. Check your email for verification.');
       return data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in signUp:', error);
-      return null;
+      throw error;
     }
   },
   
@@ -52,14 +52,17 @@ export const auth = {
       }
       
       toast.success('Signed out successfully');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in signOut:', error);
+      throw error;
     }
   },
   
   resetPassword: async (email: string) => {
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`
+      });
       
       if (error) {
         toast.error(error.message);
@@ -67,8 +70,9 @@ export const auth = {
       }
       
       toast.success('Password reset email sent');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in resetPassword:', error);
+      throw error;
     }
   },
   
@@ -84,8 +88,9 @@ export const auth = {
       }
       
       toast.success('Password updated successfully');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in updatePassword:', error);
+      throw error;
     }
   },
   
@@ -99,9 +104,9 @@ export const auth = {
       }
       
       return data.user;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in getUser:', error);
-      return null;
+      throw error;
     }
   }
 };

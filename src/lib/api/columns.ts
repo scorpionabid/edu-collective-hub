@@ -3,12 +3,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Column } from "./types";
 
+interface RPCResponse<T> {
+  data: T;
+  error: any;
+}
+
 export const columns = {
   getAll: async (categoryId: string) => {
     try {
-      // Use rpc function instead of direct table query
-      const { data, error } = await supabase
-        .rpc('get_columns_by_category', { category_id: categoryId }) as { data: any, error: any };
+      // Use rpc function instead of direct table query with proper type assertion
+      const response = await supabase.rpc('get_columns_by_category', { category_id: categoryId }) as unknown as RPCResponse<any[]>;
+      const { data, error } = response;
       
       if (error) {
         console.error('Error fetching columns:', error);
@@ -30,13 +35,13 @@ export const columns = {
   
   create: async (column: Omit<Column, 'id'>) => {
     try {
-      // Use rpc function instead of direct table insert
-      const { data, error } = await supabase
-        .rpc('create_column', {
+      // Use rpc function instead of direct table insert with proper type assertion
+      const response = await supabase.rpc('create_column', {
           column_name: column.name,
           column_type: column.type,
           category_id: column.categoryId
-        }) as { data: any, error: any };
+        }) as unknown as RPCResponse<any>;
+      const { data, error } = response;
       
       if (error) {
         toast.error(error.message);
@@ -74,13 +79,13 @@ export const columns = {
   
   update: async (id: string, column: Partial<Column>) => {
     try {
-      // Use rpc function instead of direct table update
+      // Use rpc function instead of direct table update with proper type assertion
       const updateData: Record<string, any> = { column_id: id };
       if (column.name !== undefined) updateData.column_name = column.name;
       if (column.type !== undefined) updateData.column_type = column.type;
       
-      const { data, error } = await supabase
-        .rpc('update_column', updateData) as { data: any, error: any };
+      const response = await supabase.rpc('update_column', updateData) as unknown as RPCResponse<any>;
+      const { data, error } = response;
       
       if (error) {
         toast.error(error.message);
@@ -118,9 +123,9 @@ export const columns = {
   
   delete: async (id: string) => {
     try {
-      // Use rpc function instead of direct table delete
-      const { error } = await supabase
-        .rpc('delete_column', { column_id: id }) as { data: any, error: any };
+      // Use rpc function instead of direct table delete with proper type assertion
+      const response = await supabase.rpc('delete_column', { column_id: id }) as unknown as RPCResponse<any>;
+      const { error } = response;
       
       if (error) {
         toast.error(error.message);

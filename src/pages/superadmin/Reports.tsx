@@ -1,79 +1,138 @@
 
-import React from "react";
+import { useEffect } from "react";
 import { useReportData } from "@/hooks/useReportData";
-import { ReportTable } from "@/components/reports/ReportTable";
 import { ReportFilters } from "@/components/reports/ReportFilters";
+import { ReportTable } from "@/components/reports/ReportTable";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileDown } from "lucide-react";
+import { Download } from "lucide-react";
+import { exportToExcel } from "@/utils/excelExport";
+import { PermissionGuard } from "@/components/shared/PermissionGuard";
+import { AccessDenied } from "@/components/shared/AccessDenied";
 
 const Reports = () => {
+  const reportData = useReportData();
+  
   const {
     selectedRegion,
     setSelectedRegion,
     selectedSector,
     setSelectedSector,
+    selectedSchool,
+    setSelectedSchool,
     selectedCategory,
     setSelectedCategory,
+    regions,
     filteredSectors,
+    filteredSchools,
+    categories,
     columns,
     data,
+    loading,
     filters,
+    setFilters,
     sortConfig,
-    updateFilteredSectors,
-    fetchCategoryColumns,
-    handleFilter,
-    handleSort,
-    filteredAndSortedData,
-    handleExportToExcel
-  } = useReportData();
+    setSortConfig,
+    fetchCategoryColumns
+  } = reportData;
 
-  // Component content
+  const handleFilter = (columnName: string, value: string) => {
+    setFilters({ ...filters, [columnName]: value });
+  };
+
+  const handleSort = (columnName: string) => {
+    setSortConfig(prev => ({
+      key: columnName,
+      direction: prev.key === columnName && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const filteredAndSortedData = () => {
+    // Filter data based on the filters
+    let filteredData = [...data];
+    Object.keys(filters).forEach(column => {
+      const value = filters[column].toLowerCase();
+      if (value) {
+        filteredData = filteredData.filter(row => {
+          if (row[column] === null || row[column] === undefined) return false;
+          return String(row[column]).toLowerCase().includes(value);
+        });
+      }
+    });
+
+    // Sort data based on the sortConfig
+    if (sortConfig.key) {
+      filteredData.sort((a, b) => {
+        if (a[sortConfig.key] < b[sortConfig.key]) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (a[sortConfig.key] > b[sortConfig.key]) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+
+    return filteredData;
+  };
+
+  const handleExportToExcel = () => {
+    exportToExcel(filteredAndSortedData(), columns, 'report_data');
+  };
+
+  useEffect(() => {
+    if (selectedCategory) {
+      fetchCategoryColumns(selectedCategory);
+    }
+  }, [selectedCategory]);
+
   return (
-    <div className="container mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold mb-6">Hesabatlar</h1>
-      
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Hesabat Filtrlər</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ReportFilters 
-            selectedRegion={selectedRegion}
-            setSelectedRegion={setSelectedRegion}
-            selectedSector={selectedSector}
-            setSelectedSector={setSelectedSector}
-            selectedCategory={selectedCategory}
-            setSelectedCategory={setSelectedCategory}
-            filteredSectors={filteredSectors}
-            updateFilteredSectors={updateFilteredSectors}
-            fetchCategoryColumns={fetchCategoryColumns}
+    <div className="container mx-auto py-8">
+      <PermissionGuard 
+        action="access_reports"
+        fallback={<AccessDenied message="Bu hesabatları görmək üçün icazəniz yoxdur" />}
+      >
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold">Hesabatlar</h1>
+          <Button onClick={handleExportToExcel} className="flex items-center gap-2">
+            <Download className="h-4 w-4" />
+            Excel-ə ixrac et
+          </Button>
+        </div>
+
+        <ReportFilters
+          selectedRegion={selectedRegion}
+          setSelectedRegion={setSelectedRegion}
+          selectedSector={selectedSector}
+          setSelectedSector={setSelectedSector}
+          selectedSchool={selectedSchool}
+          setSelectedSchool={setSelectedSchool}
+          selectedCategory={selectedCategory}
+          setSelectedCategory={setSelectedCategory}
+          regions={regions}
+          filteredSectors={filteredSectors}
+          filteredSchools={filteredSchools}
+          categories={categories}
+          fetchCategoryColumns={fetchCategoryColumns}
+          updateFilteredSectors={(region) => {
+            // This is where you'd implement the logic to update sectors based on region
+            console.log("Updating sectors for region:", region);
+          }}
+        />
+        
+        {loading ? (
+          <div className="text-center py-8">Loading...</div>
+        ) : (
+          <ReportTable 
+            columns={columns} 
+            data={data}
+            filters={filters}
+            handleFilter={handleFilter}
+            sortConfig={sortConfig}
+            handleSort={handleSort}
+            filteredAndSortedData={filteredAndSortedData}
           />
-        </CardContent>
-      </Card>
-      
-      {columns.length > 0 && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Hesabat Nəticələri</CardTitle>
-            <Button variant="outline" onClick={handleExportToExcel}>
-              <FileDown className="mr-2 h-4 w-4" />
-              Excel-ə İxrac Et
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <ReportTable
-              columns={columns}
-              data={filteredAndSortedData()}
-              filters={filters}
-              handleFilter={handleFilter}
-              sortConfig={sortConfig}
-              handleSort={handleSort}
-              filteredAndSortedData={filteredAndSortedData}
-            />
-          </CardContent>
-        </Card>
-      )}
+        )}
+      </PermissionGuard>
     </div>
   );
 };

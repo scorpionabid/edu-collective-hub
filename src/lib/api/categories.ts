@@ -3,12 +3,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Category } from "./types";
 
+interface RPCResponse<T> {
+  data: T;
+  error: any;
+}
+
 export const categories = {
   getAll: async () => {
     try {
-      // Use the rpc function instead of direct table query
-      const { data, error } = await supabase
-        .rpc('get_categories_with_columns') as { data: any, error: any };
+      // Use the rpc function with proper type assertion
+      const response = await supabase.rpc('get_categories_with_columns') as unknown as RPCResponse<any[]>;
+      const { data, error } = response;
       
       if (error) {
         console.error('Error fetching categories:', error);
@@ -39,9 +44,9 @@ export const categories = {
   
   getById: async (id: string) => {
     try {
-      // Use rpc function instead of direct table query
-      const { data, error } = await supabase
-        .rpc('get_category_by_id', { category_id: id }) as { data: any, error: any };
+      // Use rpc function with proper type assertion
+      const response = await supabase.rpc('get_category_by_id', { category_id: id }) as unknown as RPCResponse<any[]>;
+      const { data, error } = response;
       
       if (error) {
         console.error('Error fetching category:', error);
@@ -84,14 +89,14 @@ export const categories = {
   
   create: async (category: Omit<Category, 'id' | 'columns'>) => {
     try {
-      // Use rpc function instead of direct table insert
-      const { data, error } = await supabase
-        .rpc('create_category', {
-          category_name: category.name,
-          region_id: category.regionId,
-          sector_id: category.sectorId,
-          school_id: category.schoolId
-        }) as { data: any, error: any };
+      // Use rpc function with proper type assertion
+      const response = await supabase.rpc('create_category', {
+        category_name: category.name,
+        region_id: category.regionId,
+        sector_id: category.sectorId,
+        school_id: category.schoolId
+      }) as unknown as RPCResponse<any>;
+      const { data, error } = response;
       
       if (error) {
         toast.error(error.message);
@@ -135,15 +140,15 @@ export const categories = {
   
   update: async (id: string, category: Partial<Category>) => {
     try {
-      // Use rpc function instead of direct table update
+      // Use rpc function with proper type assertion
       const updateData: Record<string, any> = { category_id: id };
       if (category.name !== undefined) updateData.category_name = category.name;
       if (category.regionId !== undefined) updateData.region_id = category.regionId;
       if (category.sectorId !== undefined) updateData.sector_id = category.sectorId;
       if (category.schoolId !== undefined) updateData.school_id = category.schoolId;
 
-      const { data, error } = await supabase
-        .rpc('update_category', updateData) as { data: any, error: any };
+      const response = await supabase.rpc('update_category', updateData) as unknown as RPCResponse<any>;
+      const { data, error } = response;
       
       if (error) {
         toast.error(error.message);
@@ -187,9 +192,9 @@ export const categories = {
   
   delete: async (id: string) => {
     try {
-      // Use rpc function instead of direct table delete
-      const { error } = await supabase
-        .rpc('delete_category', { category_id: id }) as { data: any, error: any };
+      // Use rpc function with proper type assertion
+      const response = await supabase.rpc('delete_category', { category_id: id }) as unknown as RPCResponse<any>;
+      const { error } = response;
       
       if (error) {
         toast.error(error.message);
