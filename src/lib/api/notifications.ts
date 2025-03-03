@@ -1,348 +1,318 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { 
-  NotificationGroup, 
-  CreateNotificationGroupData,
-  UpdateNotificationGroupData,
-  NotificationGroupMember,
-  AddGroupMemberData,
-  MassNotification,
-  CreateMassNotificationData,
-  MassNotificationRecipient,
-  NotificationStats,
-  GetMassNotificationsParams
-} from "./types";
 
+// Types
+export interface Notification {
+  id: string;
+  userId: string;
+  title: string;
+  body: string;
+  notificationType: string;
+  isRead: boolean;
+  actionUrl?: string;
+  data?: any;
+  createdAt: string;
+  readAt?: string;
+}
+
+export interface NotificationPreference {
+  id: string;
+  userId: string;
+  notificationType: string;
+  channelId: string;
+  isEnabled: boolean;
+  quietHoursStart?: string;
+  quietHoursEnd?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NotificationChannel {
+  id: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface UserDevice {
+  id: string;
+  userId: string;
+  deviceToken: string;
+  deviceType: 'web' | 'android' | 'ios';
+  isActive: boolean;
+  lastUsedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NotificationTemplate {
+  id: string;
+  name: string;
+  title: string;
+  body: string;
+  templateType: 'email' | 'push' | 'in-app';
+  htmlContent?: string;
+  variables?: any[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Notification API methods
 export const notifications = {
-  // Notification Groups
-  getGroups: async (): Promise<NotificationGroup[]> => {
+  // Get user notifications
+  getNotifications: async (limit = 50, offset = 0): Promise<Notification[]> => {
     try {
       const { data, error } = await supabase
-        .from('notification_groups')
+        .from('notifications')
         .select('*')
-        .order('name', { ascending: true });
-
-      if (error) throw error;
-      return data as NotificationGroup[];
-    } catch (error) {
-      console.error('Error fetching notification groups:', error);
-      toast.error('Failed to load notification groups');
-      return [];
-    }
-  },
-
-  getGroupById: async (id: string): Promise<NotificationGroup | null> => {
-    try {
-      const { data, error } = await supabase
-        .from('notification_groups')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (error) throw error;
-      return data as NotificationGroup;
-    } catch (error) {
-      console.error('Error fetching notification group:', error);
-      toast.error('Failed to load notification group');
-      return null;
-    }
-  },
-
-  createGroup: async (groupData: CreateNotificationGroupData): Promise<NotificationGroup | null> => {
-    try {
-      const { data, error } = await supabase
-        .from('notification_groups')
-        .insert({
-          name: groupData.name,
-          description: groupData.description,
-          created_by: (await supabase.auth.getUser()).data.user?.id,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .select()
-        .single();
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
 
       if (error) throw error;
       
-      toast.success('Notification group created successfully');
-      return data as NotificationGroup;
+      return data.map(notification => ({
+        id: notification.id,
+        userId: notification.user_id,
+        title: notification.title,
+        body: notification.body,
+        notificationType: notification.notification_type,
+        isRead: notification.is_read,
+        actionUrl: notification.action_url,
+        data: notification.data,
+        createdAt: notification.created_at,
+        readAt: notification.read_at
+      }));
     } catch (error) {
-      console.error('Error creating notification group:', error);
-      toast.error('Failed to create notification group');
-      return null;
-    }
-  },
-
-  updateGroup: async (id: string, groupData: UpdateNotificationGroupData): Promise<NotificationGroup | null> => {
-    try {
-      const updateData: any = {
-        updated_at: new Date().toISOString()
-      };
-      
-      if (groupData.name !== undefined) updateData.name = groupData.name;
-      if (groupData.description !== undefined) updateData.description = groupData.description;
-      
-      const { data, error } = await supabase
-        .from('notification_groups')
-        .update(updateData)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      
-      toast.success('Notification group updated successfully');
-      return data as NotificationGroup;
-    } catch (error) {
-      console.error('Error updating notification group:', error);
-      toast.error('Failed to update notification group');
-      return null;
-    }
-  },
-
-  deleteGroup: async (id: string): Promise<boolean> => {
-    try {
-      // First delete all members
-      const { error: membersError } = await supabase
-        .from('notification_group_members')
-        .delete()
-        .eq('group_id', id);
-        
-      if (membersError) throw membersError;
-      
-      // Then delete the group
-      const { error } = await supabase
-        .from('notification_groups')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      
-      toast.success('Notification group deleted successfully');
-      return true;
-    } catch (error) {
-      console.error('Error deleting notification group:', error);
-      toast.error('Failed to delete notification group');
-      return false;
-    }
-  },
-
-  // Group Members
-  getGroupMembers: async (groupId: string): Promise<NotificationGroupMember[]> => {
-    try {
-      const { data, error } = await supabase
-        .from('notification_group_members')
-        .select('*')
-        .eq('group_id', groupId);
-
-      if (error) throw error;
-      return data as NotificationGroupMember[];
-    } catch (error) {
-      console.error('Error fetching group members:', error);
-      toast.error('Failed to load group members');
-      return [];
-    }
-  },
-
-  addGroupMember: async (memberData: AddGroupMemberData): Promise<NotificationGroupMember | null> => {
-    try {
-      // Check if member already exists
-      const { data: existingMember, error: checkError } = await supabase
-        .from('notification_group_members')
-        .select('*')
-        .eq('group_id', memberData.groupId)
-        .eq('member_id', memberData.memberId)
-        .eq('member_type', memberData.memberType)
-        .maybeSingle();
-        
-      if (checkError) throw checkError;
-      
-      if (existingMember) {
-        toast.info('Member already exists in this group');
-        return existingMember as NotificationGroupMember;
-      }
-      
-      const { data, error } = await supabase
-        .from('notification_group_members')
-        .insert({
-          group_id: memberData.groupId,
-          member_id: memberData.memberId,
-          member_type: memberData.memberType,
-          created_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      
-      toast.success('Member added to group successfully');
-      return data as NotificationGroupMember;
-    } catch (error) {
-      console.error('Error adding group member:', error);
-      toast.error('Failed to add member to group');
-      return null;
-    }
-  },
-
-  removeGroupMember: async (id: string): Promise<boolean> => {
-    try {
-      const { error } = await supabase
-        .from('notification_group_members')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      
-      toast.success('Member removed from group successfully');
-      return true;
-    } catch (error) {
-      console.error('Error removing group member:', error);
-      toast.error('Failed to remove member from group');
-      return false;
-    }
-  },
-
-  // Mass Notifications
-  getMassNotifications: async (params?: GetMassNotificationsParams): Promise<MassNotification[]> => {
-    try {
-      let query = supabase
-        .from('mass_notifications')
-        .select('*')
-        .order('created_at', { ascending: false });
-        
-      if (params?.fromDate) {
-        query = query.gte('created_at', params.fromDate);
-      }
-      
-      if (params?.toDate) {
-        query = query.lte('created_at', params.toDate);
-      }
-      
-      if (params?.status) {
-        query = query.eq('delivery_status', params.status);
-      }
-      
-      if (params?.type) {
-        query = query.eq('notification_type', params.type);
-      }
-      
-      if (params?.page !== undefined && params?.limit !== undefined) {
-        const from = (params.page - 1) * params.limit;
-        const to = from + params.limit - 1;
-        query = query.range(from, to);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      return data as MassNotification[];
-    } catch (error) {
-      console.error('Error fetching mass notifications:', error);
+      console.error('Error fetching notifications:', error);
       toast.error('Failed to load notifications');
       return [];
     }
   },
 
-  getMassNotificationById: async (id: string): Promise<MassNotification | null> => {
+  // Get unread notification count
+  getUnreadCount: async (): Promise<number> => {
     try {
-      const { data, error } = await supabase
-        .from('mass_notifications')
-        .select('*')
-        .eq('id', id)
-        .single();
+      const { count, error } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_read', false);
 
       if (error) throw error;
-      return data as MassNotification;
+      
+      return count || 0;
     } catch (error) {
-      console.error('Error fetching notification:', error);
-      toast.error('Failed to load notification');
-      return null;
+      console.error('Error fetching unread count:', error);
+      return 0;
     }
   },
 
-  createMassNotification: async (notificationData: CreateMassNotificationData): Promise<MassNotification | null> => {
+  // Mark a notification as read
+  markAsRead: async (notificationId: string): Promise<boolean> => {
     try {
-      // Create notification
-      const { data: notification, error: notificationError } = await supabase
-        .from('mass_notifications')
-        .insert({
-          title: notificationData.title,
-          message: notificationData.message,
-          notification_type: notificationData.notificationType,
-          delivery_status: 'pending',
-          created_by: (await supabase.auth.getUser()).data.user?.id,
-          created_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-        
-      if (notificationError) throw notificationError;
+      const { data, error } = await supabase
+        .rpc('mark_notification_read', { p_notification_id: notificationId });
+
+      if (error) throw error;
       
-      // Trigger the function to process recipients and send the notification
-      const { error: functionError } = await supabase.functions.invoke('process-notification', {
-        body: { 
-          notificationId: notification.id,
-          recipients: notificationData.recipients
-        }
-      });
+      return !!data;
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      toast.error('Failed to update notification');
+      return false;
+    }
+  },
+
+  // Mark all notifications as read
+  markAllAsRead: async (): Promise<number> => {
+    try {
+      const { data, error } = await supabase
+        .rpc('mark_all_notifications_read');
+
+      if (error) throw error;
       
-      if (functionError) throw functionError;
+      return data;
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      toast.error('Failed to update notifications');
+      return 0;
+    }
+  },
+
+  // Send a notification (admin operation)
+  sendNotification: async (
+    userId: string,
+    title: string,
+    body: string,
+    notificationType: string,
+    actionUrl?: string,
+    data?: any
+  ): Promise<string | null> => {
+    try {
+      const { data: result, error } = await supabase
+        .rpc('send_notification', {
+          p_user_id: userId,
+          p_title: title,
+          p_body: body,
+          p_notification_type: notificationType,
+          p_action_url: actionUrl,
+          p_data: data
+        });
+
+      if (error) throw error;
       
       toast.success('Notification sent successfully');
-      return notification as MassNotification;
+      return result;
     } catch (error) {
-      console.error('Error creating mass notification:', error);
+      console.error('Error sending notification:', error);
       toast.error('Failed to send notification');
       return null;
     }
   },
 
-  // Notification Recipients
-  getNotificationRecipients: async (notificationId: string): Promise<MassNotificationRecipient[]> => {
+  // User Notification Preferences
+  getUserPreferences: async (): Promise<NotificationPreference[]> => {
     try {
       const { data, error } = await supabase
-        .from('mass_notification_recipients')
-        .select('*')
-        .eq('notification_id', notificationId);
+        .from('user_notification_preferences')
+        .select('*');
 
       if (error) throw error;
-      return data as MassNotificationRecipient[];
+      
+      return data.map(pref => ({
+        id: pref.id,
+        userId: pref.user_id,
+        notificationType: pref.notification_type,
+        channelId: pref.channel_id,
+        isEnabled: pref.is_enabled,
+        quietHoursStart: pref.quiet_hours_start,
+        quietHoursEnd: pref.quiet_hours_end,
+        createdAt: pref.created_at,
+        updatedAt: pref.updated_at
+      }));
     } catch (error) {
-      console.error('Error fetching notification recipients:', error);
-      toast.error('Failed to load notification recipients');
+      console.error('Error fetching notification preferences:', error);
+      toast.error('Failed to load notification preferences');
       return [];
     }
   },
 
-  getNotificationStats: async (notificationId: string): Promise<NotificationStats> => {
+  // Update user preference for a notification type and channel
+  updatePreference: async (
+    notificationType: string,
+    channelId: string,
+    isEnabled: boolean,
+    quietHoursStart?: string,
+    quietHoursEnd?: string
+  ): Promise<boolean> => {
     try {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) {
+        throw new Error('User not authenticated');
+      }
+
       const { data, error } = await supabase
-        .from('mass_notification_recipients')
-        .select('status')
-        .eq('notification_id', notificationId);
+        .from('user_notification_preferences')
+        .upsert({
+          user_id: user.user.id,
+          notification_type: notificationType,
+          channel_id: channelId,
+          is_enabled: isEnabled,
+          quiet_hours_start: quietHoursStart,
+          quiet_hours_end: quietHoursEnd,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,notification_type,channel_id'
+        });
 
       if (error) throw error;
       
-      const stats: NotificationStats = {
-        totalSent: data.length,
-        delivered: data.filter(r => r.status === 'sent').length,
-        read: data.filter(r => r.status === 'read').length,
-        failed: data.filter(r => r.status === 'failed').length,
-        pending: data.filter(r => r.status === 'pending').length
-      };
-      
-      return stats;
+      toast.success('Notification preferences updated');
+      return true;
     } catch (error) {
-      console.error('Error fetching notification stats:', error);
-      toast.error('Failed to load notification statistics');
-      return {
-        totalSent: 0,
-        delivered: 0,
-        read: 0,
-        failed: 0,
-        pending: 0
-      };
+      console.error('Error updating notification preferences:', error);
+      toast.error('Failed to update notification preferences');
+      return false;
+    }
+  },
+
+  // Get notification channels (email, push, in-app)
+  getChannels: async (): Promise<NotificationChannel[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('notification_channels')
+        .select('*')
+        .eq('is_active', true);
+
+      if (error) throw error;
+      
+      return data.map(channel => ({
+        id: channel.id,
+        name: channel.name,
+        description: channel.description,
+        isActive: channel.is_active,
+        createdAt: channel.created_at
+      }));
+    } catch (error) {
+      console.error('Error fetching notification channels:', error);
+      return [];
+    }
+  },
+
+  // Device registration for push notifications
+  registerDevice: async (
+    deviceToken: string,
+    deviceType: 'web' | 'android' | 'ios'
+  ): Promise<boolean> => {
+    try {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) {
+        throw new Error('User not authenticated');
+      }
+
+      const { error } = await supabase
+        .from('user_devices')
+        .upsert({
+          user_id: user.user.id,
+          device_token: deviceToken,
+          device_type: deviceType,
+          is_active: true,
+          last_used_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,device_token'
+        });
+
+      if (error) throw error;
+      
+      return true;
+    } catch (error) {
+      console.error('Error registering device:', error);
+      return false;
+    }
+  },
+
+  // Unregister a device
+  unregisterDevice: async (deviceToken: string): Promise<boolean> => {
+    try {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) {
+        throw new Error('User not authenticated');
+      }
+
+      const { error } = await supabase
+        .from('user_devices')
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq('user_id', user.user.id)
+        .eq('device_token', deviceToken);
+
+      if (error) throw error;
+      
+      return true;
+    } catch (error) {
+      console.error('Error unregistering device:', error);
+      return false;
     }
   }
 };

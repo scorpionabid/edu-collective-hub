@@ -374,6 +374,62 @@ export type Database = {
           },
         ]
       }
+      email_queue: {
+        Row: {
+          attempts: number | null
+          body: string
+          created_at: string
+          error_message: string | null
+          html_body: string | null
+          id: string
+          last_attempt_at: string | null
+          notification_id: string | null
+          recipient_email: string
+          sent_at: string | null
+          status: string | null
+          subject: string
+          user_id: string | null
+        }
+        Insert: {
+          attempts?: number | null
+          body: string
+          created_at?: string
+          error_message?: string | null
+          html_body?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          notification_id?: string | null
+          recipient_email: string
+          sent_at?: string | null
+          status?: string | null
+          subject: string
+          user_id?: string | null
+        }
+        Update: {
+          attempts?: number | null
+          body?: string
+          created_at?: string
+          error_message?: string | null
+          html_body?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          notification_id?: string | null
+          recipient_email?: string
+          sent_at?: string | null
+          status?: string | null
+          subject?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_queue_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "notifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       error_logs: {
         Row: {
           browser_info: Json | null
@@ -568,6 +624,30 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_channels: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+        }
+        Relationships: []
+      }
       notification_group_members: {
         Row: {
           created_at: string | null
@@ -624,6 +704,81 @@ export type Database = {
           id?: string
           name?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      notification_templates: {
+        Row: {
+          body: string
+          created_at: string
+          html_content: string | null
+          id: string
+          name: string
+          template_type: string
+          title: string
+          updated_at: string
+          variables: Json | null
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          html_content?: string | null
+          id?: string
+          name: string
+          template_type: string
+          title: string
+          updated_at?: string
+          variables?: Json | null
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          html_content?: string | null
+          id?: string
+          name?: string
+          template_type?: string
+          title?: string
+          updated_at?: string
+          variables?: Json | null
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          action_url: string | null
+          body: string
+          created_at: string
+          data: Json | null
+          id: string
+          is_read: boolean | null
+          notification_type: string
+          read_at: string | null
+          title: string
+          user_id: string | null
+        }
+        Insert: {
+          action_url?: string | null
+          body: string
+          created_at?: string
+          data?: Json | null
+          id?: string
+          is_read?: boolean | null
+          notification_type: string
+          read_at?: string | null
+          title: string
+          user_id?: string | null
+        }
+        Update: {
+          action_url?: string | null
+          body?: string
+          created_at?: string
+          data?: Json | null
+          id?: string
+          is_read?: boolean | null
+          notification_type?: string
+          read_at?: string | null
+          title?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -750,6 +905,69 @@ export type Database = {
             columns: ["sector_id"]
             isOneToOne: false
             referencedRelation: "sectors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_notification_queue: {
+        Row: {
+          attempts: number | null
+          body: string
+          created_at: string
+          data: Json | null
+          device_id: string | null
+          error_message: string | null
+          id: string
+          last_attempt_at: string | null
+          notification_id: string | null
+          sent_at: string | null
+          status: string | null
+          title: string
+          user_id: string | null
+        }
+        Insert: {
+          attempts?: number | null
+          body: string
+          created_at?: string
+          data?: Json | null
+          device_id?: string | null
+          error_message?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          notification_id?: string | null
+          sent_at?: string | null
+          status?: string | null
+          title: string
+          user_id?: string | null
+        }
+        Update: {
+          attempts?: number | null
+          body?: string
+          created_at?: string
+          data?: Json | null
+          device_id?: string | null
+          error_message?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          notification_id?: string | null
+          sent_at?: string | null
+          status?: string | null
+          title?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_notification_queue_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "user_devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_notification_queue_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "notifications"
             referencedColumns: ["id"]
           },
         ]
@@ -1097,6 +1315,83 @@ export type Database = {
           },
         ]
       }
+      user_devices: {
+        Row: {
+          created_at: string
+          device_token: string
+          device_type: string
+          id: string
+          is_active: boolean | null
+          last_used_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_token: string
+          device_type: string
+          id?: string
+          is_active?: boolean | null
+          last_used_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_token?: string
+          device_type?: string
+          id?: string
+          is_active?: boolean | null
+          last_used_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_notification_preferences: {
+        Row: {
+          channel_id: string | null
+          created_at: string
+          id: string
+          is_enabled: boolean | null
+          notification_type: string
+          quiet_hours_end: string | null
+          quiet_hours_start: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          channel_id?: string | null
+          created_at?: string
+          id?: string
+          is_enabled?: boolean | null
+          notification_type: string
+          quiet_hours_end?: string | null
+          quiet_hours_start?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          channel_id?: string | null
+          created_at?: string
+          id?: string
+          is_enabled?: boolean | null
+          notification_type?: string
+          quiet_hours_end?: string | null
+          quiet_hours_start?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_notification_preferences_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "notification_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       validation_errors: {
         Row: {
           component_name: string
@@ -1206,7 +1501,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      mark_all_notifications_read: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      mark_notification_read: {
+        Args: {
+          p_notification_id: string
+        }
+        Returns: boolean
+      }
+      send_notification: {
+        Args: {
+          p_user_id: string
+          p_title: string
+          p_body: string
+          p_notification_type: string
+          p_action_url?: string
+          p_data?: Json
+        }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
