@@ -44,7 +44,7 @@ export const trackError = async ({
         });
       } else {
         Sentry.captureMessage(errorMessage, {
-          level: 'error',
+          level: Sentry.Severity.Error,
           extra: {
             errorContext,
             component,
@@ -149,7 +149,7 @@ export const trackAsyncErrors = <T extends (...args: any[]) => Promise<any>>(
 /**
  * Global error handler for uncaught errors
  */
-export const setupGlobalErrorHandlers = () => {
+export const setupGlobalErrorHandlers = (): void => {
   // Handle unhandled promise rejections
   window.addEventListener('unhandledrejection', (event) => {
     trackError({
