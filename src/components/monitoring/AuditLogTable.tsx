@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import {
   ColumnDef,
@@ -42,11 +41,11 @@ export function AuditLogTable({ data }: AuditLogTableProps) {
       header: "Action",
       cell: ({ row }) => {
         const action = row.getValue("action") as string;
-        let variant: "default" | "destructive" | "outline" | "secondary" | "success" = "default";
+        let variant: "default" | "destructive" | "outline" | "secondary" = "default";
         
         switch(action.toLowerCase()) {
           case "insert":
-            variant = "success";
+            variant = "default";
             break;
           case "update":
             variant = "secondary";

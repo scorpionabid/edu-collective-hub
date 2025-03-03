@@ -7,15 +7,15 @@ import { PerformanceMetric } from '@/lib/monitoring/types';
 
 interface PerformanceMetricsChartProps {
   data: PerformanceMetric[];
-  title: string;
+  title?: string;
   description?: string;
 }
 
-const PerformanceMetricsChart: React.FC<PerformanceMetricsChartProps> = ({ 
+export function PerformanceMetricsChart({ 
   data, 
-  title, 
+  title = "Performance Metrics", 
   description 
-}) => {
+}: PerformanceMetricsChartProps) {
   // Format data for the chart
   const chartData = data.map(metric => ({
     ...metric,
@@ -60,6 +60,5 @@ const PerformanceMetricsChart: React.FC<PerformanceMetricsChartProps> = ({
       </CardContent>
     </Card>
   );
-};
+}
 
-export default PerformanceMetricsChart;

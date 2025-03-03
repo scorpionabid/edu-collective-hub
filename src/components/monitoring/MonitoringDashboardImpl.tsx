@@ -9,22 +9,31 @@ import { ErrorLogsTable } from './ErrorLogsTable';
 import { AuditLogTable } from './AuditLogTable';
 import { SystemMetricsCard } from './SystemMetricsCard';
 import { supabase } from '@/integrations/supabase/client';
-import { PerformanceMetric, ErrorLog, ApiMetric, AuditLogEntry, dbToPerformanceMetric, dbToErrorLog, dbToApiMetric, dbToAuditLogEntry } from '@/lib/monitoring/types';
+import { 
+  PerformanceMetric, 
+  ErrorLog, 
+  ApiMetric, 
+  AuditLogEntry, 
+  dbToPerformanceMetric, 
+  dbToErrorLog, 
+  dbToApiMetric, 
+  dbToAuditLogEntry 
+} from '@/lib/monitoring/types';
 import { useToast } from '@/hooks/use-toast';
 
-interface MonitoringDashboardProps {
+interface MonitoringDashboardImplProps {
   limitPerformanceMetrics?: number;
   limitErrorLogs?: number;
   limitApiMetrics?: number;
   limitAuditLogs?: number;
 }
 
-export const MonitoringDashboardImpl: React.FC<MonitoringDashboardProps> = ({
+export function MonitoringDashboardImpl({
   limitPerformanceMetrics = 100,
   limitErrorLogs = 100,
   limitApiMetrics = 100,
   limitAuditLogs = 100
-}) => {
+}: MonitoringDashboardImplProps) {
   const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetric[]>([]);
   const [errorLogs, setErrorLogs] = useState<ErrorLog[]>([]);
   const [apiMetrics, setApiMetrics] = useState<ApiMetric[]>([]);
@@ -232,4 +241,5 @@ export const MonitoringDashboardImpl: React.FC<MonitoringDashboardProps> = ({
       </Tabs>
     </div>
   );
-};
+}
+

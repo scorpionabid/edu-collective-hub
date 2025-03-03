@@ -1,99 +1,99 @@
 
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  ResponsiveContainer 
-} from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { format } from 'date-fns';
 import { ApiMetric } from '@/lib/monitoring/types';
 
 interface ApiMetricsChartProps {
   data: ApiMetric[];
-  title: string;
+  title?: string;
   description?: string;
 }
 
-const ApiMetricsChart: React.FC<ApiMetricsChartProps> = ({ 
+export function ApiMetricsChart({ 
   data, 
-  title, 
+  title = "API Performance Metrics", 
   description 
-}) => {
-  // Process the data to aggregate by endpoint
+}: ApiMetricsChartProps) {
+  // Format data for the chart
+  const chartData = data.map(metric => ({
+    ...metric,
+    timestamp: metric.timestamp ? format(new Date(metric.timestamp), 'HH:mm') : '',
+    duration: metric.durationMs,
+    endpoint: metric.endpoint.split('/').slice(-1)[0] || metric.endpoint, // Get last part of path for cleaner display
+  }));
+
+  // Group data by endpoint for the bar chart
   const endpointData = React.useMemo(() => {
-    const endpointMap = new Map<string, { count: number, avgDuration: number, successRate: number }>();
+    const groupedByEndpoint: Record<string, { endpoint: string, avgDuration: number, count: number }> = {};
     
     data.forEach(metric => {
-      const key = `${metric.method} ${metric.endpoint}`;
-      const current = endpointMap.get(key) || { count: 0, avgDuration: 0, successRate: 0 };
-      const isSuccess = (metric.statusCode || 0) < 400;
+      const endpoint = metric.endpoint.split('/').slice(-1)[0] || metric.endpoint;
+      if (!groupedByEndpoint[endpoint]) {
+        groupedByEndpoint[endpoint] = { 
+          endpoint, 
+          avgDuration: 0, 
+          count: 0 
+        };
+      }
       
-      // Update calculations
-      const newCount = current.count + 1;
-      const newAvgDuration = (current.avgDuration * current.count + metric.durationMs) / newCount;
-      const newSuccessRate = ((current.successRate * current.count) + (isSuccess ? 100 : 0)) / newCount;
-      
-      endpointMap.set(key, {
-        count: newCount,
-        avgDuration: Math.round(newAvgDuration),
-        successRate: Math.round(newSuccessRate)
-      });
+      groupedByEndpoint[endpoint].avgDuration += metric.durationMs;
+      groupedByEndpoint[endpoint].count++;
     });
-
-    // Convert map to array and sort by average duration
-    return Array.from(endpointMap.entries())
-      .map(([name, stats]) => ({
-        name: name.length > 25 ? name.substring(0, 22) + '...' : name,
-        avgDuration: stats.avgDuration,
-        successRate: stats.successRate,
-        count: stats.count
-      }))
-      .sort((a, b) => b.avgDuration - a.avgDuration)
-      .slice(0, 10); // Show only top 10 by duration
+    
+    // Calculate averages and convert to array
+    return Object.values(groupedByEndpoint).map(item => ({
+      ...item,
+      avgDuration: Math.round(item.avgDuration / item.count)
+    }));
   }, [data]);
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        {description && <CardDescription>{description}</CardDescription>}
-      </CardHeader>
-      <CardContent>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart
-            data={endpointData}
-            margin={{ top: 20, right: 30, left: 20, bottom: 70 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis 
-              dataKey="name" 
-              angle={-45} 
-              textAnchor="end" 
-              height={70} 
-              tick={{ fontSize: 12 }} 
-            />
-            <YAxis yAxisId="left" orientation="left" label={{ value: 'Avg Duration (ms)', angle: -90, position: 'insideLeft' }} />
-            <YAxis yAxisId="right" orientation="right" label={{ value: 'Success Rate (%)', angle: 90, position: 'insideRight' }} />
-            <Tooltip 
-              formatter={(value, name) => {
-                if (name === 'avgDuration') return [`${value} ms`, 'Avg Duration'];
-                if (name === 'successRate') return [`${value}%`, 'Success Rate'];
-                return [value, name];
-              }}
-            />
-            <Legend />
-            <Bar yAxisId="left" dataKey="avgDuration" fill="#8884d8" name="Avg Duration" />
-            <Bar yAxisId="right" dataKey="successRate" fill="#82ca9d" name="Success Rate" />
-          </BarChart>
-        </ResponsiveContainer>
-      </CardContent>
-    </Card>
-  );
-};
+    <div className="space-y-6">
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>API Response Times</CardTitle>
+          <CardDescription>Response time in milliseconds over time</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="timestamp" />
+              <YAxis />
+              <Tooltip 
+                formatter={(value) => [`${value} ms`, 'Response Time']}
+                labelFormatter={(label) => `Time: ${label}`}
+              />
+              <Legend />
+              <Line type="monotone" dataKey="duration" stroke="#8884d8" activeDot={{ r: 8 }} name="Response Time" />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
 
-export default ApiMetricsChart;
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Average Response Time by Endpoint</CardTitle>
+          <CardDescription>Average response time in milliseconds for each endpoint</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={endpointData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="endpoint" />
+              <YAxis />
+              <Tooltip 
+                formatter={(value) => [`${value} ms`, 'Avg Response Time']}
+              />
+              <Legend />
+              <Bar dataKey="avgDuration" fill="#82ca9d" name="Avg Response Time" />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
