@@ -8,7 +8,7 @@ export const formData = {
     try {
       // Use stored procedure instead of direct table query
       const { data, error } = await supabase
-        .rpc('get_all_form_data');
+        .rpc('get_all_form_data') as { data: any, error: any };
       
       if (error) {
         console.error('Error fetching all form data:', error);
@@ -18,13 +18,13 @@ export const formData = {
       // Transform the response to match the expected FormData type
       return Array.isArray(data) ? data.map((item: any) => ({
         id: item.id,
-        categoryId: item.category_id,
-        schoolId: item.school_id,
+        categoryId: item.categoryId,
+        schoolId: item.schoolId,
         data: item.data,
         status: item.status,
-        submittedAt: item.submitted_at,
-        approvedAt: item.approved_at,
-        approvedBy: item.approved_by
+        submittedAt: item.submittedAt,
+        approvedAt: item.approvedAt,
+        approvedBy: item.approvedBy
       })) : [];
     } catch (error) {
       console.error('Error in getAll form data:', error);
@@ -38,7 +38,7 @@ export const formData = {
       const { data, error } = await supabase
         .rpc('get_form_data_by_category', { 
           category_id: categoryId 
-        });
+        }) as { data: any, error: any };
       
       if (error) {
         console.error('Error fetching form data by category:', error);
@@ -71,8 +71,8 @@ export const formData = {
       // Use stored procedure instead of direct table query
       const { data, error } = await supabase
         .rpc('get_form_data_by_id', { 
-          form_data_id: id 
-        });
+          form_id: id 
+        }) as { data: any, error: any };
       
       if (error) {
         console.error('Error fetching form data by ID:', error);
@@ -86,13 +86,13 @@ export const formData = {
       // Transform the response to match the expected FormData type
       return {
         id: data.id,
-        categoryId: data.category_id,
-        schoolId: data.school_id,
+        categoryId: data.categoryId,
+        schoolId: data.schoolId,
         data: data.data,
         status: data.status,
-        submittedAt: data.submitted_at,
-        approvedAt: data.approved_at,
-        approvedBy: data.approved_by
+        submittedAt: data.submittedAt,
+        approvedAt: data.approvedAt,
+        approvedBy: data.approvedBy
       };
     } catch (error) {
       console.error('Error in getById form data:', error);
@@ -110,12 +110,12 @@ export const formData = {
     try {
       // Use stored procedure instead of direct table insert
       const { data, error } = await supabase
-        .rpc('create_form_data', {
+        .rpc('submit_form_data', {
           category_id: formData.categoryId,
           school_id: formData.schoolId,
           form_data: formData.data,
-          status: formData.status
-        });
+          form_status: formData.status
+        }) as { data: any, error: any };
       
       if (error) {
         toast.error(error.message);
@@ -127,13 +127,13 @@ export const formData = {
       if (data) {
         return {
           id: data.id,
-          categoryId: data.category_id,
-          schoolId: data.school_id,
+          categoryId: data.categoryId,
+          schoolId: data.schoolId,
           data: data.data,
           status: data.status,
-          submittedAt: data.submitted_at,
-          approvedAt: data.approved_at,
-          approvedBy: data.approved_by
+          submittedAt: data.submittedAt,
+          approvedAt: data.approvedAt,
+          approvedBy: data.approvedBy
         };
       }
       
@@ -160,12 +160,12 @@ export const formData = {
   update: async (id: string, formData: Partial<FormData>) => {
     try {
       // Use stored procedure instead of direct table update
-      const updateData: Record<string, any> = { form_data_id: id };
+      const updateData: Record<string, any> = { form_id: id };
       if (formData.data !== undefined) updateData.form_data = formData.data;
-      if (formData.status !== undefined) updateData.status = formData.status;
+      if (formData.status !== undefined) updateData.form_status = formData.status;
       
       const { data, error } = await supabase
-        .rpc('update_form_data', updateData);
+        .rpc('update_form_data', updateData) as { data: any, error: any };
       
       if (error) {
         toast.error(error.message);
@@ -177,13 +177,13 @@ export const formData = {
       if (data) {
         return {
           id: data.id,
-          categoryId: data.category_id,
-          schoolId: data.school_id,
+          categoryId: data.categoryId,
+          schoolId: data.schoolId,
           data: data.data,
           status: data.status,
-          submittedAt: data.submitted_at,
-          approvedAt: data.approved_at,
-          approvedBy: data.approved_by
+          submittedAt: data.submittedAt,
+          approvedAt: data.approvedAt,
+          approvedBy: data.approvedBy
         };
       }
       
@@ -211,7 +211,7 @@ export const formData = {
     try {
       // Use stored procedure instead of direct table delete
       const { error } = await supabase
-        .rpc('delete_form_data', { form_data_id: id });
+        .rpc('delete_form_data', { form_data_id: id }) as { data: any, error: any };
       
       if (error) {
         toast.error(error.message);
@@ -229,7 +229,7 @@ export const formData = {
   submit: async (id: string) => {
     try {
       const { data, error } = await supabase
-        .rpc('submit_form_data', { form_data_id: id });
+        .rpc('submit_form_data', { form_data_id: id }) as { data: any, error: any };
       
       if (error) {
         toast.error(error.message);
@@ -241,13 +241,13 @@ export const formData = {
       if (data) {
         return {
           id: data.id,
-          categoryId: data.category_id,
-          schoolId: data.school_id,
+          categoryId: data.categoryId,
+          schoolId: data.schoolId,
           data: data.data,
           status: data.status,
-          submittedAt: data.submitted_at,
-          approvedAt: data.approved_at,
-          approvedBy: data.approved_by
+          submittedAt: data.submittedAt,
+          approvedAt: data.approvedAt,
+          approvedBy: data.approvedBy
         };
       }
       
@@ -265,7 +265,7 @@ export const formData = {
         .rpc('approve_form_data', { 
           form_data_id: id,
           approved_by_id: approvedBy
-        });
+        }) as { data: any, error: any };
       
       if (error) {
         toast.error(error.message);
@@ -277,13 +277,13 @@ export const formData = {
       if (data) {
         return {
           id: data.id,
-          categoryId: data.category_id,
-          schoolId: data.school_id,
+          categoryId: data.categoryId,
+          schoolId: data.schoolId,
           data: data.data,
           status: data.status,
-          submittedAt: data.submitted_at,
-          approvedAt: data.approved_at,
-          approvedBy: data.approved_by
+          submittedAt: data.submittedAt,
+          approvedAt: data.approvedAt,
+          approvedBy: data.approvedBy
         };
       }
       
@@ -301,7 +301,7 @@ export const formData = {
         .rpc('reject_form_data', { 
           form_data_id: id,
           rejection_reason: reason
-        });
+        }) as { data: any, error: any };
       
       if (error) {
         toast.error(error.message);
@@ -313,13 +313,13 @@ export const formData = {
       if (data) {
         return {
           id: data.id,
-          categoryId: data.category_id,
-          schoolId: data.school_id,
+          categoryId: data.categoryId,
+          schoolId: data.schoolId,
           data: data.data,
           status: data.status,
-          submittedAt: data.submitted_at,
-          approvedAt: data.approved_at,
-          approvedBy: data.approved_by
+          submittedAt: data.submittedAt,
+          approvedAt: data.approvedAt,
+          approvedBy: data.approvedBy
         };
       }
       

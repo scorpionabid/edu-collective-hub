@@ -8,7 +8,7 @@ export const columns = {
     try {
       // Use rpc function instead of direct table query
       const { data, error } = await supabase
-        .rpc('get_columns_by_category', { category_id: categoryId });
+        .rpc('get_columns_by_category', { category_id: categoryId }) as { data: any, error: any };
       
       if (error) {
         console.error('Error fetching columns:', error);
@@ -36,7 +36,7 @@ export const columns = {
           column_name: column.name,
           column_type: column.type,
           category_id: column.categoryId
-        });
+        }) as { data: any, error: any };
       
       if (error) {
         toast.error(error.message);
@@ -80,7 +80,7 @@ export const columns = {
       if (column.type !== undefined) updateData.column_type = column.type;
       
       const { data, error } = await supabase
-        .rpc('update_column', updateData);
+        .rpc('update_column', updateData) as { data: any, error: any };
       
       if (error) {
         toast.error(error.message);
@@ -120,7 +120,7 @@ export const columns = {
     try {
       // Use rpc function instead of direct table delete
       const { error } = await supabase
-        .rpc('delete_column', { column_id: id });
+        .rpc('delete_column', { column_id: id }) as { data: any, error: any };
       
       if (error) {
         toast.error(error.message);

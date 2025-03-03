@@ -8,7 +8,7 @@ export const categories = {
     try {
       // Use the rpc function instead of direct table query
       const { data, error } = await supabase
-        .rpc('get_categories_with_columns');
+        .rpc('get_categories_with_columns') as { data: any, error: any };
       
       if (error) {
         console.error('Error fetching categories:', error);
@@ -41,7 +41,7 @@ export const categories = {
     try {
       // Use rpc function instead of direct table query
       const { data, error } = await supabase
-        .rpc('get_category_by_id', { category_id: id });
+        .rpc('get_category_by_id', { category_id: id }) as { data: any, error: any };
       
       if (error) {
         console.error('Error fetching category:', error);
@@ -91,7 +91,7 @@ export const categories = {
           region_id: category.regionId,
           sector_id: category.sectorId,
           school_id: category.schoolId
-        });
+        }) as { data: any, error: any };
       
       if (error) {
         toast.error(error.message);
@@ -143,7 +143,7 @@ export const categories = {
       if (category.schoolId !== undefined) updateData.school_id = category.schoolId;
 
       const { data, error } = await supabase
-        .rpc('update_category', updateData);
+        .rpc('update_category', updateData) as { data: any, error: any };
       
       if (error) {
         toast.error(error.message);
@@ -189,7 +189,7 @@ export const categories = {
     try {
       // Use rpc function instead of direct table delete
       const { error } = await supabase
-        .rpc('delete_category', { category_id: id });
+        .rpc('delete_category', { category_id: id }) as { data: any, error: any };
       
       if (error) {
         toast.error(error.message);
