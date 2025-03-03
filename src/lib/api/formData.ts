@@ -223,5 +223,72 @@ export const formData = {
       console.error('Error in delete form data:', error);
       toast.error('Failed to delete form data');
     }
+  },
+
+  // Add missing methods for workflow operations
+  submit: async (id: string) => {
+    try {
+      const { data, error } = await supabase
+        .rpc('submit_form_data', { form_data_id: id });
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+      
+      toast.success('Form data submitted successfully');
+      
+      return data;
+    } catch (error) {
+      console.error('Error submitting form data:', error);
+      toast.error('Failed to submit form data');
+      return null;
+    }
+  },
+  
+  approve: async (id: string, approvedBy: string) => {
+    try {
+      const { data, error } = await supabase
+        .rpc('approve_form_data', { 
+          form_data_id: id,
+          approved_by_id: approvedBy
+        });
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+      
+      toast.success('Form data approved successfully');
+      
+      return data;
+    } catch (error) {
+      console.error('Error approving form data:', error);
+      toast.error('Failed to approve form data');
+      return null;
+    }
+  },
+  
+  reject: async (id: string, reason: string) => {
+    try {
+      const { data, error } = await supabase
+        .rpc('reject_form_data', { 
+          form_data_id: id,
+          rejection_reason: reason
+        });
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+      
+      toast.success('Form data rejected');
+      
+      return data;
+    } catch (error) {
+      console.error('Error rejecting form data:', error);
+      toast.error('Failed to reject form data');
+      return null;
+    }
   }
 };

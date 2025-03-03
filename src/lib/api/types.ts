@@ -1,3 +1,4 @@
+
 // Common types used across API modules
 
 export interface Category {
@@ -166,6 +167,7 @@ export interface Sector {
   name: string;
   regionId: string;
   region_id?: string; // Include this for backward compatibility
+  regionName?: string; // Added for UI display purposes
 }
 
 export interface School {
@@ -173,7 +175,10 @@ export interface School {
   name: string;
   sectorId?: string;
   sector_id?: string; // Include this for backward compatibility
+  regionId?: string; // Added for easier region filtering
   address?: string;
   phone?: string;
   email?: string;
+  sectorName?: string; // Added for UI display purposes
+  regionName?: string; // Added for UI display purposes
 }

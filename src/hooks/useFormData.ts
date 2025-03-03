@@ -1,68 +1,79 @@
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, FormData } from "@/lib/api";
-import { useEffect } from "react";
+import { useState, useEffect } from 'react';
+import { api } from '@/lib/api';
+import { FormData } from '@/lib/api/types';
+import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
-export function useFormData(schoolId?: string) {
-  const queryClient = useQueryClient();
-  
-  const formDataQuery = useQuery({
-    queryKey: ['formData', schoolId],
-    queryFn: () => api.formData.getAll(schoolId),
-    enabled: !!schoolId
-  });
-  
-  const submitForm = useMutation({
-    mutationFn: api.formData.submit,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['formData', schoolId] });
+export const useFormData = () => {
+  const [formEntries, setFormEntries] = useState<FormData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+
+  const fetchFormEntries = async () => {
+    try {
+      setLoading(true);
+      const data = await api.formData.getAll();
+      setFormEntries(data);
+    } catch (error) {
+      console.error('Error fetching form entries:', error);
+      toast.error('Failed to load form entries');
+    } finally {
+      setLoading(false);
     }
-  });
-  
-  const updateForm = useMutation({
-    mutationFn: ({ id, formData }: { id: string; formData: Partial<FormData> }) => 
-      api.formData.update(id, formData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['formData', schoolId] });
-    }
-  });
-  
-  const approveForm = useMutation({
-    mutationFn: ({ id, approvedBy }: { id: string; approvedBy: string }) => 
-      api.formData.approve(id, approvedBy),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['formData', schoolId] });
-    }
-  });
-  
-  const rejectForm = useMutation({
-    mutationFn: api.formData.reject,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['formData', schoolId] });
-    }
-  });
-  
-  // Set up real-time subscription
-  useEffect(() => {
-    if (!schoolId) return;
-    
-    const channel = api.realtime.subscribeToFormData(schoolId, (payload) => {
-      queryClient.invalidateQueries({ queryKey: ['formData', schoolId] });
-    });
-    
-    return () => {
-      api.realtime.unsubscribe(channel);
-    };
-  }, [schoolId, queryClient]);
-  
-  return {
-    formData: formDataQuery.data || [],
-    isLoading: formDataQuery.isLoading,
-    isError: formDataQuery.isError,
-    error: formDataQuery.error,
-    submitForm,
-    updateForm,
-    approveForm,
-    rejectForm
   };
-}
+
+  const submitFormEntry = async (id: string) => {
+    try {
+      const result = await api.formData.submit(id);
+      if (result) {
+        toast.success('Form submitted successfully');
+        await fetchFormEntries();
+      }
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      toast.error('Failed to submit form');
+    }
+  };
+
+  const approveFormEntry = async (id: string) => {
+    if (!user) return;
+    
+    try {
+      const result = await api.formData.approve(id, user.id);
+      if (result) {
+        toast.success('Form approved successfully');
+        await fetchFormEntries();
+      }
+    } catch (error) {
+      console.error('Error approving form:', error);
+      toast.error('Failed to approve form');
+    }
+  };
+
+  const rejectFormEntry = async (id: string, reason: string) => {
+    try {
+      const result = await api.formData.reject(id, reason);
+      if (result) {
+        toast.success('Form rejected');
+        await fetchFormEntries();
+      }
+    } catch (error) {
+      console.error('Error rejecting form:', error);
+      toast.error('Failed to reject form');
+    }
+  };
+
+  useEffect(() => {
+    fetchFormEntries();
+  }, []);
+
+  return {
+    formEntries,
+    loading,
+    fetchFormEntries,
+    submitFormEntry,
+    approveFormEntry,
+    rejectFormEntry
+  };
+};
