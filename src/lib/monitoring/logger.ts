@@ -1,3 +1,4 @@
+
 import * as Sentry from '@sentry/react';
 import { LogLevel, LoggerOptions } from './types';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,11 +18,28 @@ class Logger {
     error: 3
   };
 
+  // Store the current user ID
+  private userId: string | null = null;
+
   /**
    * Initialize the logger with options
    */
   init(options: LoggerOptions): void {
     this.options = { ...this.options, ...options };
+  }
+
+  /**
+   * Set the current user ID for logging context
+   */
+  setUserId(userId: string): void {
+    this.userId = userId;
+  }
+
+  /**
+   * Clear the current user ID
+   */
+  clearUserId(): void {
+    this.userId = null;
   }
 
   /**
@@ -72,12 +90,18 @@ class Logger {
     // Get timestamp
     const timestamp = new Date().toISOString();
 
+    // Add userId to context if available
+    const enhancedContext = {
+      ...(context || {}),
+      ...(this.userId ? { userId: this.userId } : {})
+    };
+
     // Prepare log entry
     const logEntry = {
       level,
       message,
       timestamp,
-      context: this.sanitizeContext(context || {})
+      context: this.sanitizeContext(enhancedContext)
     };
 
     // Log to console if enabled
@@ -155,7 +179,7 @@ class Logger {
    */
   private logToSentry(level: LogLevel, message: string, context: Record<string, any>): void {
     // Map log level to Sentry level
-    let sentryLevel: Sentry.SeverityLevel;
+    let sentryLevel: 'debug' | 'info' | 'warning' | 'error' | 'fatal';
     switch (level) {
       case 'debug':
         sentryLevel = 'debug';
@@ -197,10 +221,10 @@ class Logger {
   private async logToDatabase(level: LogLevel, message: string, context: Record<string, any>): Promise<void> {
     try {
       // Get user ID if available
-      let userId: string | undefined;
-      if (typeof window !== 'undefined') {
+      let userId = this.userId;
+      if (!userId && typeof window !== 'undefined') {
         const { data } = await supabase.auth.getUser();
-        userId = data.user?.id;
+        userId = data.user?.id || null;
       }
 
       // Insert log into database

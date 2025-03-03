@@ -1,6 +1,11 @@
 
 import { FilterParams } from './common';
 
+export interface ImportError {
+  row: number;
+  message: string;
+}
+
 export interface ImportJob {
   id: string;
   status: 'waiting' | 'processing' | 'complete' | 'error';
@@ -11,10 +16,12 @@ export interface ImportJob {
   tableName: string;
   withUpsert: boolean;
   keyField?: string;
-  errors: Array<{ row: number; message: string }>;
+  errors: Array<ImportError>;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+  completedAt?: string;
+  fileSize?: number;
   // Mapping properties for frontend-backend compatibility
   created_at?: string;
   processed_rows?: number;
@@ -38,7 +45,7 @@ export interface ExportJob {
   errorMessage?: string;
   tableName: string;
   downloadUrl: string;
-  completedAt: string;
+  completedAt: string | null;
   filters: FilterParams;
   userId: string;
 }

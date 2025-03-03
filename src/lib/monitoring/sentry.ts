@@ -1,88 +1,130 @@
 
 import * as Sentry from '@sentry/react';
-import { BrowserTracing } from '@sentry/tracing';
+import { Span } from '@sentry/tracing';
+import { RewriteFrames } from '@sentry/integrations';
 
+/**
+ * Initialize Sentry for error tracking
+ */
 export const initSentry = () => {
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('Sentry not initialized in development mode');
+    return;
+  }
+
+  const dsn = process.env.REACT_APP_SENTRY_DSN;
+  if (!dsn) {
+    console.warn('No Sentry DSN provided, error tracking will not be enabled');
+    return;
+  }
+
+  try {
     Sentry.init({
-      dsn: "https://examplePublicKey@o0.ingest.sentry.io/0", // Replace with your actual Sentry DSN
-      integrations: [new BrowserTracing()],
-      // Set tracesSampleRate to 1.0 to capture 100% of transactions for performance monitoring
-      tracesSampleRate: 0.5,
-      // Set to true in production
-      enabled: process.env.NODE_ENV === 'production',
-      // Session tracking for user behavior analysis
-      autoSessionTracking: true,
-      // We recommend adjusting this value in production
-      maxBreadcrumbs: 50,
-      environment: process.env.NODE_ENV,
+      dsn,
+      integrations: [
+        new RewriteFrames({
+          iteratee: (frame) => {
+            if (frame.filename) {
+              // Strip the domain from the URL
+              frame.filename = frame.filename.replace(/^.*\/\/[^/]+/, '');
+              // Strip webpack:// prefix
+              frame.filename = frame.filename.replace(/webpack:\/\//g, '');
+              // Append src/ prefix for source mapping
+              if (!frame.filename.startsWith('src/')) {
+                frame.filename = `src/${frame.filename}`;
+              }
+            }
+            return frame;
+          },
+        }),
+        new Sentry.BrowserTracing({
+          tracingOrigins: ['localhost', 'yourapp.com', /^\//],
+        }),
+      ],
       
-      // Before sending an event to Sentry, you can enhance the data
-      beforeSend(event) {
-        // You can modify the event here
-        // For example, scrub sensitive data
+      // Set tracesSampleRate to 1.0 to capture 100% of transactions for performance monitoring
+      tracesSampleRate: 0.2,
+      
+      // Filter sensitive data
+      beforeSend: (event) => {
+        // Don't send events in development mode
+        if (process.env.NODE_ENV !== 'production') {
+          return null;
+        }
+        
+        // Filter out sensitive data from the event payload
         if (event.request && event.request.headers) {
           delete event.request.headers['Authorization'];
+          delete event.request.headers['Cookie'];
         }
         
         return event;
       },
+      
+      // Environment configuration
+      environment: process.env.NODE_ENV || 'development',
     });
-
-    // Add global error handler for uncaught errors
-    window.addEventListener('error', (event) => {
-      Sentry.captureException(event.error);
-    });
-
-    // Add global error handler for unhandled promise rejections
-    window.addEventListener('unhandledrejection', (event) => {
-      Sentry.captureException(event.reason);
-    });
+    
+    console.log('Sentry initialized successfully');
+  } catch (error) {
+    console.error('Failed to initialize Sentry:', error);
   }
 };
 
-// Log user identity to Sentry once they are authenticated
+/**
+ * Set user information in Sentry context
+ */
 export const setSentryUser = (user: { id: string; email?: string; role?: string }) => {
-  if (process.env.NODE_ENV === 'production') {
-    Sentry.setUser({
-      id: user.id,
-      email: user.email,
-      role: user.role,
-    });
-  }
-};
-
-// Clear user identity from Sentry on logout
-export const clearSentryUser = () => {
-  if (process.env.NODE_ENV === 'production') {
-    Sentry.setUser(null);
-  }
-};
-
-// Custom error boundary component that reports to Sentry
-export const SentryErrorBoundary = Sentry.ErrorBoundary;
-
-// Create a custom profile for performance monitoring
-export const startSentryTransaction = (name: string, op: string) => {
-  return Sentry.startTransaction({
-    name,
-    op,
+  Sentry.setUser({
+    id: user.id,
+    email: user.email,
+    role: user.role,
   });
 };
 
-// Add breadcrumb to track user actions or important events
-export const addSentryBreadcrumb = (
-  category: string, 
-  message: string, 
-  level: Sentry.Severity = Sentry.Severity.Info,
-  data?: Record<string, any>
-) => {
-  if (process.env.NODE_ENV === 'production') {
-    Sentry.addBreadcrumb({
-      category,
-      message,
-      level,
-      data,
-    });
-  }
+/**
+ * Clear user information from Sentry context
+ */
+export const clearSentryUser = () => {
+  Sentry.setUser(null);
+};
+
+/**
+ * Set extra context information for Sentry events
+ */
+export const setSentryContext = (name: string, context: Record<string, any>) => {
+  Sentry.setContext(name, context);
+};
+
+/**
+ * Set tag for Sentry events
+ */
+export const setSentryTag = (key: string, value: string) => {
+  Sentry.setTag(key, value);
+};
+
+/**
+ * Capture exception with Sentry
+ */
+export const captureException = (error: Error, context?: Record<string, any>) => {
+  Sentry.captureException(error, { contexts: { additional: context } });
+};
+
+/**
+ * Capture message with Sentry
+ */
+export const captureMessage = (message: string, level: 'info' | 'warning' | 'error' = 'info', context?: Record<string, any>) => {
+  Sentry.captureMessage(message, { 
+    level, 
+    contexts: { additional: context } 
+  });
+};
+
+/**
+ * Start a Sentry transaction
+ */
+export const startTransaction = (name: string, op: string): Span => {
+  const transaction = Sentry.startTransaction({ name, op });
+  Sentry.configureScope(scope => scope.setSpan(transaction));
+  return transaction;
 };

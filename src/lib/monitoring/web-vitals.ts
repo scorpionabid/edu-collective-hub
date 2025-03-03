@@ -1,222 +1,200 @@
 
+import { getCLS, getFID, getLCP, getTTFB, type Metric } from 'web-vitals';
 import { supabase } from '@/integrations/supabase/client';
+import { captureException } from './sentry';
 import { logger } from './logger';
-import { Metric, onCLS, onFID, onLCP, onTTFB } from 'web-vitals';
-import { PerformanceMetric } from './types';
 
 /**
  * Initialize web vitals tracking
  */
-export const initWebVitals = (): void => {
-  if (typeof window !== 'undefined') {
-    onCLS(metric => trackWebVitals(metric));
-    onFID(metric => trackWebVitals(metric));
-    onLCP(metric => trackWebVitals(metric));
-    onTTFB(metric => trackWebVitals(metric));
+export const initWebVitals = () => {
+  if (typeof window === 'undefined') return;
+
+  try {
+    // Core Web Vitals
+    getCLS(trackMetric);
+    getFID(trackMetric);
+    getLCP(trackMetric);
+    getTTFB(trackMetric);
+
+    // Custom page load timing
     trackPageLoad();
+
+    logger.info('Web vitals tracking initialized');
+  } catch (error) {
+    captureException(error as Error);
+    logger.error('Failed to initialize web vitals tracking', { error });
   }
 };
 
 /**
- * Tracks Core Web Vitals and other performance metrics
+ * Track a web vitals metric
  */
-export const trackWebVitals = async (metric: Metric): Promise<void> => {
+const trackMetric = (metric: Metric) => {
   try {
-    // Get user information if available
-    const { data: { user } } = await supabase.auth.getUser();
-    const userId = user?.id;
+    const { name, value, delta, id } = metric;
     
-    // Get the current page path
-    const pagePath = window.location.pathname;
-    
-    // Get device and network information
-    const deviceInfo = {
-      userAgent: navigator.userAgent,
-      language: navigator.language,
-      platform: navigator.platform,
-      screenWidth: window.screen.width,
-      screenHeight: window.screen.height,
-      devicePixelRatio: window.devicePixelRatio
-    };
-    
-    const networkInfo = {
-      effectiveType: (navigator as any).connection?.effectiveType,
-      downlink: (navigator as any).connection?.downlink,
-      rtt: (navigator as any).connection?.rtt
-    };
-    
-    // Create the performance metric
-    const performanceMetric: Record<string, any> = {
-      page_path: pagePath,
+    // Log to console in development
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`Web Vital: ${name}`, { value, delta, id });
+    }
+
+    // Save to database
+    saveMetricToDatabase({
+      metricName: name,
+      value,
+      id
+    });
+  } catch (error) {
+    logger.error('Error tracking web vital metric', { error });
+  }
+};
+
+/**
+ * Track custom page load metric
+ */
+const trackPageLoad = () => {
+  try {
+    // Wait for the load event to ensure all resources are loaded
+    window.addEventListener('load', () => {
+      // Get the navigation timing data
+      const perfData = window.performance.timing;
+      const pageLoadTime = perfData.loadEventEnd - perfData.navigationStart;
+      const ttfb = perfData.responseStart - perfData.navigationStart;
+      
+      if (pageLoadTime > 0) {
+        // Log to console in development
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('Page Load Time', { pageLoadTime, ttfb });
+        }
+  
+        // Save to database
+        saveMetricToDatabase({
+          metricName: 'LOAD',
+          value: pageLoadTime,
+          ttfb
+        });
+      }
+    });
+  } catch (error) {
+    logger.error('Error tracking page load', { error });
+  }
+};
+
+/**
+ * Save metric data to the database
+ */
+const saveMetricToDatabase = async ({ 
+  metricName, 
+  value, 
+  id, 
+  ttfb 
+}: { 
+  metricName: string, 
+  value: number, 
+  id?: string, 
+  ttfb?: number 
+}) => {
+  try {
+    // Get user ID if available
+    let userId = undefined;
+    try {
+      const { data } = await supabase.auth.getUser();
+      userId = data.user?.id;
+    } catch (error) {
+      // Ignore error, just continue without user ID
+    }
+
+    // Gather device and network info
+    const deviceInfo = getDeviceInfo();
+    const networkInfo = getNetworkInfo();
+
+    // Map the metric name to the database column name
+    let metricData: Record<string, any> = {
+      page_path: window.location.pathname,
+      load_time_ms: 0, // Default value will be overridden based on the metric
       user_id: userId,
       device_info: deviceInfo,
-      network_info: networkInfo,
-      load_time_ms: 0 // Default value will be overridden
+      network_info: networkInfo
     };
-    
-    // Map the web-vitals metric to our database schema
-    switch (metric.name) {
+
+    // Set the appropriate metric value based on the metric name
+    switch (metricName) {
       case 'CLS':
-        performanceMetric.cls_score = metric.value;
-        performanceMetric.load_time_ms = performance.now(); // Use current time as load time
+        metricData.cls_score = value;
+        metricData.load_time_ms = 0; // Use a default value since CLS doesn't have a direct time equivalent
         break;
       case 'FID':
-        performanceMetric.fid_ms = metric.value;
-        performanceMetric.load_time_ms = metric.value;
+        metricData.fid_ms = Math.round(value);
+        metricData.load_time_ms = Math.round(value);
         break;
       case 'LCP':
-        performanceMetric.lcp_ms = metric.value;
-        performanceMetric.load_time_ms = metric.value;
+        metricData.lcp_ms = Math.round(value);
+        metricData.load_time_ms = Math.round(value);
         break;
       case 'TTFB':
-        performanceMetric.ttfb_ms = metric.value;
-        performanceMetric.load_time_ms = performance.now();
+        metricData.ttfb_ms = Math.round(value);
+        metricData.load_time_ms = Math.round(value);
         break;
-      case 'FCP':
-        // FCP isn't directly stored but can be used as a general page load time
-        performanceMetric.load_time_ms = metric.value;
+      case 'LOAD':
+        metricData.load_time_ms = Math.round(value);
+        if (ttfb) metricData.ttfb_ms = Math.round(ttfb);
         break;
       default:
-        // For custom metrics
-        performanceMetric.load_time_ms = metric.value;
+        metricData.load_time_ms = Math.round(value);
     }
+
+    // Insert into database
+    const { error } = await supabase.from('performance_metrics').insert(metricData);
     
-    // Store in the database - make sure all required fields are present
-    if (performanceMetric.page_path && performanceMetric.load_time_ms) {
-      const { error } = await supabase.from('performance_metrics').insert([performanceMetric]);
-      
-      if (error) {
-        logger.warn('Failed to store performance metrics', { error, metric: performanceMetric });
-      }
-    } else {
-      logger.warn('Incomplete performance metric data', { metric: performanceMetric });
+    if (error) {
+      throw error;
     }
   } catch (error) {
-    // Don't let metrics tracking interrupt the application flow
-    logger.warn('Error tracking web vitals', { error });
+    logger.error('Failed to save metric to database', { error, metricName, value });
   }
 };
 
 /**
- * Measures and tracks page load time
+ * Get device information for context
  */
-export const trackPageLoad = (): void => {
+const getDeviceInfo = (): Record<string, any> => {
   try {
-    // Use Performance API to get navigation timing data
-    if (!window.performance) {
-      console.warn('Performance API not supported');
-      return;
-    }
-    
-    // Queue the measurement to happen after the page is fully loaded
-    window.addEventListener('load', () => {
-      setTimeout(async () => {
-        try {
-          // Get user information if available
-          const { data: { user } } = await supabase.auth.getUser();
-          const userId = user?.id;
-          
-          // Get the current page path
-          const pagePath = window.location.pathname;
-          
-          // Get performance timing data
-          const timing = performance.timing;
-          const loadTime = timing.loadEventEnd - timing.navigationStart;
-          const ttfb = timing.responseStart - timing.navigationStart;
-          
-          // Get device and network information
-          const deviceInfo = {
-            userAgent: navigator.userAgent,
-            language: navigator.language,
-            platform: navigator.platform,
-            screenWidth: window.screen.width,
-            screenHeight: window.screen.height,
-            devicePixelRatio: window.devicePixelRatio
-          };
-          
-          const networkInfo = {
-            effectiveType: (navigator as any).connection?.effectiveType,
-            downlink: (navigator as any).connection?.downlink,
-            rtt: (navigator as any).connection?.rtt
-          };
-          
-          // Create the performance metric with required fields
-          const performanceMetric: Record<string, any> = {
-            page_path: pagePath,
-            load_time_ms: loadTime,
-            ttfb_ms: ttfb,
-            user_id: userId,
-            device_info: deviceInfo,
-            network_info: networkInfo
-          };
-          
-          // Store in the database
-          const { error } = await supabase.from('performance_metrics').insert([performanceMetric]);
-          
-          if (error) {
-            logger.warn('Failed to store page load metrics', { error, metric: performanceMetric });
-          }
-        } catch (error) {
-          logger.warn('Error tracking page load', { error });
-        }
-      }, 0);
-    });
+    return {
+      userAgent: navigator.userAgent,
+      screenWidth: window.screen.width,
+      screenHeight: window.screen.height,
+      devicePixelRatio: window.devicePixelRatio,
+      platform: navigator.platform,
+      vendor: navigator.vendor,
+      memory: navigator.deviceMemory,
+      hardwareConcurrency: navigator.hardwareConcurrency
+    };
   } catch (error) {
-    // Don't let metrics tracking interrupt the application flow
-    logger.warn('Error setting up page load tracking', { error });
+    return { error: 'Failed to get device info' };
   }
 };
 
 /**
- * Measures and tracks component render time
+ * Get network information for context
  */
-export const trackComponentRender = (componentName: string, renderTimeMs: number): void => {
+const getNetworkInfo = (): Record<string, any> => {
   try {
-    // Get the current page path
-    const pagePath = window.location.pathname;
+    const connection = (navigator as any).connection || 
+                       (navigator as any).mozConnection || 
+                       (navigator as any).webkitConnection;
     
-    // Log the component render time
-    logger.debug('Component render time', {
-      component: componentName,
-      renderTimeMs,
-      pagePath
-    });
-    
-    // Store the render time in a custom performance mark
-    performance.mark(`${componentName}-render-${Date.now()}`);
-    
-    // We might want to store this data for slow renders only
-    if (renderTimeMs > 100) {
-      (async () => {
-        try {
-          // Get user information if available
-          const { data: { user } } = await supabase.auth.getUser();
-          const userId = user?.id;
-          
-          // Create the performance metric with required fields
-          const performanceMetric: Record<string, any> = {
-            page_path: `${pagePath}#${componentName}`,
-            load_time_ms: renderTimeMs,
-            user_id: userId,
-            device_info: {
-              userAgent: navigator.userAgent,
-              component: componentName
-            }
-          };
-          
-          // Store in the database
-          const { error } = await supabase.from('performance_metrics').insert([performanceMetric]);
-          
-          if (error) {
-            logger.warn('Failed to store component render metrics', { error, metric: performanceMetric });
-          }
-        } catch (error) {
-          logger.warn('Error tracking component render', { error });
-        }
-      })();
+    if (connection) {
+      return {
+        effectiveType: connection.effectiveType,
+        downlink: connection.downlink,
+        rtt: connection.rtt,
+        saveData: connection.saveData
+      };
     }
+    
+    return { info: 'Network info not available' };
   } catch (error) {
-    // Don't let metrics tracking interrupt the application flow
-    logger.warn('Error tracking component render', { error });
+    return { error: 'Failed to get network info' };
   }
 };
