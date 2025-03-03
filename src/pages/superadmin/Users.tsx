@@ -14,8 +14,8 @@ const Users = () => {
     toast.info(`Edit admin: ${admin.firstName} ${admin.lastName}`);
   };
 
-  const handleDelete = (adminId: number) => {
-    setAdmins(admins.filter(admin => admin.id !== adminId));
+  const handleDelete = (admin: AdminUser) => {
+    setAdmins(admins.filter(a => a.id !== admin.id));
     toast.success("Admin deleted successfully");
   };
 

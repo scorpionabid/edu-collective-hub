@@ -238,16 +238,20 @@ export const formData = {
       
       toast.success('Form data submitted successfully');
       
-      return data ? {
-        id: data.id,
-        categoryId: data.category_id,
-        schoolId: data.school_id,
-        data: data.data,
-        status: data.status,
-        submittedAt: data.submitted_at,
-        approvedAt: data.approved_at,
-        approvedBy: data.approved_by
-      } : null;
+      if (data) {
+        return {
+          id: data.id,
+          categoryId: data.category_id,
+          schoolId: data.school_id,
+          data: data.data,
+          status: data.status,
+          submittedAt: data.submitted_at,
+          approvedAt: data.approved_at,
+          approvedBy: data.approved_by
+        };
+      }
+      
+      return null;
     } catch (error) {
       console.error('Error submitting form data:', error);
       toast.error('Failed to submit form data');
@@ -270,16 +274,20 @@ export const formData = {
       
       toast.success('Form data approved successfully');
       
-      return data ? {
-        id: data.id,
-        categoryId: data.category_id,
-        schoolId: data.school_id,
-        data: data.data,
-        status: data.status,
-        submittedAt: data.submitted_at,
-        approvedAt: data.approved_at,
-        approvedBy: data.approved_by
-      } : null;
+      if (data) {
+        return {
+          id: data.id,
+          categoryId: data.category_id,
+          schoolId: data.school_id,
+          data: data.data,
+          status: data.status,
+          submittedAt: data.submitted_at,
+          approvedAt: data.approved_at,
+          approvedBy: data.approved_by
+        };
+      }
+      
+      return null;
     } catch (error) {
       console.error('Error approving form data:', error);
       toast.error('Failed to approve form data');
@@ -302,16 +310,20 @@ export const formData = {
       
       toast.success('Form data rejected');
       
-      return data ? {
-        id: data.id,
-        categoryId: data.category_id,
-        schoolId: data.school_id,
-        data: data.data,
-        status: data.status,
-        submittedAt: data.submitted_at,
-        approvedAt: data.approved_at,
-        approvedBy: data.approved_by
-      } : null;
+      if (data) {
+        return {
+          id: data.id,
+          categoryId: data.category_id,
+          schoolId: data.school_id,
+          data: data.data,
+          status: data.status,
+          submittedAt: data.submitted_at,
+          approvedAt: data.approved_at,
+          approvedBy: data.approved_by
+        };
+      }
+      
+      return null;
     } catch (error) {
       console.error('Error rejecting form data:', error);
       toast.error('Failed to reject form data');

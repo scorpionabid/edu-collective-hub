@@ -66,7 +66,7 @@ const Reports = () => {
               columns={columns}
               data={filteredAndSortedData()}
               filters={filters}
-              onFilterChange={handleFilter}
+              handleFilter={handleFilter}
               sortConfig={sortConfig}
               handleSort={handleSort}
               filteredAndSortedData={filteredAndSortedData}

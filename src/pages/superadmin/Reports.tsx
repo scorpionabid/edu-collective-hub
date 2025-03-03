@@ -18,11 +18,8 @@ const Reports = () => {
     filteredSectors,
     columns,
     data,
-    setData,
     filters,
-    setFilters,
     sortConfig,
-    setSortConfig,
     updateFilteredSectors,
     fetchCategoryColumns,
     handleFilter,
@@ -69,7 +66,7 @@ const Reports = () => {
               columns={columns}
               data={filteredAndSortedData()}
               filters={filters}
-              onFilterChange={handleFilter}
+              handleFilter={handleFilter}
               sortConfig={sortConfig}
               handleSort={handleSort}
               filteredAndSortedData={filteredAndSortedData}
