@@ -1,13 +1,15 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { School } from "./types";
 
 export const schools = {
   getAll: async () => {
     try {
       const { data, error } = await supabase
         .from('schools')
-        .select('*');
+        .select('*')
+        .order('name');
       
       if (error) {
         console.error('Error fetching schools:', error);
@@ -17,25 +19,6 @@ export const schools = {
       return data || [];
     } catch (error) {
       console.error('Error in getAll schools:', error);
-      return [];
-    }
-  },
-  
-  getBySector: async (sectorId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('schools')
-        .select('*')
-        .eq('sector_id', sectorId);
-      
-      if (error) {
-        console.error('Error fetching schools by sector:', error);
-        throw error;
-      }
-      
-      return data || [];
-    } catch (error) {
-      console.error('Error in getBySector schools:', error);
       return [];
     }
   },
@@ -60,11 +43,31 @@ export const schools = {
     }
   },
   
-  create: async (school: { name: string; sector_id: string; address?: string; email?: string; phone?: string }) => {
+  getBySector: async (sectorId: string) => {
     try {
       const { data, error } = await supabase
         .from('schools')
-        .insert(school)
+        .select('*')
+        .eq('sector_id', sectorId)
+        .order('name');
+      
+      if (error) {
+        console.error('Error fetching schools by sector:', error);
+        throw error;
+      }
+      
+      return data || [];
+    } catch (error) {
+      console.error('Error in getBySector schools:', error);
+      return [];
+    }
+  },
+  
+  create: async (schoolData: Omit<School, 'id'>) => {
+    try {
+      const { data, error } = await supabase
+        .from('schools')
+        .insert(schoolData)
         .select()
         .single();
       
@@ -78,15 +81,22 @@ export const schools = {
     } catch (error) {
       console.error('Error in create school:', error);
       toast.error('Failed to create school');
-      return { id: "0", ...school };
+      return { 
+        id: "0", 
+        name: schoolData.name,
+        sector_id: schoolData.sector_id,
+        address: schoolData.address,
+        email: schoolData.email,
+        phone: schoolData.phone
+      };
     }
   },
   
-  update: async (id: string, school: { name?: string; address?: string; email?: string; phone?: string }) => {
+  update: async (id: string, schoolData: Partial<School>) => {
     try {
       const { data, error } = await supabase
         .from('schools')
-        .update(school)
+        .update(schoolData)
         .eq('id', id)
         .select()
         .single();
@@ -101,7 +111,14 @@ export const schools = {
     } catch (error) {
       console.error('Error in update school:', error);
       toast.error('Failed to update school');
-      return { id, ...school };
+      return { 
+        id, 
+        name: schoolData.name || "Unknown",
+        sector_id: schoolData.sector_id || "",
+        address: schoolData.address || "",
+        email: schoolData.email || "",
+        phone: schoolData.phone || ""
+      };
     }
   },
   

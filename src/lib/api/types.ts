@@ -1,4 +1,3 @@
-
 // Common types used across API modules
 
 export interface Category {
@@ -154,4 +153,27 @@ export interface GetMassNotificationsParams {
   createdBy?: string;
   createdAfter?: string;
   createdBefore?: string;
+}
+
+// Add Region type
+export interface Region {
+  id: string;
+  name: string;
+}
+
+export interface Sector {
+  id: string;
+  name: string;
+  regionId: string;
+  region_id?: string; // Include this for backward compatibility
+}
+
+export interface School {
+  id: string;
+  name: string;
+  sectorId?: string;
+  sector_id?: string; // Include this for backward compatibility
+  address?: string;
+  phone?: string;
+  email?: string;
 }

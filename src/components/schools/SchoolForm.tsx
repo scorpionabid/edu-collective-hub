@@ -1,122 +1,151 @@
 
-import React from 'react';
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useForm, Controller } from "react-hook-form";
-
-interface Sector {
-  id: string;
-  name: string;
-  regionId?: string;
-}
+import { School } from "@/lib/api/types";
 
 interface SchoolFormProps {
-  onSubmit: (data: any) => void;
-  sectors: Sector[];
-  initialData?: any;
+  school?: School;
+  onSubmit: (data: Omit<School, 'id'>) => void;
+  sectors: any[];
+  regions: any[];
 }
 
-export const SchoolForm: React.FC<SchoolFormProps> = ({ 
-  onSubmit, 
-  sectors, 
-  initialData 
-}) => {
-  const { register, handleSubmit, control, formState: { errors } } = useForm({
-    defaultValues: initialData || { 
-      name: '', 
-      sector_id: '', 
-      address: '', 
-      email: '', 
-      phone: '' 
+export const SchoolForm = ({ school, onSubmit, sectors, regions }: SchoolFormProps) => {
+  const [name, setName] = useState(school?.name || "");
+  const [sectorId, setSectorId] = useState(school?.sector_id || "");
+  const [address, setAddress] = useState(school?.address || "");
+  const [email, setEmail] = useState(school?.email || "");
+  const [phone, setPhone] = useState(school?.phone || "");
+  const [regionId, setRegionId] = useState("");
+  const [filteredSectors, setFilteredSectors] = useState(sectors);
+
+  // Set initial region based on sector
+  useEffect(() => {
+    if (school?.sector_id) {
+      const sector = sectors.find(s => s.id === school.sector_id);
+      if (sector && sector.region_id) {
+        setRegionId(sector.region_id);
+      }
     }
-  });
+  }, [school, sectors]);
+
+  // Filter sectors based on selected region
+  useEffect(() => {
+    if (regionId) {
+      setFilteredSectors(sectors.filter(sector => sector.region_id === regionId));
+      if (!filteredSectors.find(s => s.id === sectorId)) {
+        setSectorId("");
+      }
+    } else {
+      setFilteredSectors(sectors);
+    }
+  }, [regionId, sectors, sectorId]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit({
+      name,
+      sector_id: sectorId,
+      address,
+      email,
+      phone
+    });
+  };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="name">School Name</Label>
-        <Input 
-          id="name" 
-          placeholder="Enter school name"
-          {...register("name", { required: "School name is required" })}
-        />
-        {errors.name && (
-          <p className="text-sm text-red-500">{errors.name.message as string}</p>
-        )}
-      </div>
-      
-      <div className="space-y-2">
-        <Label htmlFor="sector">Sector</Label>
-        <Controller
-          control={control}
-          name="sector_id"
-          rules={{ required: "Sector is required" }}
-          render={({ field }) => (
-            <Select 
-              value={field.value} 
-              onValueChange={field.onChange}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select sector" />
-              </SelectTrigger>
-              <SelectContent>
-                {sectors.map(sector => (
-                  <SelectItem key={sector.id} value={sector.id}>
-                    {sector.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        />
-        {errors.sector_id && (
-          <p className="text-sm text-red-500">{errors.sector_id.message as string}</p>
-        )}
-      </div>
-      
-      <div className="space-y-2">
-        <Label htmlFor="address">Address</Label>
-        <Input 
-          id="address" 
-          placeholder="Enter address"
-          {...register("address")}
+        <Label htmlFor="name">Məktəb adı</Label>
+        <Input
+          id="name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Məktəb adını daxil edin"
+          required
         />
       </div>
-      
+
+      <div className="space-y-2">
+        <Label htmlFor="region">Region</Label>
+        <Select
+          value={regionId}
+          onValueChange={(value) => {
+            setRegionId(value);
+            setSectorId("");  // Reset sector when region changes
+          }}
+        >
+          <SelectTrigger id="region">
+            <SelectValue placeholder="Region seçin" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">Region seçin</SelectItem>
+            {regions.map((region) => (
+              <SelectItem key={region.id} value={region.id}>
+                {region.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="sector">Sektor</Label>
+        <Select
+          value={sectorId}
+          onValueChange={setSectorId}
+          disabled={!regionId} // Disable if no region is selected
+        >
+          <SelectTrigger id="sector">
+            <SelectValue placeholder="Sektor seçin" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">Sektor seçin</SelectItem>
+            {filteredSectors.map((sector) => (
+              <SelectItem key={sector.id} value={sector.id}>
+                {sector.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="address">Ünvan</Label>
+        <Input
+          id="address"
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+          placeholder="Ünvanı daxil edin"
+        />
+      </div>
+
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
-        <Input 
-          id="email" 
+        <Input
+          id="email"
           type="email"
-          placeholder="Enter email"
-          {...register("email", { 
-            pattern: {
-              value: /\S+@\S+\.\S+/,
-              message: "Invalid email address"
-            }
-          })}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email ünvanını daxil edin"
         />
-        {errors.email && (
-          <p className="text-sm text-red-500">{errors.email.message as string}</p>
-        )}
       </div>
-      
+
       <div className="space-y-2">
-        <Label htmlFor="phone">Phone</Label>
-        <Input 
-          id="phone" 
-          placeholder="Enter phone number"
-          {...register("phone")}
+        <Label htmlFor="phone">Telefon</Label>
+        <Input
+          id="phone"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="Telefon nömrəsini daxil edin"
         />
       </div>
-      
-      <Button type="submit" className="w-full">
-        {initialData ? 'Update School' : 'Add School'}
+
+      <Button type="submit">
+        {school ? "Yenilə" : "Yarat"}
       </Button>
     </form>
   );
 };
-
-export default SchoolForm;

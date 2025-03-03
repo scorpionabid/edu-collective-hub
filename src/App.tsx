@@ -1,4 +1,3 @@
-
 import { Route, Routes, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import Index from "@/pages/Index";
@@ -25,11 +24,11 @@ import RegionReports from "@/pages/regionadmin/Reports";
 
 // SectorAdmin pages
 import SectorDashboard from "@/pages/sectoradmin/Dashboard";
+import SectorReports from "@/pages/sectoradmin/Reports";
 import SectorTables from "@/pages/SectorTables";
 import SectorUsers from "@/pages/SectorUsers";
 import SectorCategories from "@/pages/SectorCategories";
 import SectorForms from "@/pages/SectorForms";
-import SectorReports from "@/pages/sectoradmin/Reports";
 
 // SchoolAdmin pages
 import SchoolDashboard from "@/pages/schooladmin/Dashboard";

@@ -9,23 +9,23 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Filter, SortAsc, SortDesc } from "lucide-react";
 import { Column } from "@/lib/api/types";
-import { Dispatch, SetStateAction } from "react";
 
 interface ReportTableProps {
   columns: Column[];
   data: any[];
   filters: { [key: string]: string };
   sortConfig: { key: string; direction: 'asc' | 'desc' } | null;
-  handleFilter: (columnName: string, value: string) => void;
+  onFilterChange: (columnName: string, value: string) => void;
   handleSort: (columnName: string) => void;
   filteredAndSortedData: () => any[];
 }
 
 export const ReportTable = ({
   columns,
+  data,
   filters,
   sortConfig,
-  handleFilter,
+  onFilterChange,
   handleSort,
   filteredAndSortedData,
 }: ReportTableProps) => {
@@ -65,7 +65,7 @@ export const ReportTable = ({
                         placeholder="Filter..."
                         value={filters[column.name] || ""}
                         onChange={(e) =>
-                          handleFilter(column.name, e.target.value)
+                          onFilterChange(column.name, e.target.value)
                         }
                       />
                     </div>
@@ -77,8 +77,8 @@ export const ReportTable = ({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {filteredAndSortedData().length > 0 ? (
-          filteredAndSortedData().map((row, index) => (
+        {data.length > 0 ? (
+          data.map((row, index) => (
             <TableRow key={index}>
               {columns.map((column) => (
                 <TableCell key={column.id}>
