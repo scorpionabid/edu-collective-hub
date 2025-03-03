@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { usePermission } from '@/contexts/PermissionContext';
+import { AccessDenied } from './AccessDenied';
 
 interface PermissionGuardProps {
   action: string;
@@ -26,17 +27,17 @@ export function PermissionGuard({
   const { hasPermission } = usePermission();
   
   // Check if the user has permission for the action on the target
-  if (hasPermission(action as any, target)) {
+  if (hasPermission(action, target)) {
     return <>{children}</>;
   }
   
-  // If the user doesn't have permission, render the fallback or nothing
+  // If the user doesn't have permission, render the fallback or default AccessDenied
   if (fallback) {
     return <>{fallback}</>;
   }
   
-  // Default message when no fallback is provided
-  return null;
+  // Default AccessDenied component when no fallback is provided
+  return <AccessDenied />;
 }
 
 /**
