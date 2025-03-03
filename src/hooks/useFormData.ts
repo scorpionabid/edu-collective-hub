@@ -1,76 +1,76 @@
 
 import { useState, useCallback } from 'react';
 import { api } from '@/lib/api';
-import { FormData } from '@/lib/api/types';
+import { FormData, PaginatedResponse } from '@/lib/api/types';
 import { toast } from 'sonner';
 
-export function useFormData() {
-  const [formEntries, setFormEntries] = useState<FormData[]>([]);
+export const useFormData = (categoryId?: string, schoolId?: string) => {
+  const [formData, setFormData] = useState<FormData[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
-  const fetchFormEntries = useCallback(async () => {
+  const fetchFormData = useCallback(async () => {
+    if (!categoryId || !schoolId) return;
+    
+    setLoading(true);
+    setError(null);
+    
     try {
-      setLoading(true);
-      const data = await api.formData.getAll();
-      setFormEntries(data);
-    } catch (error) {
-      console.error('Error fetching form entries:', error);
-      toast.error('Failed to load form entries');
+      const response = await api.formData.getForSchool(schoolId, categoryId);
+      // Need to properly extract data array from PaginatedResponse
+      if (response && Array.isArray(response.data)) {
+        setFormData(response.data);
+      } else {
+        console.error('Unexpected response format:', response);
+        setFormData([]);
+      }
+    } catch (err) {
+      console.error('Error fetching form data:', err);
+      setError(err instanceof Error ? err : new Error('Failed to fetch form data'));
+      toast.error('Failed to fetch form data');
+    } finally {
+      setLoading(false);
+    }
+  }, [categoryId, schoolId]);
+
+  const submitFormData = useCallback(async (data: Omit<FormData, 'id'>) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Add createdAt and updatedAt fields for the form data
+      const enhancedData: Omit<FormData, 'id'> = {
+        ...data,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      const response = await api.formData.submit(enhancedData);
+      toast.success('Form data submitted successfully');
+      
+      // Update local state with the new form data
+      if (response) {
+        setFormData(prevData => [...prevData, response]);
+      }
+      
+      return response;
+    } catch (err) {
+      console.error('Error submitting form data:', err);
+      setError(err instanceof Error ? err : new Error('Failed to submit form data'));
+      toast.error('Failed to submit form data');
+      throw err;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const submitFormEntry = useCallback(async (id: string) => {
-    try {
-      setLoading(true);
-      await api.formData.submit(id);
-      toast.success('Form submitted successfully');
-      fetchFormEntries();
-    } catch (error) {
-      console.error('Error submitting form:', error);
-      toast.error('Failed to submit form');
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchFormEntries]);
-
-  const approveFormEntry = useCallback(async (id: string) => {
-    try {
-      setLoading(true);
-      // Use the current user's ID for approval
-      const userId = "current-user-id"; // This should be fetched from auth context
-      await api.formData.approve(id, userId);
-      toast.success('Form approved successfully');
-      fetchFormEntries();
-    } catch (error) {
-      console.error('Error approving form:', error);
-      toast.error('Failed to approve form');
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchFormEntries]);
-
-  const rejectFormEntry = useCallback(async (id: string, reason: string) => {
-    try {
-      setLoading(true);
-      await api.formData.reject(id, reason);
-      toast.success('Form rejected');
-      fetchFormEntries();
-    } catch (error) {
-      console.error('Error rejecting form:', error);
-      toast.error('Failed to reject form');
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchFormEntries]);
-
   return {
-    formEntries,
+    formData,
     loading,
-    fetchFormEntries,
-    submitFormEntry,
-    approveFormEntry,
-    rejectFormEntry
+    error,
+    fetchFormData,
+    submitFormData
   };
-}
+};
+
+export default useFormData;

@@ -1,124 +1,113 @@
 
-import { useState } from 'react';
-import { toast } from 'sonner';
-import { useAuth } from '@/hooks/useAuth';
-import { sanitizationService } from '@/lib/validation/sanitization';
-import { validationService } from '@/lib/validation/validationService';
-import { errorTracker, ErrorCategory, ErrorSeverity } from '@/lib/validation/errorTracker';
-import * as z from 'zod';
+import { useState, useCallback } from 'react';
 import { api } from '@/lib/api';
+import { FormData } from '@/lib/api/types';
+import { useAuth } from '@/hooks/useAuth';
+import sanitizationService from '@/lib/validation/sanitization';
+import { toast } from 'sonner';
+import * as z from 'zod';
+import { ZodType, ZodTypeDef } from 'zod';
 
-export type SubmissionOptions = {
-  sanitize?: boolean;
-  trackErrors?: boolean;
-  showToast?: boolean;
-  componentName?: string;
-};
-
-export function useValidatedFormSubmission<T extends Record<string, any>>(
-  categoryId: string,
-  options: SubmissionOptions = {}
-) {
+export function useValidatedFormSubmission() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionErrors, setSubmissionErrors] = useState<Record<string, string>>({});
   const { user } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  
-  const submitForm = async (formData: T): Promise<boolean> => {
-    setIsLoading(true);
-    setError(null);
-    
+
+  const validateAndSubmitForm = useCallback(async <T>(
+    formData: Record<string, any>,
+    schema: ZodType<T, ZodTypeDef, T>,
+    options: {
+      categoryId: string;
+      schoolId: string;
+      onSuccess?: (data: FormData) => void;
+      onError?: (errors: Record<string, string>) => void;
+    }
+  ) => {
+    setIsSubmitting(true);
+    setSubmissionErrors({});
+
     try {
-      // Get the validation schema for this category
-      const validationPromise = api.categories.getValidationSchema(categoryId);
-      
-      // Sanitize data if enabled
-      const sanitizedData = options.sanitize
-        ? sanitizationService.sanitizeObject(formData)
-        : formData;
-      
-      // Load and validate with schema
-      const schema = await validationPromise;
-      const validationResult = validationService.validate(schema, sanitizedData, {
-        showToast: options.showToast,
-      });
-      
-      if (!validationResult.success) {
-        // Handle validation errors
-        const firstError = validationResult.errors?.[0];
-        const errorMessage = firstError?.message || 'Validation failed';
+      // First, sanitize the form data
+      const sanitizedData = sanitizationService.sanitize.formData(formData);
+
+      // Then validate with schema
+      const parseResult = schema.safeParse(sanitizedData);
+
+      if (!parseResult.success) {
+        const errors = parseResult.error.errors.reduce((acc, error) => {
+          const path = error.path.join('.');
+          acc[path] = error.message;
+          return acc;
+        }, {} as Record<string, string>);
+
+        setSubmissionErrors(errors);
         
-        setError(errorMessage);
-        
-        if (options.showToast) {
-          toast.error(errorMessage);
+        if (options.onError) {
+          options.onError(errors);
         }
         
-        if (options.trackErrors && validationResult.errors) {
-          // Track each validation error
-          validationResult.errors.forEach((err) => {
-            const fieldName = err.path.join('.') || 'unknown';
-            errorTracker.logValidationError({
-              userId: user?.id,
-              componentName: options.componentName || 'unknown',
-              fieldName,
-              errorMessage: err.message,
-              inputValue: sanitizedData[fieldName],
-            });
-          });
-        }
-        
-        return false;
+        toast.error('Please fix the form errors before submitting');
+        setIsSubmitting(false);
+        return null;
       }
-      
-      // Submit the validated data
-      const result = await api.formData.create({
-        categoryId,
-        schoolId: user?.profile?.schoolId || '',
-        data: validationResult.data,
+
+      // Prepare the submission data
+      const submissionData: Omit<FormData, 'id'> = {
+        categoryId: options.categoryId,
+        schoolId: options.schoolId,
+        data: sanitizedData,
         status: 'draft',
-      });
-      
-      if (options.showToast) {
-        toast.success('Form data submitted successfully');
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      // Add user information if available
+      if (user) {
+        submissionData.createdBy = user.id;
       }
-      
-      return true;
+
+      // Submit the form
+      const response = await api.formData.submit(submissionData);
+
+      if (response) {
+        toast.success('Form submitted successfully');
+        
+        if (options.onSuccess) {
+          options.onSuccess(response);
+        }
+        
+        setIsSubmitting(false);
+        return response;
+      } else {
+        throw new Error('Failed to submit form: No response received');
+      }
     } catch (error) {
       console.error('Form submission error:', error);
       
       const errorMessage = error instanceof Error 
         ? error.message 
-        : 'An error occurred during form submission';
+        : 'An unexpected error occurred during form submission';
       
-      setError(errorMessage);
+      toast.error(errorMessage);
       
-      if (options.showToast) {
-        toast.error(errorMessage);
+      setSubmissionErrors({
+        form: errorMessage
+      });
+      
+      if (options.onError) {
+        options.onError({ form: errorMessage });
       }
       
-      if (options.trackErrors) {
-        errorTracker.logError(
-          errorMessage,
-          ErrorCategory.FORM_SUBMISSION,
-          ErrorSeverity.ERROR,
-          {
-            categoryId,
-            component: options.componentName || 'unknown',
-            userId: user?.id,
-          }
-        );
-      }
-      
-      return false;
-    } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
+      return null;
     }
-  };
-  
+  }, [user]);
+
   return {
-    submitForm,
-    isLoading,
-    error,
-    clearError: () => setError(null),
+    isSubmitting,
+    submissionErrors,
+    validateAndSubmitForm
   };
 }
+
+export default useValidatedFormSubmission;

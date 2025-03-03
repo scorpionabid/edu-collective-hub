@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useEnhancedExcelImport } from '@/hooks/useEnhancedExcelImport';
+import { ImportError } from '@/lib/api/types';
 
 interface ExcelImportDropzoneProps<T> {
   onImportComplete?: (data: T[]) => void;
@@ -44,7 +45,7 @@ export function ExcelImportDropzone<T>({
     errors,
     processExcelFile,
     cancelImport
-  } = useEnhancedExcelImport<T>({
+  } = useEnhancedExcelImport({
     batchSize,
     maxRows,
     transformFn,

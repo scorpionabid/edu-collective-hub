@@ -28,11 +28,7 @@ export const createStringSchema = (options?: {
     schema = schema.max(maxLength, `${label} must not exceed ${maxLength} characters`);
   }
   
-  if (!required) {
-    return schema.optional();
-  }
-  
-  return schema.min(1, `${label} is required`);
+  return required ? schema.min(1, `${label} is required`) : schema.optional();
 };
 
 export const createEmailSchema = (options?: { required?: boolean; label?: string }) => {
@@ -40,11 +36,7 @@ export const createEmailSchema = (options?: { required?: boolean; label?: string
   
   let schema = z.string().email(`Invalid ${label.toLowerCase()} address`);
   
-  if (!required) {
-    return schema.optional();
-  }
-  
-  return schema;
+  return required ? schema : schema.optional();
 };
 
 export const createNumberSchema = (options?: {
@@ -70,41 +62,36 @@ export const createNumberSchema = (options?: {
     schema = schema.max(max, `${label} must not exceed ${max}`);
   }
   
-  if (!required) {
-    return schema.optional();
-  }
-  
-  return schema;
+  return required ? schema : schema.optional();
 };
 
 // Common schemas for reuse
 export const idSchema = z.string().uuid();
 export const nameSchema = createStringSchema({ label: 'Name', minLength: 2, maxLength: 100 });
 export const emailSchema = createEmailSchema();
-export const phoneSchema = createStringSchema({
-  label: 'Phone',
-  minLength: 10,
-  maxLength: 20,
-}).regex(/^[+]?[\d\s()-]+$/, 'Invalid phone number format');
+export const phoneSchema = z.string()
+  .min(10, 'Phone number must be at least 10 characters')
+  .max(20, 'Phone number must not exceed 20 characters')
+  .regex(/^[+]?[\d\s()-]+$/, 'Invalid phone number format')
+  .optional();
 
 // Advanced validation schemas
-export const passwordSchema = createStringSchema({ 
-  label: 'Password', 
-  minLength: 8, 
-  maxLength: 100 
-}).refine(
-  (password) => {
-    // At least one uppercase letter, one lowercase letter, one number, and one special character
-    const hasUppercase = /[A-Z]/.test(password);
-    const hasLowercase = /[a-z]/.test(password);
-    const hasNumber = /[0-9]/.test(password);
-    const hasSpecial = /[^A-Za-z0-9]/.test(password);
-    return hasUppercase && hasLowercase && hasNumber && hasSpecial;
-  },
-  {
-    message: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
-  }
-);
+export const passwordSchema = z.string()
+  .min(8, 'Password must be at least 8 characters')
+  .max(100, 'Password must not exceed 100 characters')
+  .refine(
+    (password) => {
+      // At least one uppercase letter, one lowercase letter, one number, and one special character
+      const hasUppercase = /[A-Z]/.test(password);
+      const hasLowercase = /[a-z]/.test(password);
+      const hasNumber = /[0-9]/.test(password);
+      const hasSpecial = /[^A-Za-z0-9]/.test(password);
+      return hasUppercase && hasLowercase && hasNumber && hasSpecial;
+    },
+    {
+      message: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
+    }
+  );
 
 // Domain-specific schemas
 export const categorySchema = z.object({

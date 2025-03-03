@@ -19,7 +19,7 @@ export interface Column {
   type: string;
   categoryId: string;
   required: boolean;
-  options?: string[];
+  options?: string[] | any; // Modified to accept any type for flexibility
   description?: string;
 }
 
@@ -216,7 +216,7 @@ export interface QueryOptions {
   filter?: FilterParams;
   includes?: string[];
   filters?: FilterParams; // Added to support existing code
-  cache?: boolean; // Added to support cache operations
+  cache?: boolean | CacheOptions; // Modified to support both boolean and object
 }
 
 // Import/Export types
@@ -323,4 +323,20 @@ export interface ValidationRule {
   validationFn?: string;
   roles?: string[];
   categoryId?: string;
+}
+
+// Enhanced Excel Import interfaces
+export interface ImportError {
+  row: number;
+  message: string;
+}
+
+export interface EnhancedExcelImportHook<T> {
+  isImporting: boolean;
+  progress: number;
+  totalRows: number;
+  processedRows: number;
+  errors: ImportError[];
+  processExcelFile: (file: File) => Promise<void>;
+  cancelImport: () => void;
 }

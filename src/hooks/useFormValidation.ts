@@ -1,269 +1,171 @@
-
-import { useState, useCallback, useMemo } from 'react';
+import { useCallback, useState } from 'react';
 import * as z from 'zod';
+import { ZodEffects, ZodObject, ZodType, ZodTypeDef } from 'zod';
+import sanitizationService from '@/lib/validation/sanitization';
+import { api } from '@/lib/api';
 import { toast } from 'sonner';
-import { validationService } from '@/lib/validation/validationService';
-import { sanitizationService } from '@/lib/validation/sanitization';
-import { errorTracker } from '@/lib/validation/errorTracker';
-import { useAuth } from '@/hooks/useAuth';
 
-export type ValidationState<T> = {
-  isValid: boolean;
-  errors: Record<string, string>;
-  dirtyFields: Set<string>;
-  submitCount: number;
-  isSubmitting: boolean;
-  data: Partial<T>;
-};
+export function useFormValidation<T>() {
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [validationSchema, setValidationSchema] = useState<ZodType<T, ZodTypeDef, T>>();
+  const [isValid, setIsValid] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
 
-export type ValidationOptions = {
-  showToast?: boolean;
-  sanitize?: boolean;
-  trackErrors?: boolean;
-  componentName?: string;
-};
-
-export function useFormValidation<T extends Record<string, any>>(
-  schema: z.ZodType<T>,
-  initialData: Partial<T> = {},
-  options: ValidationOptions = {}
-) {
-  const { user } = useAuth();
-  const [state, setState] = useState<ValidationState<T>>({
-    isValid: false,
-    errors: {},
-    dirtyFields: new Set<string>(),
-    submitCount: 0,
-    isSubmitting: false,
-    data: initialData,
-  });
-  
-  // Memoize the schema to prevent unnecessary rerenders
-  const validationSchema = useMemo(() => schema, [schema]);
-  
   // Validate a single field
-  const validateField = useCallback(
-    (name: string, value: any): string | null => {
-      try {
-        // Create a sub-schema for just this field
-        const fieldSchema = z.object({ [name]: validationSchema.shape[name] });
-        const result = validationService.validate(fieldSchema, { [name]: value });
-        
-        if (!result.success && result.formattedErrors && result.formattedErrors[name]) {
-          if (options.trackErrors) {
-            // Track the validation error
-            errorTracker.logValidationError({
-              userId: user?.id,
-              componentName: options.componentName || 'unknown',
-              fieldName: name,
-              errorMessage: result.formattedErrors[name],
-              inputValue: value,
-            });
-          }
-          
-          return result.formattedErrors[name];
-        }
-        
-        return null;
-      } catch (error) {
-        console.error(`Validation error for field ${name}:`, error);
-        return 'Validation failed';
-      }
-    },
-    [validationSchema, options.trackErrors, options.componentName, user?.id]
-  );
-  
-  // Set a field value and validate it
-  const setFieldValue = useCallback(
-    (name: string, value: any, validateImmediately: boolean = true) => {
-      // Sanitize the value if enabled
-      const sanitizedValue = options.sanitize
-        ? sanitizationService.sanitizeValue(value)
-        : value;
-      
-      setState((prev) => {
-        const newData = { ...prev.data, [name]: sanitizedValue };
-        const newDirtyFields = new Set(prev.dirtyFields).add(name);
-        
-        // Validate the field if needed
-        let fieldError: string | null = null;
-        if (validateImmediately) {
-          fieldError = validateField(name, sanitizedValue);
-        }
-        
-        // Update errors
-        const newErrors = { ...prev.errors };
-        if (fieldError) {
-          newErrors[name] = fieldError;
-        } else {
-          delete newErrors[name];
-        }
-        
-        return {
-          ...prev,
-          data: newData,
-          dirtyFields: newDirtyFields,
-          errors: newErrors,
-          isValid: Object.keys(newErrors).length === 0,
-        };
-      });
-    },
-    [validateField, options.sanitize]
-  );
-  
-  // Validate all fields in the form
-  const validateForm = useCallback((): boolean => {
-    const result = validationService.validate(validationSchema, state.data, {
-      showToast: options.showToast,
-    });
+  const validateField = useCallback((
+    field: string,
+    value: any,
+    formData: Record<string, any>,
+    schema?: ZodType<any>
+  ) => {
+    if (!schema) return true;
     
-    if (!result.success && result.formattedErrors) {
-      setState((prev) => ({
-        ...prev,
-        errors: result.formattedErrors || {},
-        isValid: false,
-      }));
-      
-      if (options.trackErrors && result.errors) {
-        // Track each validation error
-        result.errors.forEach((error) => {
-          const fieldName = error.path.join('.') || 'unknown';
-          errorTracker.logValidationError({
-            userId: user?.id,
-            componentName: options.componentName || 'unknown',
-            fieldName,
-            errorMessage: error.message,
-            inputValue: state.data[fieldName],
-          });
-        });
+    // Extract the specific field schema if it's an object schema with shape
+    let fieldSchema: ZodType<any> | undefined;
+    try {
+      // Try to access the field schema safely
+      if (schema instanceof ZodObject) {
+        // @ts-ignore - this is a workaround for shape property access
+        fieldSchema = schema._def.shape()[field];
       }
-      
-      return false;
+    } catch (err) {
+      console.warn(`Could not extract schema for field ${field}:`, err);
     }
     
-    setState((prev) => ({
-      ...prev,
-      errors: {},
-      isValid: true,
-    }));
+    // If fieldSchema is not found, we'll validate the whole form
+    // but only report errors for this specific field
+    const schemaToUse = fieldSchema || schema;
     
-    return true;
-  }, [validationSchema, state.data, options.showToast, options.trackErrors, options.componentName, user?.id]);
-  
-  // Reset the form
-  const resetForm = useCallback(
-    (newData: Partial<T> = {}) => {
-      setState({
-        isValid: false,
-        errors: {},
-        dirtyFields: new Set<string>(),
-        submitCount: 0,
-        isSubmitting: false,
-        data: newData,
+    try {
+      // If we have a field-specific schema, validate just the field
+      if (fieldSchema) {
+        fieldSchema.parse(value);
+      } else {
+        // Otherwise validate the whole form data and check for field errors
+        schemaToUse.parse(formData);
+      }
+      
+      // Remove any existing error for this field
+      setValidationErrors(prev => {
+        const updated = { ...prev };
+        delete updated[field];
+        return updated;
       });
-    },
-    []
-  );
-  
-  // Submit the form
-  const submitForm = useCallback(
-    async (onSubmit: (data: T) => Promise<void> | void) => {
-      setState((prev) => ({
-        ...prev,
-        isSubmitting: true,
-        submitCount: prev.submitCount + 1,
-      }));
       
-      const isValid = validateForm();
-      
-      if (!isValid) {
-        setState((prev) => ({
-          ...prev,
-          isSubmitting: false,
-        }));
+      return true;
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        // Only set errors for the current field
+        const fieldErrors = err.errors
+          .filter(e => e.path.includes(field) || e.path[0] === field)
+          .reduce((acc, curr) => {
+            const path = Array.isArray(curr.path) ? curr.path.join('.') : curr.path;
+            acc[path] = curr.message;
+            return acc;
+          }, {} as Record<string, string>);
         
-        if (options.showToast) {
-          toast.error('Zəhmət olmasa bütün sahələri düzgün doldurun.');
+        if (Object.keys(fieldErrors).length > 0) {
+          setValidationErrors(prev => ({
+            ...prev,
+            [field]: fieldErrors[field] || fieldErrors[Object.keys(fieldErrors)[0]]
+          }));
+          return false;
         }
-        
-        return;
       }
       
-      try {
-        // Sanitize all data before submission if enabled
-        const submissionData = options.sanitize
-          ? sanitizationService.sanitizeObject(state.data as T)
-          : (state.data as T);
+      // If no specific field errors, it's valid for this field
+      setValidationErrors(prev => {
+        const updated = { ...prev };
+        delete updated[field];
+        return updated;
+      });
+      
+      return true;
+    }
+  }, []);
+
+  // Validate the entire form
+  const validateForm = useCallback(async (
+    formData: Record<string, any>,
+    schema?: ZodType<T, ZodTypeDef, T>
+  ) => {
+    setIsValidating(true);
+    const schemaToUse = schema || validationSchema;
+    
+    if (!schemaToUse) {
+      setIsValid(true);
+      setValidationErrors({});
+      setIsValidating(false);
+      return true;
+    }
+    
+    try {
+      // First sanitize the form data
+      const sanitizedData = sanitizationService.sanitize.formData(formData);
+      
+      // Then validate with Zod
+      schemaToUse.parse(sanitizedData);
+      
+      setIsValid(true);
+      setValidationErrors({});
+      setIsValidating(false);
+      return true;
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        const newErrors = err.errors.reduce((acc, curr) => {
+          const path = Array.isArray(curr.path) ? curr.path.join('.') : curr.path.toString();
+          acc[path] = curr.message;
+          return acc;
+        }, {} as Record<string, string>);
         
-        await onSubmit(submissionData as T);
-      } catch (error) {
-        console.error('Form submission error:', error);
-        
-        if (options.showToast) {
-          toast.error('Form göndərilməsi zamanı xəta baş verdi.');
-        }
-        
-        if (options.trackErrors) {
-          errorTracker.logValidationError({
-            userId: user?.id,
-            componentName: options.componentName || 'unknown',
-            fieldName: '_form',
-            errorMessage: error instanceof Error ? error.message : 'Unknown error',
-          });
-        }
-      } finally {
-        setState((prev) => ({
-          ...prev,
-          isSubmitting: false,
-        }));
+        setValidationErrors(newErrors);
+        setIsValid(false);
+        setIsValidating(false);
+        return false;
       }
-    },
-    [validateForm, state.data, options.showToast, options.sanitize, options.trackErrors, options.componentName, user?.id]
-  );
-  
-  // Form context helpers
-  const formContext = useMemo(
-    () => ({
-      register: (name: string) => ({
-        name,
-        id: name,
-        value: state.data[name] || '',
-        onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-          setFieldValue(name, e.target.value);
-        },
-        onBlur: () => {
-          if (state.dirtyFields.has(name)) {
-            validateField(name, state.data[name]);
-          }
-        },
-      }),
-      setValue: setFieldValue,
-      getFieldProps: (name: string) => ({
-        name,
-        id: name,
-        value: state.data[name] || '',
-        onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-          setFieldValue(name, e.target.value);
-        },
-        onBlur: () => {
-          if (state.dirtyFields.has(name)) {
-            validateField(name, state.data[name]);
-          }
-        },
-        error: state.errors[name],
-        touched: state.dirtyFields.has(name),
-      }),
-    }),
-    [state, setFieldValue, validateField]
-  );
-  
+      
+      // For other types of errors
+      console.error('Validation error:', err);
+      toast.error('An unexpected error occurred during form validation');
+      setIsValid(false);
+      setIsValidating(false);
+      return false;
+    }
+  }, [validationSchema]);
+
+  // Report validation error to analytics/monitoring
+  const reportValidationError = useCallback(async (
+    field: string,
+    value: any,
+    errorMessage: string,
+    formId?: string
+  ) => {
+    try {
+      if (api.categoryValidation && api.categoryValidation.logValidationError) {
+        await api.categoryValidation.logValidationError({
+          fieldName: field,
+          errorMessage,
+          inputValue: value,
+          formId,
+          componentName: 'FormValidation'
+        });
+      }
+    } catch (err) {
+      console.error('Failed to report validation error:', err);
+    }
+  }, []);
+
   return {
-    ...state,
-    setFieldValue,
+    validationErrors,
+    setValidationErrors,
+    validationSchema,
+    setValidationSchema,
+    isValid,
+    isValidating,
     validateField,
     validateForm,
-    resetForm,
-    submitForm,
-    formContext,
+    reportValidationError
   };
 }
+
+export default useFormValidation;
