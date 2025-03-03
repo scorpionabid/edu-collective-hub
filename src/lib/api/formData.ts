@@ -7,18 +7,24 @@ export const formData = {
   getAll: async (schoolId?: string) => {
     try {
       // Use rpc function instead of direct table query
-      const params: Record<string, any> = {};
-      if (schoolId) params.school_id_filter = schoolId;
+      let rpcFunction = 'get_all_form_data';
+      let params: Record<string, any> = {};
+      
+      if (schoolId) {
+        rpcFunction = 'get_form_data_by_school';
+        params = { school_id: schoolId };
+      }
       
       const { data, error } = await supabase
-        .rpc('get_form_data', params);
+        .rpc(rpcFunction, params);
       
       if (error) {
         console.error('Error fetching form data:', error);
         throw error;
       }
       
-      return (data as any[])?.map(entry => ({
+      // Transform the data to match the expected FormData type
+      return Array.isArray(data) ? data.map(entry => ({
         id: entry.id,
         categoryId: entry.category_id,
         schoolId: entry.school_id,
@@ -27,7 +33,7 @@ export const formData = {
         submittedAt: entry.submitted_at,
         approvedAt: entry.approved_at,
         approvedBy: entry.approved_by
-      })) || [];
+      })) : [];
     } catch (error) {
       console.error('Error in getAll formData:', error);
       return [];
@@ -49,6 +55,7 @@ export const formData = {
         return null;
       }
       
+      // Transform the data to match the expected FormData type
       const entry = data[0];
       return {
         id: entry.id,
@@ -74,8 +81,7 @@ export const formData = {
           category_id: formData.categoryId,
           school_id: formData.schoolId,
           form_data: formData.data,
-          status: formData.status,
-          submitted_at: formData.status === 'submitted' ? new Date().toISOString() : null
+          form_status: formData.status
         });
       
       if (error) {
@@ -85,6 +91,7 @@ export const formData = {
       
       toast.success('Form submitted successfully');
       
+      // Transform the data to match the expected FormData type
       if (data) {
         return {
           id: data.id,
@@ -126,10 +133,7 @@ export const formData = {
       const updateData: Record<string, any> = { form_id: id };
       if (formData.data !== undefined) updateData.form_data = formData.data;
       if (formData.status !== undefined) {
-        updateData.status = formData.status;
-        if (formData.status === 'submitted') {
-          updateData.submitted_at = new Date().toISOString();
-        }
+        updateData.form_status = formData.status;
       }
       
       const { data, error } = await supabase
@@ -142,6 +146,7 @@ export const formData = {
       
       toast.success('Form updated successfully');
       
+      // Transform the data to match the expected FormData type
       if (data) {
         return {
           id: data.id,
@@ -181,7 +186,7 @@ export const formData = {
       const { data, error } = await supabase
         .rpc('approve_form_data', {
           form_id: id,
-          approved_by: approvedBy
+          approved_by_user: approvedBy
         });
       
       if (error) {
@@ -191,6 +196,7 @@ export const formData = {
       
       toast.success('Form approved successfully');
       
+      // Transform the data to match the expected FormData type
       if (data) {
         return {
           id: data.id,
@@ -225,6 +231,7 @@ export const formData = {
       
       toast.success('Form rejected');
       
+      // Transform the data to match the expected FormData type
       if (data) {
         return {
           id: data.id,

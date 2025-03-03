@@ -452,7 +452,7 @@ export const getMassNotificationById = async (id: string): Promise<MassNotificat
 
 export const getNotificationRecipients = async (notificationId: string): Promise<MassNotificationRecipient[]> => {
   try {
-    const { data, error } = await supabase
+    const { data: recipientsData, error } = await supabase
       .from('mass_notification_recipients')
       .select('*')
       .eq('notification_id', notificationId);
@@ -463,16 +463,16 @@ export const getNotificationRecipients = async (notificationId: string): Promise
     }
     
     // Cast the status field to the correct type
-    return data?.map(recipient => ({
-      id: recipient.id,
-      notificationId: recipient.notification_id,
-      recipientType: recipient.recipient_type as "region" | "sector" | "school" | "profile",
-      recipientId: recipient.recipient_id,
-      recipientName: recipient.recipient_name || '',
-      status: recipient.status as "pending" | "sent" | "failed" | "read",
-      sentAt: recipient.sent_at,
-      readAt: recipient.read_at,
-      createdAt: recipient.created_at
+    return recipientsData?.map((r: any) => ({
+      id: r.id,
+      notificationId: r.notification_id,
+      recipientType: r.recipient_type as "region" | "sector" | "school" | "profile",
+      recipientId: r.recipient_id,
+      recipientName: r.recipient_name || '',  // Adding a fallback value
+      status: r.status as "pending" | "sent" | "failed" | "read",
+      sentAt: r.sent_at,
+      readAt: r.read_at,
+      createdAt: r.created_at
     })) || [];
   } catch (error) {
     console.error('Error in getNotificationRecipients:', error);

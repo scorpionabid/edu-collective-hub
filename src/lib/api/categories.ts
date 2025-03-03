@@ -15,7 +15,8 @@ export const categories = {
         throw error;
       }
       
-      return (data as any[])?.map(category => ({
+      // Transform data to match the expected Category type
+      return Array.isArray(data) ? data.map(category => ({
         id: category.id,
         name: category.name,
         regionId: category.region_id,
@@ -29,7 +30,7 @@ export const categories = {
               categoryId: column.category_id
             })) 
           : []
-      })) || [];
+      })) : [];
     } catch (error) {
       console.error('Error in getAll categories:', error);
       return [];
@@ -51,6 +52,7 @@ export const categories = {
         return null;
       }
       
+      // Transform data to match the expected Category type
       const category = data[0];
       return {
         id: category.id,

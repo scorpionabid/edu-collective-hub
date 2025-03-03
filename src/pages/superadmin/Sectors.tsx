@@ -1,61 +1,53 @@
-import { useState, useEffect } from 'react';
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { PlusCircle, Pencil, Trash2, Office } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableCaption,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { PlusCircle, Building, Pencil, Trash2 } from "lucide-react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { sectors } from "@/lib/api/sectors";
+import { regions } from "@/lib/api/regions";
+import { Region } from "@/lib/api/types";
 
 interface Sector {
   id: string;
   name: string;
-  regionId: string;
-  regionName?: string;
+  regionId?: string;
 }
 
 const SuperadminSectors = () => {
-  const [sectors, setSectors] = useState<Sector[]>([]);
-  const [regions, setRegions] = useState<any[]>([]);
+  const { user } = useAuth();
+  const [sectorsData, setSectorsData] = useState<Sector[]>([]);
+  const [regionsData, setRegionsData] = useState<Region[]>([]);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editingSector, setEditingSector] = useState<Sector | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deletingSector, setDeletingSector] = useState<Sector | null>(null);
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState('');
-  const [regionId, setRegionId] = useState('');
-
-  // Add getById function to regions API for this page
-  const loadRegionName = async (regionId: string) => {
-    try {
-      const regionData = await api.regions.getAll();
-      const region = regionData.find(r => r.id === regionId);
-      return region?.name || 'Unknown Region';
-    } catch (error) {
-      console.error(`Error loading region name for ${regionId}:`, error);
-      return 'Unknown Region';
-    }
-  };
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const fetchSectors = async () => {
-    try {
-      const sectorData = await api.sectors.getAll();
-      loadRegionNames(sectorData);
-    } catch (error) {
-      console.error('Error fetching sectors:', error);
-      toast.error('Sektorları yükləmək alınmadı');
-    }
+    const fetchedSectors = await sectors.getAll();
+    setSectorsData(fetchedSectors);
   };
 
   const fetchRegions = async () => {
-    try {
-      const regionData = await api.regions.getAll();
-      setRegions(regionData);
-    } catch (error) {
-      console.error('Error fetching regions:', error);
-      toast.error('Regionları yükləmək alınmadı');
-    }
+    const fetchedRegions = await regions.getAll();
+    setRegionsData(fetchedRegions);
   };
 
   useEffect(() => {
@@ -63,203 +55,199 @@ const SuperadminSectors = () => {
     fetchRegions();
   }, []);
 
-  // Fix the handleUpdateSector function
-  const handleUpdateSector = () => {
-    if (editingSector) {
-      api.sectors.update(editingSector.id, editingSector.name)
-        .then(() => {
-          setEditingSector(null);
-          fetchSectors();
-          toast.success('Sektor uğurla yeniləndi');
-        })
-        .catch(error => {
-          console.error('Error updating sector:', error);
-          toast.error('Sektoru yeniləmək alınmadı');
-        });
+  const handleAddSector = async (data: { name: string, region_id: string }) => {
+    try {
+      // Using create with name and regionId parameters
+      await sectors.create(data.name, data.region_id);
+      toast.success('Sector created successfully');
+      fetchSectors();
+      setAddDialogOpen(false);
+    } catch (error) {
+      toast.error('Failed to create sector');
     }
   };
 
-  const handleDeleteSector = () => {
-    if (deletingSector) {
-      api.sectors.delete(deletingSector.id)
-        .then(() => {
-          setDeletingSector(null);
-          fetchSectors();
-          toast.success('Sektor uğurla silindi');
-        })
-        .catch(error => {
-          console.error('Error deleting sector:', error);
-          toast.error('Sektoru silmək alınmadı');
-        });
-    }
-  };
-
-  // Fix the loadRegionNames function by adding regionId to the sector object
-  const loadRegionNames = async (sectors: any[]) => {
-    const sectorsWithRegionNames = await Promise.all(
-      sectors.map(async (sector) => {
-        if (sector.region_id) {
-          const regionName = await loadRegionName(sector.region_id);
-          return {
-            ...sector,
-            regionId: sector.region_id, // Add regionId property
-            regionName
-          };
-        }
-        return sector;
-      })
-    );
+  const handleUpdateSector = async (data: { name: string }) => {
+    if (!editingSector) return;
     
-    setSectors(sectorsWithRegionNames);
+    try {
+      // Using update with id and name parameters
+      await sectors.update(editingSector.id, data.name);
+      toast.success('Sector updated successfully');
+      fetchSectors();
+      setEditDialogOpen(false);
+      setEditingSector(null);
+    } catch (error) {
+      toast.error('Failed to update sector');
+    }
   };
 
-  // Fix the create sector function call
-  const handleCreateSector = (data: { name: string; regionId: string }) => {
-    api.sectors.create({
-      name: data.name,
-      region_id: data.regionId
-    })
-      .then((newSector) => {
-        // Now add the regionName to the new sector
-        if (newSector && newSector.region_id) {
-          loadRegionName(newSector.region_id)
-            .then(regionName => {
-              setSectors([...sectors, {
-                ...newSector,
-                regionId: newSector.region_id,
-                regionName
-              }]);
-            });
-      } else {
-        fetchSectors(); // Just reload all sectors
-      }
-      toast.success('Sektor uğurla yaradıldı');
-    })
-    .catch(error => {
-      console.error('Error creating sector:', error);
-      toast.error('Sektoru yaratmaq alınmadı');
-    });
+  const handleDeleteSector = async () => {
+    if (!deletingSector) return;
+
+    try {
+      await sectors.delete(deletingSector.id);
+      toast.success("Sektor uğurla silindi");
+      fetchSectors();
+      setDeleteDialogOpen(false);
+      setDeletingSector(null);
+    } catch (error) {
+      toast.error("Sektoru silərkən xəta baş verdi");
+    }
   };
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Sektorlar</CardTitle>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button>
-              <PlusCircle className="w-4 h-4 mr-2" />
-              Sektor əlavə et
+    <div className="container mx-auto py-10">
+      <Card>
+        <CardHeader>
+          <CardTitle>Sectors</CardTitle>
+          <CardDescription>Manage sectors here.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-4">
+            <Button onClick={() => setAddDialogOpen(true)}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Add Sector
             </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Sektor yarat</DialogTitle>
-              <DialogDescription>
-                Yeni sektoru yaratmaq üçün formu doldurun.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="name" className="text-right">
-                  Ad
-                </Label>
-                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="region" className="text-right">
-                  Region
-                </Label>
-                <Select onValueChange={setRegionId}>
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Region seç" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {regions.map((region) => (
-                      <SelectItem key={region.id} value={region.id}>{region.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <Button onClick={() => {
-              handleCreateSector({ name: name, regionId: regionId });
-              setOpen(false);
-            }}>Yarat</Button>
-          </DialogContent>
-        </Dialog>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Adı</TableHead>
-              <TableHead>Region</TableHead>
-              <TableHead className="text-right">Əməliyyatlar</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sectors.map((sector) => (
-              <TableRow key={sector.id}>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Office className="w-4 h-4" />
-                    <span>
-                      {sector.name}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell>{sector.regionName}</TableCell>
-                <TableCell className="text-right">
-                  <Button variant="ghost" size="sm" onClick={() => setEditingSector(sector)}>
-                    <Pencil className="w-4 h-4 mr-2" />
-                    Redaktə et
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setDeletingSector(sector)}>
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Sil
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-      <Dialog open={editingSector !== null} onOpenChange={() => setEditingSector(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Sektoru redaktə et</DialogTitle>
-            <DialogDescription>
-              Sektorun adını dəyişdirin.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
-                Ad
-              </Label>
-              <Input id="name" defaultValue={editingSector?.name} onChange={(e) => {
-                if (editingSector) {
-                  setEditingSector({ ...editingSector, name: e.target.value });
-                }
-              }} className="col-span-3" />
-            </div>
           </div>
-          <Button onClick={handleUpdateSector}>Yenilə</Button>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Region</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sectorsData.map((sector) => (
+                <TableRow key={sector.id}>
+                  <TableCell>{sector.name}</TableCell>
+                  <TableCell>
+                    {regionsData.find((region) => region.id === sector.regionId)?.name || "N/A"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setEditingSector(sector);
+                          setEditDialogOpen(true);
+                        }}
+                      >
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Edit
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={() => {
+                          setDeletingSector(sector);
+                          setDeleteDialogOpen(true);
+                        }}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <h2 className="text-lg font-medium">Add Sector</h2>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const formData = new FormData(e.target as HTMLFormElement);
+              handleAddSector({
+                name: formData.get("name") as string,
+                region_id: formData.get("region_id") as string,
+              });
+            }}
+            className="grid gap-4 py-4"
+          >
+            <div className="grid gap-2">
+              <label htmlFor="name" className="text-right text-sm font-medium leading-none">
+                Name
+              </label>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:text-muted-foreground file:h-10 file:px-2 file:select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="region_id" className="text-right text-sm font-medium leading-none">
+                Region
+              </label>
+              <select
+                id="region_id"
+                name="region_id"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:text-muted-foreground file:h-10 file:px-2 file:select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="">Select Region</option>
+                {regionsData.map((region) => (
+                  <option key={region.id} value={region.id}>
+                    {region.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Button type="submit">Add Sector</Button>
+          </form>
         </DialogContent>
       </Dialog>
-      <Dialog open={deletingSector !== null} onOpenChange={() => setDeletingSector(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Sektoru sil</DialogTitle>
-            <DialogDescription>
-              {deletingSector?.name} adlı sektoru silmək istədiyinizə əminsiniz?
-            </DialogDescription>
-          </DialogHeader>
-          <Button onClick={handleDeleteSector}>Sil</Button>
+
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <h2 className="text-lg font-medium">Edit Sector</h2>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const formData = new FormData(e.target as HTMLFormElement);
+              handleUpdateSector({
+                name: formData.get("name") as string,
+              });
+            }}
+            className="grid gap-4 py-4"
+          >
+            <div className="grid gap-2">
+              <label htmlFor="name" className="text-right text-sm font-medium leading-none">
+                Name
+              </label>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                defaultValue={editingSector?.name}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:text-muted-foreground file:h-10 file:px-2 file:select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+            <Button type="submit">Update Sector</Button>
+          </form>
         </DialogContent>
       </Dialog>
-    </Card>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <h2 className="text-lg font-medium">Delete Sector</h2>
+          <p className="mb-5">Are you sure you want to delete this sector?</p>
+          <div className="flex justify-end space-x-2">
+            <Button variant="secondary" onClick={() => setDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteSector}>
+              Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 };
 
