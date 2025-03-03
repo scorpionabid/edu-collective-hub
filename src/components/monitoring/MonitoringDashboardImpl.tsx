@@ -139,7 +139,7 @@ export function MonitoringDashboardImpl({
 
   // Calculate summary statistics
   const criticalErrors = errorLogs.filter(log => log.severity === 'critical').length;
-  const slowRequests = apiMetrics.filter(metric => metric.durationMs > 1000).length;
+  const slowRequests = apiMetrics.filter(metric => metric.duration_ms > 1000).length;
   const performanceIssues = performanceMetrics.filter(metric => metric.loadTimeMs > 3000).length;
   
   return (
@@ -242,4 +242,3 @@ export function MonitoringDashboardImpl({
     </div>
   );
 }
-

@@ -20,7 +20,7 @@ export function ApiMetricsChart({
   const chartData = data.map(metric => ({
     ...metric,
     timestamp: metric.timestamp ? format(new Date(metric.timestamp), 'HH:mm') : '',
-    duration: metric.durationMs,
+    duration: metric.duration_ms,
     endpoint: metric.endpoint.split('/').slice(-1)[0] || metric.endpoint, // Get last part of path for cleaner display
   }));
 
@@ -38,7 +38,7 @@ export function ApiMetricsChart({
         };
       }
       
-      groupedByEndpoint[endpoint].avgDuration += metric.durationMs;
+      groupedByEndpoint[endpoint].avgDuration += metric.duration_ms;
       groupedByEndpoint[endpoint].count++;
     });
     
@@ -96,4 +96,3 @@ export function ApiMetricsChart({
     </div>
   );
 }
-

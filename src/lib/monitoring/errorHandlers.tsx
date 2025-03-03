@@ -2,7 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from './logger';
 import * as Sentry from '@sentry/react';
-import React from 'react';
+import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { ErrorLog } from './types';
 
 interface TrackErrorOptions {
@@ -92,31 +92,46 @@ export const trackError = async (options: TrackErrorOptions): Promise<void> => {
   }
 };
 
+interface WithErrorTrackingProps {
+  componentName: string;
+}
+
 /**
  * Higher-order component to track errors in React components
  */
 export function withErrorTracking<P extends object>(
   Component: React.ComponentType<P>,
-  options: { componentName: string }
+  options: WithErrorTrackingProps
 ): React.ComponentType<P> {
   const displayName = options.componentName || Component.displayName || Component.name || 'Component';
   
-  const WithErrorTracking: React.FC<P> = (props) => {
-    const handleError = (error: Error, errorInfo: React.ErrorInfo) => {
+  class WithErrorTracking extends React.Component<P, { hasError: boolean }> {
+    constructor(props: P) {
+      super(props);
+      this.state = { hasError: false };
+    }
+    
+    static getDerivedStateFromError() {
+      return { hasError: true };
+    }
+    
+    componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
       trackError({
         errorMessage: error.message,
         errorStack: error.stack,
         component: displayName,
         context: { errorInfo: errorInfo.componentStack }
       });
-    };
+    }
     
-    return (
-      <React.ErrorBoundary fallback={<div>Something went wrong.</div>} onError={handleError}>
-        <Component {...props} />
-      </React.ErrorBoundary>
-    );
-  };
+    render() {
+      if (this.state.hasError) {
+        return <div>Something went wrong.</div>;
+      }
+      
+      return <Component {...this.props} />;
+    }
+  }
   
   WithErrorTracking.displayName = `WithErrorTracking(${displayName})`;
   
@@ -157,24 +172,21 @@ export const setupGlobalErrorHandlers = (): void => {
   }
 };
 
+interface ErrorBoundaryProps {
+  children: ReactNode;
+  fallback?: ReactNode;
+  componentName?: string;
+  onError?: (error: Error, errorInfo: ErrorInfo) => void;
+}
+
 /**
  * Error boundary component for React applications
  */
-export class ErrorBoundary extends React.Component<
-  { 
-    children: React.ReactNode; 
-    fallback?: React.ReactNode;
-    componentName?: string;
-    onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
-  },
+export class ErrorBoundary extends Component<
+  ErrorBoundaryProps,
   { hasError: boolean }
 > {
-  constructor(props: { 
-    children: React.ReactNode; 
-    fallback?: React.ReactNode;
-    componentName?: string;
-    onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
-  }) {
+  constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false };
   }
@@ -183,7 +195,7 @@ export class ErrorBoundary extends React.Component<
     return { hasError: true };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Track the error
     trackError({
       errorMessage: error.message,

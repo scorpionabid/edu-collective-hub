@@ -1,8 +1,21 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from './logger';
-import { Metric } from 'web-vitals';
+import { Metric, onCLS, onFID, onLCP, onTTFB } from 'web-vitals';
 import { PerformanceMetric } from './types';
+
+/**
+ * Initialize web vitals tracking
+ */
+export const initWebVitals = (): void => {
+  if (typeof window !== 'undefined') {
+    onCLS(metric => trackWebVitals(metric));
+    onFID(metric => trackWebVitals(metric));
+    onLCP(metric => trackWebVitals(metric));
+    onTTFB(metric => trackWebVitals(metric));
+    trackPageLoad();
+  }
+};
 
 /**
  * Tracks Core Web Vitals and other performance metrics
@@ -15,12 +28,6 @@ export const trackWebVitals = async (metric: Metric): Promise<void> => {
     
     // Get the current page path
     const pagePath = window.location.pathname;
-    
-    // Create the performance metric
-    const performanceMetric: { [key: string]: any } = {
-      page_path: pagePath,
-      user_id: userId,
-    };
     
     // Get device and network information
     const deviceInfo = {
@@ -38,22 +45,32 @@ export const trackWebVitals = async (metric: Metric): Promise<void> => {
       rtt: (navigator as any).connection?.rtt
     };
     
-    performanceMetric.device_info = deviceInfo;
-    performanceMetric.network_info = networkInfo;
+    // Create the performance metric
+    const performanceMetric: Record<string, any> = {
+      page_path: pagePath,
+      user_id: userId,
+      device_info: deviceInfo,
+      network_info: networkInfo,
+      load_time_ms: 0 // Default value will be overridden
+    };
     
     // Map the web-vitals metric to our database schema
     switch (metric.name) {
       case 'CLS':
         performanceMetric.cls_score = metric.value;
+        performanceMetric.load_time_ms = performance.now(); // Use current time as load time
         break;
       case 'FID':
         performanceMetric.fid_ms = metric.value;
+        performanceMetric.load_time_ms = metric.value;
         break;
       case 'LCP':
         performanceMetric.lcp_ms = metric.value;
+        performanceMetric.load_time_ms = metric.value;
         break;
       case 'TTFB':
         performanceMetric.ttfb_ms = metric.value;
+        performanceMetric.load_time_ms = performance.now();
         break;
       case 'FCP':
         // FCP isn't directly stored but can be used as a general page load time
@@ -64,16 +81,15 @@ export const trackWebVitals = async (metric: Metric): Promise<void> => {
         performanceMetric.load_time_ms = metric.value;
     }
     
-    // Ensure load_time_ms is always present (required field)
-    if (!performanceMetric.load_time_ms) {
-      performanceMetric.load_time_ms = performance.now();
-    }
-    
-    // Store in the database
-    const { error } = await supabase.from('performance_metrics').insert(performanceMetric);
-    
-    if (error) {
-      logger.warn('Failed to store performance metrics', { error, metric: performanceMetric });
+    // Store in the database - make sure all required fields are present
+    if (performanceMetric.page_path && performanceMetric.load_time_ms) {
+      const { error } = await supabase.from('performance_metrics').insert([performanceMetric]);
+      
+      if (error) {
+        logger.warn('Failed to store performance metrics', { error, metric: performanceMetric });
+      }
+    } else {
+      logger.warn('Incomplete performance metric data', { metric: performanceMetric });
     }
   } catch (error) {
     // Don't let metrics tracking interrupt the application flow
@@ -87,8 +103,7 @@ export const trackWebVitals = async (metric: Metric): Promise<void> => {
 export const trackPageLoad = (): void => {
   try {
     // Use Performance API to get navigation timing data
-    const performance = window.performance;
-    if (!performance) {
+    if (!window.performance) {
       console.warn('Performance API not supported');
       return;
     }
@@ -109,14 +124,6 @@ export const trackPageLoad = (): void => {
           const loadTime = timing.loadEventEnd - timing.navigationStart;
           const ttfb = timing.responseStart - timing.navigationStart;
           
-          // Create the performance metric
-          const performanceMetric: { [key: string]: any } = {
-            page_path: pagePath,
-            load_time_ms: loadTime,
-            ttfb_ms: ttfb,
-            user_id: userId,
-          };
-          
           // Get device and network information
           const deviceInfo = {
             userAgent: navigator.userAgent,
@@ -133,11 +140,18 @@ export const trackPageLoad = (): void => {
             rtt: (navigator as any).connection?.rtt
           };
           
-          performanceMetric.device_info = deviceInfo;
-          performanceMetric.network_info = networkInfo;
+          // Create the performance metric with required fields
+          const performanceMetric: Record<string, any> = {
+            page_path: pagePath,
+            load_time_ms: loadTime,
+            ttfb_ms: ttfb,
+            user_id: userId,
+            device_info: deviceInfo,
+            network_info: networkInfo
+          };
           
           // Store in the database
-          const { error } = await supabase.from('performance_metrics').insert(performanceMetric);
+          const { error } = await supabase.from('performance_metrics').insert([performanceMetric]);
           
           if (error) {
             logger.warn('Failed to store page load metrics', { error, metric: performanceMetric });
@@ -179,8 +193,8 @@ export const trackComponentRender = (componentName: string, renderTimeMs: number
           const { data: { user } } = await supabase.auth.getUser();
           const userId = user?.id;
           
-          // Create the performance metric
-          const performanceMetric: { [key: string]: any } = {
+          // Create the performance metric with required fields
+          const performanceMetric: Record<string, any> = {
             page_path: `${pagePath}#${componentName}`,
             load_time_ms: renderTimeMs,
             user_id: userId,
@@ -191,7 +205,7 @@ export const trackComponentRender = (componentName: string, renderTimeMs: number
           };
           
           // Store in the database
-          const { error } = await supabase.from('performance_metrics').insert(performanceMetric);
+          const { error } = await supabase.from('performance_metrics').insert([performanceMetric]);
           
           if (error) {
             logger.warn('Failed to store component render metrics', { error, metric: performanceMetric });
