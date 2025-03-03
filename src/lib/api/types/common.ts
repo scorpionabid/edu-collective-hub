@@ -1,4 +1,6 @@
 
+import { CacheOptions } from './cache';
+
 // Common interfaces for pagination, query options, etc.
 export interface PaginatedResponse<T> {
   data: T[];

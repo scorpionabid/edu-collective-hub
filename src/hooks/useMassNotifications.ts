@@ -5,58 +5,65 @@ import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { CreateMassNotificationData, GetMassNotificationsParams } from '@/lib/api/types';
 
-export const useMassNotifications = () => {
+export function useMassNotifications() {
+  const [isLoading, setIsLoading] = useState(false);
   const queryClient = useQueryClient();
-  const [error, setError] = useState<string | null>(null);
 
+  // Fetch mass notifications
   const {
     data: notifications = [],
-    isLoading,
-    isError,
-    refetch,
+    isLoading: isNotificationsLoading,
+    error: notificationsError,
+    refetch: refetchNotifications,
   } = useQuery({
     queryKey: ['massNotifications'],
-    queryFn: async () => {
-      try {
-        const response = await api.notifications.mass.getMassNotifications();
-        return response;
-      } catch (err) {
-        console.error('Error fetching mass notifications:', err);
-        setError('Failed to load notifications');
-        return [];
-      }
-    },
+    queryFn: () => api.notifications.mass.getMassNotifications(),
   });
 
+  // Create mass notification mutation
   const createNotificationMutation = useMutation({
-    mutationFn: async (data: CreateMassNotificationData) => {
-      try {
-        return await api.notifications.mass.createMassNotification(data);
-      } catch (err) {
-        console.error('Error creating mass notification:', err);
-        throw new Error('Failed to create notification');
-      }
-    },
+    mutationFn: (data: CreateMassNotificationData) => 
+      api.notifications.mass.createMassNotification(data),
     onSuccess: () => {
+      toast.success('Notification created successfully');
       queryClient.invalidateQueries({ queryKey: ['massNotifications'] });
-      toast.success('Notification created and queued for delivery');
     },
-    onError: (error) => {
-      toast.error(error.message || 'Failed to create notification');
-      setError(error.message || 'Failed to create notification');
+    onError: (error: Error) => {
+      toast.error(`Failed to create notification: ${error.message}`);
     },
   });
 
-  const createNotification = (data: CreateMassNotificationData) => {
-    createNotificationMutation.mutate(data);
+  // Create mass notification function
+  const createMassNotification = async (data: CreateMassNotificationData) => {
+    setIsLoading(true);
+    try {
+      await createNotificationMutation.mutateAsync(data);
+      return true;
+    } catch (error) {
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  // Get notification stats
+  const {
+    data: stats,
+    isLoading: isStatsLoading,
+    error: statsError,
+    refetch: refetchStats,
+  } = useQuery({
+    queryKey: ['notificationStats'],
+    queryFn: () => api.notifications.mass.getNotificationStats(),
+  });
 
   return {
     notifications,
-    isLoading,
-    isError,
-    error,
-    createNotification,
-    refetch,
+    stats,
+    isLoading: isLoading || isNotificationsLoading || isStatsLoading,
+    error: notificationsError || statsError,
+    createMassNotification,
+    refetchNotifications,
+    refetchStats,
   };
-};
+}

@@ -1,92 +1,92 @@
 
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { AddGroupMemberData } from '@/lib/api/types';
 
-export const useGroupMembers = (groupId: string) => {
+export function useGroupMembers(groupId?: string) {
+  const [isLoading, setIsLoading] = useState(false);
   const queryClient = useQueryClient();
-  const [error, setError] = useState<string | null>(null);
 
+  // Fetch group members
   const {
     data: members = [],
-    isLoading,
-    isError,
-    refetch,
+    isLoading: isMembersLoading,
+    error: membersError,
+    refetch: refetchMembers,
   } = useQuery({
-    queryKey: ['notificationGroups', groupId, 'members'],
-    queryFn: async () => {
-      try {
-        const response = await api.notifications.groups.getGroupMembers(groupId);
-        return response;
-      } catch (err) {
-        console.error('Error fetching group members:', err);
-        setError('Failed to load group members');
-        return [];
-      }
-    },
+    queryKey: ['groupMembers', groupId],
+    queryFn: () => api.notifications.groups.getGroupMembers(groupId!),
+    enabled: !!groupId,
   });
 
+  // Add members mutation
   const addMembersMutation = useMutation({
-    mutationFn: async (data: AddGroupMemberData) => {
-      try {
-        return await api.notifications.groups.addGroupMembers(data);
-      } catch (err) {
-        console.error('Error adding group members:', err);
-        throw new Error('Failed to add members to group');
-      }
-    },
+    mutationFn: (data: AddGroupMemberData) => 
+      api.notifications.groups.addGroupMembers(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notificationGroups', groupId, 'members'] });
-      toast.success('Members added to group successfully');
+      toast.success('Members added successfully');
+      queryClient.invalidateQueries({ queryKey: ['groupMembers', groupId] });
     },
-    onError: (error) => {
-      toast.error(error.message || 'Failed to add members to group');
-      setError(error.message || 'Failed to add members to group');
+    onError: (error: Error) => {
+      toast.error(`Failed to add members: ${error.message}`);
     },
   });
 
+  // Remove member mutation
   const removeMemberMutation = useMutation({
-    mutationFn: async (memberId: string) => {
-      try {
-        return await api.notifications.groups.removeGroupMember(groupId, memberId);
-      } catch (err) {
-        console.error('Error removing group member:', err);
-        throw new Error('Failed to remove member from group');
-      }
-    },
+    mutationFn: (memberId: string) => 
+      api.notifications.groups.removeGroupMember(groupId!, memberId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notificationGroups', groupId, 'members'] });
-      toast.success('Member removed from group successfully');
+      toast.success('Member removed successfully');
+      queryClient.invalidateQueries({ queryKey: ['groupMembers', groupId] });
     },
-    onError: (error) => {
-      toast.error(error.message || 'Failed to remove member from group');
-      setError(error.message || 'Failed to remove member from group');
+    onError: (error: Error) => {
+      toast.error(`Failed to remove member: ${error.message}`);
     },
   });
 
-  const addMembers = useCallback(
-    (memberIds: string[], memberType: string) => {
-      addMembersMutation.mutate({ groupId, memberIds, memberType });
-    },
-    [groupId, addMembersMutation]
-  );
+  // Add members function
+  const addMembers = async (memberIds: string[], memberType: string) => {
+    if (!groupId) {
+      toast.error('No group selected');
+      return;
+    }
 
-  const removeMember = useCallback(
-    (memberId: string) => {
-      removeMemberMutation.mutate(memberId);
-    },
-    [removeMemberMutation]
-  );
+    setIsLoading(true);
+    try {
+      await addMembersMutation.mutateAsync({
+        groupId,
+        memberIds,
+        memberType,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Remove member function
+  const removeMember = async (memberId: string) => {
+    if (!groupId) {
+      toast.error('No group selected');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await removeMemberMutation.mutateAsync(memberId);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return {
     members,
-    isLoading,
-    isError,
-    error,
+    isLoading: isLoading || isMembersLoading,
+    error: membersError,
     addMembers,
     removeMember,
-    refetch,
+    refetchMembers,
   };
-};
+}

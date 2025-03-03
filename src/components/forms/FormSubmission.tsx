@@ -1,321 +1,267 @@
 
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
-import { api } from '@/lib/api';
-import { Category, Column, FormData } from '@/lib/api/types';
-import { useFormValidation } from '@/hooks/useFormValidation';
-import { useValidatedFormSubmission } from '@/hooks/useValidatedFormSubmission';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import { cn } from "@/lib/utils"
-import { format } from "date-fns"
-import { CalendarIcon } from "lucide-react";
-import { Calendar } from "@/components/ui/calendar";
+import React, { useState, useEffect } from "react";
+import { z } from "zod";
+import { useFormValidation } from "@/hooks/useFormValidation";
+import { useValidatedFormSubmission } from "@/hooks/useValidatedFormSubmission";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface FormSubmissionProps {
-  onComplete?: (formData: FormData) => void;
+  categoryId: string;
+  schoolId?: string;
+  onSuccess?: () => void;
+  initialData?: any;
+  id?: string;
 }
 
-const FormSubmission: React.FC<FormSubmissionProps> = ({ onComplete }) => {
-  const { categoryId, formDataId } = useParams<{ categoryId?: string; formDataId?: string }>();
-  const navigate = useNavigate();
-  const [category, setCategory] = useState<Category>({
-    id: '',
-    name: '',
-    regionId: '',
-    sectorId: '',
-    schoolId: '',
-    description: '',
-    createdAt: '',
-    updatedAt: '',
-    createdBy: '',
-    columns: []
-  });
-  const [columns, setColumns] = useState<Column[]>([]);
-  const [formData, setFormData] = useState<FormData>({
-    id: '',
-    categoryId: '',
-    schoolId: '',
-    data: {},
-    status: 'draft',
-    createdAt: '',
-    updatedAt: ''
-  });
-  const [formValues, setFormValues] = useState<Record<string, any>>({});
-  const [formAction, setFormAction] = useState<'draft' | 'submit'>('draft');
-  const [showErrors, setShowErrors] = useState(false);
-  const [date, setDate] = useState<Date | undefined>(new Date());
+export const FormSubmission = ({
+  categoryId,
+  schoolId,
+  onSuccess,
+  initialData,
+  id,
+}: FormSubmissionProps) => {
+  const [formData, setFormData] = useState<Record<string, any>>(initialData || {});
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const { 
+    errors, 
+    isValid, 
+    validateForm, 
+    generateSchemaFromColumns,
+    validationSchema,
+    setValidationSchema,
+    clearErrors
+  } = useFormValidation();
   
-  // Use our hooks and define our own error state to avoid property conflicts
-  const { errors, isValid, validateForm } = useFormValidation(categoryId || '');
-  const { submitFormData, error, isSubmitting, clearError } = useValidatedFormSubmission(categoryId || '');
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const {
+    submitFormData,
+    error: submissionError,
+    isSubmitting,
+    clearError
+  } = useValidatedFormSubmission();
 
+  // Load validation schema when component mounts
   useEffect(() => {
-    if (categoryId) {
-      fetchCategoryDetails();
-    }
-    if (formDataId) {
-      fetchFormData();
-    }
-  }, [categoryId, formDataId]);
-
-  useEffect(() => {
-    if (formData.data) {
-      setFormValues(formData.data);
-    }
-  }, [formData]);
-
-  const fetchCategoryDetails = async () => {
-    try {
-      if (categoryId) {
-        const categoryData = await api.categories.getById(categoryId);
-        if (categoryData) {
-          setCategory(categoryData);
-          
-          // Also fetch columns for this category
-          const columnsData = await api.categories.getCategoryColumns(categoryId);
-          setColumns(columnsData);
-        }
+    const loadSchema = async () => {
+      const schema = await generateSchemaFromColumns(categoryId);
+      if (schema) {
+        setValidationSchema(schema);
       }
-    } catch (error) {
-      console.error('Error fetching category details:', error);
-    }
-  };
-
-  const fetchFormData = async () => {
-    try {
-      if (formDataId) {
-        const response = await api.formData.getFormDataById(formDataId);
-        if (response) {
-          setFormData(response);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching form data:', error);
-    }
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>, column: Column) => {
-    const { name, value } = e.target;
+    };
     
-    // Get the input type based on the element
-    const inputElement = e.target as HTMLInputElement;
-    const type = inputElement.type;
+    loadSchema();
     
-    let parsedValue: any = value;
-
-    // Handle different input types
-    if (type === 'number') {
-      parsedValue = value ? Number(value) : '';
-    } else if (type === 'checkbox') {
-      parsedValue = inputElement.checked;
-    }
-
-    setFormValues(prev => ({
-      ...prev,
-      [name]: parsedValue,
-    }));
-  };
-
-  const handleDateChange = (name: string, date: Date | undefined) => {
-    if (date) {
-      setFormValues(prev => ({
-        ...prev,
-        [name]: date.toISOString(),
-      }));
-    }
-  };
-
-  const handleSelectChange = (name: string, value: string) => {
-    setFormValues(prev => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
+    return () => {
+      clearErrors();
+      clearError();
+    };
+  }, [categoryId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate form data
-    const validationResult = validateForm(formValues);
-    setValidationErrors(validationResult.errors);
+    if (!validationSchema) {
+      toast.error("Validation schema is not loaded");
+      return;
+    }
+
+    const validationResult = validateForm(formData, validationSchema);
     
     if (!validationResult.isValid) {
-      setShowErrors(true);
       return;
     }
     
     try {
-      const submissionData = {
-        categoryId: categoryId || '',
-        schoolId: formData.schoolId || '',
-        data: formValues,
-        status: formAction === 'submit' ? 'submitted' : 'draft',
-        ...(formAction === 'submit' ? { submittedAt: new Date().toISOString() } : {})
-      };
+      const result = await submitFormData(formData, validationSchema, {
+        categoryId,
+        schoolId: schoolId || "",
+        id,
+        isUpdate: !!id
+      });
       
-      let result;
-      
-      if (formDataId) {
-        // Update existing form
-        result = await submitFormData(
-          submissionData, 
-          { categoryId: categoryId || '', id: formDataId, isUpdate: true }
-        );
-      } else {
-        // Create new form
-        result = await submitFormData(
-          submissionData, 
-          { categoryId: categoryId || '' }
-        );
-      }
-      
-      if (result) {
-        toast.success(
-          formAction === 'submit'
-            ? 'Form submitted successfully!'
-            : 'Form saved as draft.'
-        );
-        
-        if (onComplete) {
-          onComplete(result);
-        } else {
-          navigate(-1);
+      if (result?.success) {
+        toast.success("Form submitted successfully");
+        setIsSubmitted(true);
+        if (onSuccess) {
+          onSuccess();
         }
       }
     } catch (error) {
-      console.error('Form submission error:', error);
-      toast.error('An error occurred while saving the form.');
+      console.error("Form submission error:", error);
+      toast.error("Failed to submit form");
     }
   };
 
-  const handleSaveDraft = () => {
-    setFormAction('draft');
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
+    let finalValue = value;
+    
+    // Handle different input types
+    if (type === 'checkbox') {
+      finalValue = (e.target as HTMLInputElement).checked;
+    } else if (type === 'number') {
+      finalValue = value === '' ? '' : Number(value);
+    }
+    
+    setFormData({ ...formData, [name]: finalValue });
+    clearErrors();
   };
 
-  const handleFinalSubmit = () => {
-    setFormAction('submit');
+  // If validation schema is not loaded yet, show a loading message
+  if (!validationSchema) {
+    return <div>Loading form...</div>;
+  }
+
+  // If form is submitted successfully and no error, show success message
+  if (isSubmitted && !submissionError) {
+    return (
+      <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+        <h3 className="text-green-700 font-medium">Form Submitted Successfully</h3>
+        <p className="text-green-600">Thank you for your submission.</p>
+        <Button 
+          onClick={() => {
+            setFormData({});
+            setIsSubmitted(false);
+          }} 
+          className="mt-4"
+        >
+          Submit Another
+        </Button>
+      </div>
+    );
+  }
+
+  // Dynamically generate form fields based on validation schema
+  const renderFormFields = () => {
+    if (!validationSchema) return null;
+    
+    const fields = Object.keys(validationSchema.shape);
+    
+    return fields.map((fieldName) => {
+      const error = errors[fieldName];
+      let inputField;
+      
+      // Determine field type from schema
+      const fieldType = determineFieldType(fieldName, validationSchema);
+      
+      switch (fieldType) {
+        case "text":
+          inputField = (
+            <input
+              type="text"
+              id={fieldName}
+              name={fieldName}
+              value={formData[fieldName] || ""}
+              onChange={handleChange}
+              className={`w-full p-2 border rounded ${error ? "border-red-500" : "border-gray-300"}`}
+            />
+          );
+          break;
+        case "number":
+          inputField = (
+            <input
+              type="number"
+              id={fieldName}
+              name={fieldName}
+              value={formData[fieldName] || ""}
+              onChange={handleChange}
+              className={`w-full p-2 border rounded ${error ? "border-red-500" : "border-gray-300"}`}
+            />
+          );
+          break;
+        case "boolean":
+          inputField = (
+            <input
+              type="checkbox"
+              id={fieldName}
+              name={fieldName}
+              checked={formData[fieldName] || false}
+              onChange={handleChange}
+              className={`p-2 border rounded ${error ? "border-red-500" : "border-gray-300"}`}
+            />
+          );
+          break;
+        case "select":
+          inputField = (
+            <select
+              id={fieldName}
+              name={fieldName}
+              value={formData[fieldName] || ""}
+              onChange={handleChange}
+              className={`w-full p-2 border rounded ${error ? "border-red-500" : "border-gray-300"}`}
+            >
+              <option value="">Select...</option>
+              {/* We would need options from schema here */}
+            </select>
+          );
+          break;
+        default:
+          inputField = (
+            <input
+              type="text"
+              id={fieldName}
+              name={fieldName}
+              value={formData[fieldName] || ""}
+              onChange={handleChange}
+              className={`w-full p-2 border rounded ${error ? "border-red-500" : "border-gray-300"}`}
+            />
+          );
+      }
+      
+      return (
+        <div key={fieldName} className="mb-4">
+          <label htmlFor={fieldName} className="block mb-1 font-medium">
+            {fieldName.charAt(0).toUpperCase() + fieldName.slice(1).replace(/([A-Z])/g, ' $1')}
+          </label>
+          {inputField}
+          {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+        </div>
+      );
+    });
   };
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-3xl mx-auto mt-8 space-y-6">
-      <h2 className="text-2xl font-bold">{category.name}</h2>
-      <p className="text-gray-600">Fill out the form below to submit your data.</p>
-
-      {columns.map(column => (
-        <div key={column.id} className="space-y-2">
-          <Label htmlFor={column.name}>{column.name} {column.required && <span className="text-red-500">*</span>}</Label>
-          
-          {column.type === 'text' && (
-            <Input
-              type="text"
-              id={column.name}
-              name={column.name}
-              value={formValues[column.name] || ''}
-              onChange={(e) => handleChange(e, column)}
-              required={column.required}
-              aria-invalid={showErrors && validationErrors[column.name] ? 'true' : 'false'}
-            />
-          )}
-
-          {column.type === 'number' && (
-            <Input
-              type="number"
-              id={column.name}
-              name={column.name}
-              value={formValues[column.name] || ''}
-              onChange={(e) => handleChange(e, column)}
-              required={column.required}
-              aria-invalid={showErrors && validationErrors[column.name] ? 'true' : 'false'}
-            />
-          )}
-
-          {column.type === 'date' && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant={"outline"}
-                  className={cn(
-                    "w-[280px] justify-start text-left font-normal",
-                    !date && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {formValues[column.name] 
-                    ? format(new Date(formValues[column.name]), "PPP") 
-                    : <span>Pick a date</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={formValues[column.name] ? new Date(formValues[column.name]) : undefined}
-                  onSelect={(date) => handleDateChange(column.name, date)}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          )}
-
-          {column.type === 'select' && column.options && (
-            <Select 
-              value={formValues[column.name] || ''} 
-              onValueChange={(value) => handleSelectChange(column.name, value)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select an option" />
-              </SelectTrigger>
-              <SelectContent>
-                {column.options.map(option => (
-                  <SelectItem key={option} value={option}>{option}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          {column.type === 'textarea' && (
-            <Textarea
-              id={column.name}
-              name={column.name}
-              value={formValues[column.name] || ''}
-              onChange={(e) => handleChange(e, column)}
-              required={column.required}
-              aria-invalid={showErrors && validationErrors[column.name] ? 'true' : 'false'}
-            />
-          )}
-
-          {showErrors && validationErrors[column.name] && (
-            <p className="text-red-500 text-sm">{validationErrors[column.name]}</p>
-          )}
-        </div>
-      ))}
-
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded">
-          {error}
+    <div className="w-full max-w-2xl mx-auto">
+      {submissionError && (
+        <div className="p-4 mb-4 bg-red-50 border border-red-200 rounded-md">
+          <p className="text-red-700">{submissionError}</p>
         </div>
       )}
-
-      <div className="flex justify-between">
-        <Button type="button" variant="secondary" onClick={handleSaveDraft} disabled={isSubmitting}>
-          Save as Draft
-        </Button>
-        <Button type="submit" disabled={isSubmitting} onClick={handleFinalSubmit}>
-          {isSubmitting ? 'Submitting...' : 'Submit Form'}
-        </Button>
-      </div>
-    </form>
+      
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {renderFormFields()}
+        
+        <div className="flex justify-end">
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            {isSubmitting ? "Submitting..." : "Submit"}
+          </Button>
+        </div>
+      </form>
+    </div>
   );
 };
 
-export default FormSubmission;
+// Helper function to determine field type from schema
+const determineFieldType = (fieldName: string, schema: z.ZodObject<any>) => {
+  try {
+    // This is a simple implementation - might need more sophisticated logic
+    // depending on your schema structure
+    const fieldSchema = schema.shape[fieldName];
+    if (fieldSchema._def?.typeName === "ZodNumber") {
+      return "number";
+    } else if (fieldSchema._def?.typeName === "ZodBoolean") {
+      return "boolean";
+    } else if (fieldSchema._def?.typeName === "ZodEnum") {
+      return "select";
+    } else {
+      return "text";
+    }
+  } catch (error) {
+    console.error(`Error determining field type for ${fieldName}:`, error);
+    return "text";
+  }
+};

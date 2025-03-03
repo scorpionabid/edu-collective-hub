@@ -1,73 +1,44 @@
 
-import { useState, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
-import { NotificationStats } from '@/lib/api/types';
 
-export const useNotificationRecipients = (notificationId?: string) => {
-  const queryClient = useQueryClient();
-  const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState<NotificationStats>({
-    total: 0,
-    sent: 0,
-    pending: 0,
-    failed: 0,
-    read: 0,
-    totalSent: 0,
-    delivered: 0
-  });
+export function useNotificationRecipients() {
+  const [isLoading, setIsLoading] = useState(false);
 
+  // Fetch all school admins
   const {
-    data: recipients = [],
-    isLoading,
-    isError,
-    refetch,
+    data: schoolAdmins = [],
+    isLoading: isSchoolAdminsLoading,
   } = useQuery({
-    queryKey: ['notificationRecipients', notificationId],
+    queryKey: ['schoolAdmins'],
     queryFn: async () => {
-      if (!notificationId) return [];
-      try {
-        const response = await api.notifications.mass.getNotificationRecipients(notificationId);
-        return response;
-      } catch (err) {
-        console.error('Error fetching notification recipients:', err);
-        setError('Failed to load recipients');
-        return [];
-      }
+      // This is a mock function for now
+      // In a real app, this would come from a proper API endpoint
+      return [
+        { id: 'admin1', name: 'Admin 1', email: 'admin1@example.com' },
+        { id: 'admin2', name: 'Admin 2', email: 'admin2@example.com' },
+      ];
     },
-    enabled: !!notificationId,
   });
 
-  useEffect(() => {
-    if (notificationId) {
-      const fetchStats = async () => {
-        try {
-          const response = await api.notifications.mass.getNotificationStats(notificationId);
-          setStats({
-            total: response.total,
-            sent: response.sent,
-            pending: response.pending,
-            failed: response.failed,
-            read: response.read,
-            totalSent: response.totalSent,
-            delivered: response.delivered
-          });
-        } catch (err) {
-          console.error('Error fetching notification stats:', err);
-        }
-      };
-      
-      fetchStats();
-    }
-  }, [notificationId]);
+  // Fetch notification stats
+  const {
+    data: stats,
+    isLoading: isStatsLoading,
+    error: statsError,
+    refetch: refetchStats,
+  } = useQuery({
+    queryKey: ['notificationStats'],
+    queryFn: () => api.notifications.mass.getNotificationStats(),
+  });
 
   return {
-    recipients,
+    schoolAdmins,
     stats,
-    isLoading,
-    isError,
-    error,
-    refetch,
+    isLoading: isLoading || isSchoolAdminsLoading || isStatsLoading,
+    error: statsError,
+    refetchStats,
   };
-};
+}

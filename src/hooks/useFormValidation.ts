@@ -2,7 +2,7 @@
 import { useState, useCallback } from 'react';
 import { z } from 'zod';
 import { api } from '@/lib/api';
-import { Column, ValidationRule } from '@/lib/api/types';
+import { Column, ValidationRule, ValidationTextOptions } from '@/lib/api/types';
 import { toast } from 'sonner';
 
 export type ValidationErrors = Record<string, string>;
@@ -48,51 +48,68 @@ export const useFormValidation = () => {
       columns.forEach((column) => {
         if (column.type === 'text') {
           // Properly handle the label property here using the updated ValidationTextOptions type
-          schemaObj[column.name] = z.string({
+          const options: ValidationTextOptions = {
+            required: column.required,
+            label: column.name
+          };
+          
+          let textSchema = z.string({
             required_error: `${column.name} is required`,
             invalid_type_error: `${column.name} must be a string`
           });
           
           if (column.required) {
-            schemaObj[column.name] = schemaObj[column.name].min(1, {
+            textSchema = textSchema.min(1, {
               message: `${column.name} is required`
             });
+            schemaObj[column.name] = textSchema;
           } else {
-            schemaObj[column.name] = schemaObj[column.name].optional();
+            schemaObj[column.name] = textSchema.optional();
           }
         } else if (column.type === 'number') {
-          schemaObj[column.name] = column.required 
-            ? z.number({
-                required_error: `${column.name} is required`,
-                invalid_type_error: `${column.name} must be a number`
-              })
-            : z.number().optional();
+          if (column.required) {
+            schemaObj[column.name] = z.number({
+              required_error: `${column.name} is required`,
+              invalid_type_error: `${column.name} must be a number`
+            });
+          } else {
+            schemaObj[column.name] = z.number().optional();
+          }
         } else if (column.type === 'boolean') {
-          schemaObj[column.name] = column.required
-            ? z.boolean({
-                required_error: `${column.name} is required`,
-                invalid_type_error: `${column.name} must be a boolean`
-              })
-            : z.boolean().optional();
+          if (column.required) {
+            schemaObj[column.name] = z.boolean({
+              required_error: `${column.name} is required`,
+              invalid_type_error: `${column.name} must be a boolean`
+            });
+          } else {
+            schemaObj[column.name] = z.boolean().optional();
+          }
         } else if (column.type === 'date') {
-          schemaObj[column.name] = column.required
-            ? z.string({
-                required_error: `${column.name} is required`,
-              }).regex(/^\d{4}-\d{2}-\d{2}$/, {
+          if (column.required) {
+            schemaObj[column.name] = z.string({
+              required_error: `${column.name} is required`,
+            }).regex(/^\d{4}-\d{2}-\d{2}$/, {
+              message: `${column.name} must be a valid date in YYYY-MM-DD format`
+            });
+          } else {
+            schemaObj[column.name] = z.string()
+              .regex(/^\d{4}-\d{2}-\d{2}$/, {
                 message: `${column.name} must be a valid date in YYYY-MM-DD format`
               })
-            : z.string()
-                .regex(/^\d{4}-\d{2}-\d{2}$/, {
-                  message: `${column.name} must be a valid date in YYYY-MM-DD format`
-                })
-                .optional();
+              .optional();
+          }
         } else if (column.type === 'select' && column.options) {
-          schemaObj[column.name] = column.required
-            ? z.enum([...column.options as string[]] as [string, ...string[]], {
+          const options = column.options as string[];
+          if (options.length > 0) {
+            if (column.required) {
+              schemaObj[column.name] = z.enum([...options] as [string, ...string[]], {
                 required_error: `${column.name} is required`,
                 invalid_type_error: `${column.name} must be one of the allowed values`
-              })
-            : z.enum([...column.options as string[]] as [string, ...string[]]).optional();
+              });
+            } else {
+              schemaObj[column.name] = z.enum([...options] as [string, ...string[]]).optional();
+            }
+          }
         }
       });
       

@@ -61,3 +61,35 @@ export interface MassNotification {
   createdAt: string;
   createdBy?: string;
 }
+
+// Basic notification types
+export interface Notification {
+  id: string;
+  title: string;
+  body: string;
+  isRead: boolean;
+  notificationType: string;
+  userId: string;
+  createdAt: string;
+  readAt?: string;
+  actionUrl?: string;
+  data?: Record<string, any>;
+}
+
+export interface NotificationPreference {
+  id: string;
+  userId: string;
+  notificationType: string;
+  isEnabled: boolean;
+  channelId?: string;
+  quietHoursStart?: string;
+  quietHoursEnd?: string;
+}
+
+export interface NotificationChannel {
+  id: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+  createdAt: string;
+}
