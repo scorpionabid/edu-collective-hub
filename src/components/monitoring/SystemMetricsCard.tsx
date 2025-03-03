@@ -10,7 +10,7 @@ import {
   Users, 
   Activity, 
   Server, 
-  Ram, 
+  Memory, 
   Network 
 } from 'lucide-react';
 
@@ -38,7 +38,7 @@ export function SystemMetricsCard({
         return <HardDrive size={24} />;
       case 'Memory':
       case 'Ram':
-        return <Ram size={24} />;
+        return <Memory size={24} />;
       case 'Users':
         return <Users size={24} />;
       case 'Activity':
