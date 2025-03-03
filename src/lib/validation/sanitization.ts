@@ -1,94 +1,92 @@
 
-import { z } from 'zod';
 import DOMPurify from 'dompurify';
+import { z } from 'zod';
 
-// Options for HTML sanitization
 interface SanitizeHtmlOptions {
   allowedTags?: string[];
-  allowedAttributes?: { [key: string]: string[] };
-  allowedClasses?: { [key: string]: string[] };
-  dropDisallowedElements?: boolean;
-  stripIgnoreTag?: boolean;
+  allowedAttrs?: string[];
+  forbiddenTags?: string[];
+  forbiddenAttrs?: string[];
 }
 
-// Basic sanitization for all text inputs
-export const sanitizeText = (text: string): string => {
-  return DOMPurify.sanitize(text, {
-    USE_PROFILES: { html: false },
-  });
-};
-
-// HTML sanitization with configurable options
-export const sanitizeHtml = (html: string, options?: SanitizeHtmlOptions): string => {
-  // Configure DOMPurify based on options
+/**
+ * Sanitizes HTML content to prevent XSS attacks
+ */
+export function sanitizeHtml(html: string, options?: SanitizeHtmlOptions): string {
   const config: DOMPurify.Config = {
     USE_PROFILES: { html: true },
     ALLOWED_TAGS: options?.allowedTags || [
-      'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'a', 'ul', 'ol', 'li',
-      'b', 'i', 'strong', 'em', 'strike', 'code', 'hr', 'table', 'thead', 'tbody',
-      'tr', 'th', 'td', 'pre', 'blockquote', 'img', 'span',
+      'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'a', 
+      'ul', 'ol', 'li', 'b', 'i', 'strong', 'em', 'strike', 
+      'code', 'hr', 'table', 'thead', 'tbody', 'tr', 'th', 
+      'td', 'pre', 'blockquote', 'img', 'span'
     ],
-    ALLOWED_ATTR: options?.allowedAttributes ? 
-      Object.entries(options.allowedAttributes).flatMap(([tag, attrs]) => attrs) : 
-      ['href', 'name', 'target', 'src', 'alt', 'class', 'id', 'style'],
-    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button'],
-    FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'],
-    DROP_UNWANTED: options?.dropDisallowedElements || false,
-    FORCE_BODY: true,
+    ALLOWED_ATTR: options?.allowedAttrs || [
+      'href', 'name', 'target', 'src', 'alt', 'class', 'id', 'style'
+    ],
+    FORBID_TAGS: options?.forbiddenTags || [
+      'script', 'iframe', 'object', 'embed', 'form', 'input', 'button'
+    ],
+    FORBID_ATTR: options?.forbiddenAttrs || [
+      'onerror', 'onload', 'onclick', 'onmouseover'
+    ],
   };
 
-  // Return sanitized HTML
-  return DOMPurify.sanitize(html, config);
-};
+  // Convert TrustedHTML to string
+  return String(DOMPurify.sanitize(html, config));
+}
 
-// Create a Zod schema for sanitized HTML content
-export const createSanitizedHtmlSchema = (options?: {
+/**
+ * Creates a schema for sanitized HTML content
+ */
+export function createSanitizedHtmlSchema(options?: {
   required?: boolean;
   minLength?: number;
   maxLength?: number;
-  htmlOptions?: SanitizeHtmlOptions;
-  errorMessage?: string;
-}) => {
-  let schema = z.string()
-    .transform(value => sanitizeHtml(value, options?.htmlOptions));
-
+  label?: string;
+  sanitizeOptions?: SanitizeHtmlOptions;
+}) {
+  const label = options?.label || 'HTML content';
+  let schema = z.string().transform(val => sanitizeHtml(val, options?.sanitizeOptions));
+  
   if (options?.minLength) {
     schema = schema.refine(
-      val => val.length >= options.minLength!,
-      { message: `Content must be at least ${options.minLength} characters` }
+      html => html.length >= (options.minLength || 0),
+      { message: `${label} must be at least ${options.minLength} characters` }
     );
   }
-
+  
   if (options?.maxLength) {
     schema = schema.refine(
-      val => val.length <= options.maxLength!,
-      { message: `Content cannot exceed ${options.maxLength} characters` }
+      html => html.length <= (options.maxLength || 0),
+      { message: `${label} must be no more than ${options.maxLength} characters` }
     );
   }
-
-  if (options?.required) {
-    schema = schema.refine(
-      val => val.trim().length > 0,
-      { message: options.errorMessage || 'This field is required' }
-    );
-  }
-
-  if (!options?.required) {
-    return z.union([z.literal(''), schema]).optional();
-  }
-
-  return schema;
-};
-
-// Function to sanitize all string fields in an object
-export function sanitizeObject<T extends Record<string, any>>(obj: T): T {
-  const result = { ...obj };
   
-  for (const key in result) {
-    if (typeof result[key] === 'string') {
-      result[key] = sanitizeText(result[key] as string) as unknown as T[keyof T];
-    } else if (typeof result[key] === 'object' && result[key] !== null) {
-      result[key] = sanitizeObject(result[key]) as unknown as T[keyof T];
+  if (options?.required !== false) {
+    schema = schema.refine(
+      html => html.trim().length > 0,
+      { message: `${label} is required` }
+    );
+  } else {
+    schema = schema.optional();
+  }
+  
+  return schema;
+}
+
+/**
+ * Sanitize all HTML fields in an object
+ */
+export function sanitizeHtmlFields<T extends Record<string, any>>(
+  data: T,
+  htmlFields: Array<keyof T>
+): T {
+  const result = { ...data };
+  
+  for (const field of htmlFields) {
+    if (typeof result[field] === 'string') {
+      result[field] = sanitizeHtml(result[field] as string) as any;
     }
   }
   

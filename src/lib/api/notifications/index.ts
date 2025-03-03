@@ -1,42 +1,46 @@
 
-import { getNotifications, markAsRead, getUnreadCount, registerDevice, unregisterDevice } from './notifications';
+import { getNotifications, markAsRead, markAllAsRead, getUnreadCount, registerDevice, unregisterDevice } from './notifications';
 import * as groups from './groups';
 import * as mass from './mass';
-import { 
-  Notification,
-  NotificationPreference,
-  NotificationChannel,
-  NotificationGroup,
-  NotificationStats,
-  MassNotification
-} from '../types/notifications';
+import type { Notification, NotificationGroup, MassNotification, NotificationPreference, NotificationChannel, NotificationStats } from '../types/notifications';
 
-// Structure the notifications API
+// Export the notifications API
 export const notifications = {
   // Basic notification functions
   getNotifications,
   getUnreadCount,
   markAsRead,
+  markAllAsRead,
   registerDevice,
   unregisterDevice,
   
-  // Group notifications
+  // Notification groups functions
   groups: {
-    ...groups
+    getAll: groups.getAllGroups,
+    getById: groups.getGroupById,
+    create: groups.createGroup,
+    update: groups.updateGroup,
+    delete: groups.deleteGroup,
+    addMembers: groups.addGroupMembers,
+    getMembers: groups.getGroupMembers,
+    removeMembers: groups.removeGroupMembers
   },
   
-  // Mass notifications
+  // Mass notification functions
   mass: {
-    ...mass
+    getAll: mass.getAllMassNotifications,
+    create: mass.createMassNotification,
+    getRecipients: mass.getNotificationRecipients,
+    getStats: mass.getNotificationStats
   }
 };
 
-// Export the types
+// Re-export types
 export type {
   Notification,
+  NotificationGroup,
+  MassNotification,
   NotificationPreference,
   NotificationChannel,
-  NotificationGroup,
-  NotificationStats,
-  MassNotification
+  NotificationStats
 };

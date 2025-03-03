@@ -1,110 +1,91 @@
 
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
-import { CreateNotificationGroupData, UpdateNotificationGroupData } from '@/lib/api/types';
+import { api } from '@/lib/api';
+import { NotificationGroup } from '@/lib/api/types';
 
-export function useNotificationGroups() {
-  const [isLoading, setIsLoading] = useState(false);
-  const queryClient = useQueryClient();
+export const useNotificationGroups = () => {
+  const [groups, setGroups] = useState<NotificationGroup[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
-  // Fetch notification groups
-  const {
-    data: groups = [],
-    isLoading: isGroupsLoading,
-    error: groupsError,
-    refetch: refetchGroups,
-  } = useQuery({
-    queryKey: ['notificationGroups'],
-    queryFn: () => api.notifications.groups.getNotificationGroups(),
-  });
-
-  // Create notification group mutation
-  const createGroupMutation = useMutation({
-    mutationFn: (data: CreateNotificationGroupData) => 
-      api.notifications.groups.createNotificationGroup(data),
-    onSuccess: () => {
-      toast.success('Group created successfully');
-      queryClient.invalidateQueries({ queryKey: ['notificationGroups'] });
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to create group: ${error.message}`);
-    },
-  });
-
-  // Update notification group mutation
-  const updateGroupMutation = useMutation({
-    mutationFn: (data: UpdateNotificationGroupData) => 
-      api.notifications.groups.updateNotificationGroup(data),
-    onSuccess: () => {
-      toast.success('Group updated successfully');
-      queryClient.invalidateQueries({ queryKey: ['notificationGroups'] });
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to update group: ${error.message}`);
-    },
-  });
-
-  // Delete notification group mutation
-  const deleteGroupMutation = useMutation({
-    mutationFn: (id: string) => 
-      api.notifications.groups.deleteNotificationGroup(id),
-    onSuccess: () => {
-      toast.success('Group deleted successfully');
-      queryClient.invalidateQueries({ queryKey: ['notificationGroups'] });
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to delete group: ${error.message}`);
-    },
-  });
-
-  // Create group function
-  const createGroup = async (data: CreateNotificationGroupData) => {
-    setIsLoading(true);
+  const fetchGroups = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
     try {
-      await createGroupMutation.mutateAsync(data);
-      return true;
-    } catch (error) {
-      return false;
+      const groupsData = await api.notifications.groups.getAll();
+      setGroups(groupsData);
+    } catch (err: any) {
+      setError(err);
+      toast.error('Failed to fetch notification groups');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  };
+  }, []);
 
-  // Update group function
-  const updateGroup = async (data: UpdateNotificationGroupData) => {
-    setIsLoading(true);
+  const createGroup = useCallback(async (groupData: { name: string; description?: string }) => {
+    setLoading(true);
+    setError(null);
+    
     try {
-      await updateGroupMutation.mutateAsync(data);
-      return true;
-    } catch (error) {
-      return false;
+      const newGroup = await api.notifications.groups.create(groupData);
+      setGroups((prevGroups) => [...prevGroups, newGroup]);
+      toast.success('Notification group created successfully');
+      return newGroup;
+    } catch (err: any) {
+      setError(err);
+      toast.error('Failed to create notification group');
+      throw err;
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  };
+  }, []);
 
-  // Delete group function
-  const deleteGroup = async (id: string) => {
-    setIsLoading(true);
+  const updateGroup = useCallback(async (id: string, groupData: { name?: string; description?: string }) => {
+    setLoading(true);
+    setError(null);
+    
     try {
-      await deleteGroupMutation.mutateAsync(id);
-      return true;
-    } catch (error) {
-      return false;
+      const updatedGroup = await api.notifications.groups.update(id, groupData);
+      setGroups((prevGroups) => 
+        prevGroups.map((group) => group.id === id ? updatedGroup : group)
+      );
+      toast.success('Notification group updated successfully');
+      return updatedGroup;
+    } catch (err: any) {
+      setError(err);
+      toast.error('Failed to update notification group');
+      throw err;
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  };
+  }, []);
+
+  const deleteGroup = useCallback(async (id: string) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      await api.notifications.groups.delete(id);
+      setGroups((prevGroups) => prevGroups.filter((group) => group.id !== id));
+      toast.success('Notification group deleted successfully');
+    } catch (err: any) {
+      setError(err);
+      toast.error('Failed to delete notification group');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   return {
     groups,
-    isLoading: isLoading || isGroupsLoading,
-    error: groupsError,
+    loading,
+    error,
+    fetchGroups,
     createGroup,
     updateGroup,
-    deleteGroup,
-    refetchGroups,
+    deleteGroup
   };
-}
+};

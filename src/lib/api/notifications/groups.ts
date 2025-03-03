@@ -1,118 +1,160 @@
 
-import { supabase } from "@/integrations/supabase/client";
-import { NotificationGroup, CreateNotificationGroupData, UpdateNotificationGroupData, AddGroupMemberData } from '../types/notifications';
+import { supabase } from '@/integrations/supabase/client';
+import { NotificationGroup, AddGroupMemberData } from '../types/notifications';
 
-// Get all notification groups
-export const getNotificationGroups = async (): Promise<NotificationGroup[]> => {
+/**
+ * Get all notification groups
+ */
+export const getAllGroups = async (): Promise<NotificationGroup[]> => {
   const { data, error } = await supabase
     .from('notification_groups')
     .select('*')
-    .order('name', { ascending: true });
-
-  if (error) {
-    console.error('Error fetching notification groups:', error);
-    throw new Error(error.message);
-  }
-
-  return data as NotificationGroup[];
+    .order('created_at', { ascending: false });
+  
+  if (error) throw error;
+  
+  // Map the database fields to frontend fields
+  return (data || []).map(group => ({
+    id: group.id,
+    name: group.name,
+    description: group.description,
+    createdAt: group.created_at,
+    updatedAt: group.updated_at,
+    createdBy: group.created_by
+  }));
 };
 
-// Create a new notification group
-export const createNotificationGroup = async (
-  groupData: CreateNotificationGroupData
-): Promise<NotificationGroup> => {
+/**
+ * Get a notification group by ID
+ */
+export const getGroupById = async (id: string): Promise<NotificationGroup> => {
   const { data, error } = await supabase
     .from('notification_groups')
-    .insert([groupData])
+    .select('*')
+    .eq('id', id)
+    .single();
+  
+  if (error) throw error;
+  
+  return {
+    id: data.id,
+    name: data.name,
+    description: data.description,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+    createdBy: data.created_by
+  };
+};
+
+/**
+ * Create a new notification group
+ */
+export const createGroup = async (groupData: { name: string; description?: string }): Promise<NotificationGroup> => {
+  const { data, error } = await supabase
+    .from('notification_groups')
+    .insert({
+      name: groupData.name,
+      description: groupData.description
+    })
     .select()
     .single();
-
-  if (error) {
-    console.error('Error creating notification group:', error);
-    throw new Error(error.message);
-  }
-
-  return data as NotificationGroup;
+  
+  if (error) throw error;
+  
+  return {
+    id: data.id,
+    name: data.name,
+    description: data.description,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+    createdBy: data.created_by
+  };
 };
 
-// Update an existing notification group
-export const updateNotificationGroup = async (
-  groupData: UpdateNotificationGroupData
-): Promise<NotificationGroup> => {
-  const { id, ...updateData } = groupData;
-  
+/**
+ * Update a notification group
+ */
+export const updateGroup = async (id: string, groupData: { name?: string; description?: string }): Promise<NotificationGroup> => {
   const { data, error } = await supabase
     .from('notification_groups')
-    .update(updateData)
+    .update({
+      name: groupData.name,
+      description: groupData.description
+    })
     .eq('id', id)
     .select()
     .single();
-
-  if (error) {
-    console.error('Error updating notification group:', error);
-    throw new Error(error.message);
-  }
-
-  return data as NotificationGroup;
+  
+  if (error) throw error;
+  
+  return {
+    id: data.id,
+    name: data.name,
+    description: data.description,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+    createdBy: data.created_by
+  };
 };
 
-// Delete a notification group
-export const deleteNotificationGroup = async (id: string): Promise<void> => {
+/**
+ * Delete a notification group
+ */
+export const deleteGroup = async (id: string): Promise<void> => {
   const { error } = await supabase
     .from('notification_groups')
     .delete()
     .eq('id', id);
-
-  if (error) {
-    console.error('Error deleting notification group:', error);
-    throw new Error(error.message);
-  }
+  
+  if (error) throw error;
 };
 
-// Get members of a notification group
-export const getGroupMembers = async (groupId: string): Promise<any[]> => {
-  const { data, error } = await supabase
+/**
+ * Add members to a notification group
+ */
+export const addGroupMembers = async (data: AddGroupMemberData): Promise<void> => {
+  const memberEntries = data.memberIds.map(memberId => ({
+    group_id: data.groupId,
+    member_id: memberId,
+    member_type: data.memberType
+  }));
+  
+  const { error } = await supabase
+    .from('notification_group_members')
+    .insert(memberEntries);
+  
+  if (error) throw error;
+};
+
+/**
+ * Get members of a notification group
+ */
+export const getGroupMembers = async (groupId: string, memberType?: string): Promise<any[]> => {
+  let query = supabase
     .from('notification_group_members')
     .select('*')
     .eq('group_id', groupId);
-
-  if (error) {
-    console.error('Error fetching group members:', error);
-    throw new Error(error.message);
+  
+  if (memberType) {
+    query = query.eq('member_type', memberType);
   }
-
-  return data;
+  
+  const { data, error } = await query;
+  
+  if (error) throw error;
+  
+  return data || [];
 };
 
-// Add members to a notification group
-export const addGroupMembers = async (memberData: AddGroupMemberData): Promise<void> => {
-  const { groupId, memberIds, memberType } = memberData;
-
-  const membersToAdd = memberIds.map((memberId) => ({
-    group_id: groupId,
-    member_id: memberId,
-    member_type: memberType,
-  }));
-
-  const { error } = await supabase
-    .from('notification_group_members')
-    .insert(membersToAdd);
-
-  if (error) {
-    console.error('Error adding members to group:', error);
-    throw new Error(error.message);
-  }
-};
-
-// Remove a member from a notification group
-export const removeGroupMember = async (groupId: string, memberId: string): Promise<void> => {
+/**
+ * Remove members from a notification group
+ */
+export const removeGroupMembers = async (groupId: string, memberIds: string[]): Promise<void> => {
   const { error } = await supabase
     .from('notification_group_members')
     .delete()
-    .match({ group_id: groupId, member_id: memberId });
-
-  if (error) {
-    console.error('Error removing member from group:', error);
-    throw new Error(error.message);
-  }
+    .eq('group_id', groupId)
+    .in('member_id', memberIds);
+  
+  if (error) throw error;
 };

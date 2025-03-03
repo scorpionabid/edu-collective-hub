@@ -1,92 +1,73 @@
 
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
+import { api } from '@/lib/api';
 import { AddGroupMemberData } from '@/lib/api/types';
 
-export function useGroupMembers(groupId?: string) {
-  const [isLoading, setIsLoading] = useState(false);
-  const queryClient = useQueryClient();
+export const useGroupMembers = () => {
+  const [members, setMembers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
-  // Fetch group members
-  const {
-    data: members = [],
-    isLoading: isMembersLoading,
-    error: membersError,
-    refetch: refetchMembers,
-  } = useQuery({
-    queryKey: ['groupMembers', groupId],
-    queryFn: () => api.notifications.groups.getGroupMembers(groupId!),
-    enabled: !!groupId,
-  });
-
-  // Add members mutation
-  const addMembersMutation = useMutation({
-    mutationFn: (data: AddGroupMemberData) => 
-      api.notifications.groups.addGroupMembers(data),
-    onSuccess: () => {
-      toast.success('Members added successfully');
-      queryClient.invalidateQueries({ queryKey: ['groupMembers', groupId] });
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to add members: ${error.message}`);
-    },
-  });
-
-  // Remove member mutation
-  const removeMemberMutation = useMutation({
-    mutationFn: (memberId: string) => 
-      api.notifications.groups.removeGroupMember(groupId!, memberId),
-    onSuccess: () => {
-      toast.success('Member removed successfully');
-      queryClient.invalidateQueries({ queryKey: ['groupMembers', groupId] });
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to remove member: ${error.message}`);
-    },
-  });
-
-  // Add members function
-  const addMembers = async (memberIds: string[], memberType: string) => {
-    if (!groupId) {
-      toast.error('No group selected');
-      return;
-    }
-
-    setIsLoading(true);
+  const fetchMembers = useCallback(async (groupId: string, memberType?: string) => {
+    setLoading(true);
+    setError(null);
+    
     try {
-      await addMembersMutation.mutateAsync({
-        groupId,
-        memberIds,
-        memberType,
-      });
+      const membersData = await api.notifications.groups.getMembers(groupId, memberType);
+      setMembers(membersData);
+    } catch (err: any) {
+      setError(err);
+      toast.error('Failed to fetch group members');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  };
+  }, []);
 
-  // Remove member function
-  const removeMember = async (memberId: string) => {
-    if (!groupId) {
-      toast.error('No group selected');
-      return;
-    }
-
-    setIsLoading(true);
+  const addMembers = useCallback(async (data: AddGroupMemberData) => {
+    setLoading(true);
+    setError(null);
+    
     try {
-      await removeMemberMutation.mutateAsync(memberId);
+      await api.notifications.groups.addMembers(data);
+      // Refresh members list
+      const membersData = await api.notifications.groups.getMembers(data.groupId);
+      setMembers(membersData);
+      toast.success('Members added to group successfully');
+    } catch (err: any) {
+      setError(err);
+      toast.error('Failed to add members to group');
+      throw err;
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  };
+  }, []);
+
+  const removeMembers = useCallback(async (groupId: string, memberIds: string[]) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      await api.notifications.groups.removeMembers(groupId, memberIds);
+      // Refresh members list
+      const membersData = await api.notifications.groups.getMembers(groupId);
+      setMembers(membersData);
+      toast.success('Members removed from group successfully');
+    } catch (err: any) {
+      setError(err);
+      toast.error('Failed to remove members from group');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   return {
     members,
-    isLoading: isLoading || isMembersLoading,
-    error: membersError,
+    loading,
+    error,
+    fetchMembers,
     addMembers,
-    removeMember,
-    refetchMembers,
+    removeMembers
   };
-}
+};

@@ -1,44 +1,52 @@
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
+import { api } from '@/lib/api';
 
-export function useNotificationRecipients() {
-  const [isLoading, setIsLoading] = useState(false);
+interface Recipient {
+  id: string;
+  notificationId: string;
+  recipientType: string;
+  recipientId: string;
+  status: string;
+  createdAt: string;
+}
 
-  // Fetch all school admins
-  const {
-    data: schoolAdmins = [],
-    isLoading: isSchoolAdminsLoading,
-  } = useQuery({
-    queryKey: ['schoolAdmins'],
-    queryFn: async () => {
-      // This is a mock function for now
-      // In a real app, this would come from a proper API endpoint
-      return [
-        { id: 'admin1', name: 'Admin 1', email: 'admin1@example.com' },
-        { id: 'admin2', name: 'Admin 2', email: 'admin2@example.com' },
-      ];
-    },
-  });
+export const useNotificationRecipients = () => {
+  const [recipients, setRecipients] = useState<Recipient[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
-  // Fetch notification stats
-  const {
-    data: stats,
-    isLoading: isStatsLoading,
-    error: statsError,
-    refetch: refetchStats,
-  } = useQuery({
-    queryKey: ['notificationStats'],
-    queryFn: () => api.notifications.mass.getNotificationStats(),
-  });
+  const fetchRecipients = useCallback(async (notificationId: string) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const dbRecipients = await api.notifications.mass.getRecipients(notificationId);
+      
+      // Map DB format to frontend format
+      const formattedRecipients = dbRecipients.map((recipient: any) => ({
+        id: recipient.id,
+        notificationId: recipient.notification_id,
+        recipientType: recipient.recipient_type,
+        recipientId: recipient.recipient_id,
+        status: recipient.status,
+        createdAt: recipient.created_at
+      }));
+      
+      setRecipients(formattedRecipients);
+    } catch (err: any) {
+      setError(err);
+      toast.error('Failed to fetch notification recipients');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   return {
-    schoolAdmins,
-    stats,
-    isLoading: isLoading || isSchoolAdminsLoading || isStatsLoading,
-    error: statsError,
-    refetchStats,
+    recipients,
+    loading,
+    error,
+    fetchRecipients
   };
-}
+};

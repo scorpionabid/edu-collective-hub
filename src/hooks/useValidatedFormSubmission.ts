@@ -1,81 +1,86 @@
 
 import { useState } from 'react';
-import { ZodType } from 'zod';
 import { api } from '@/lib/api';
-import { toast } from 'sonner';
+import { z } from 'zod';
 import { FormData } from '@/lib/api/types';
 
-interface SubmitOptions {
+interface SubmissionOptions {
   categoryId: string;
-  schoolId?: string;
+  schoolId: string;
   id?: string;
   isUpdate?: boolean;
 }
 
-export const useValidatedFormSubmission = () => {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
+interface SubmissionResult {
+  success: boolean;
+  message?: string;
+  data?: FormData;
+}
 
-  const clearError = () => {
-    setError('');
-  };
+export const useValidatedFormSubmission = () => {
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const clearError = () => setError(null);
 
   const submitFormData = async <T extends Record<string, any>>(
-    data: T,
-    schema: ZodType<any>,
-    options: SubmitOptions
-  ): Promise<{ success: boolean; data?: FormData } | undefined> => {
+    formData: T, 
+    options: SubmissionOptions
+  ): Promise<SubmissionResult | undefined> => {
     setIsSubmitting(true);
-    clearError();
+    setError(null);
 
     try {
-      // Validate data with schema
-      const validationResult = schema.safeParse(data);
-      
-      if (!validationResult.success) {
-        const errorMessage = "Form validation failed";
-        setError(errorMessage);
-        toast.error(errorMessage);
-        return { success: false };
-      }
+      // Submit the data to the API
+      let result;
 
-      let result: FormData;
-
-      // If id is provided, update existing form data
       if (options.isUpdate && options.id) {
+        // Update existing data
         result = await api.formData.updateFormData(options.id, {
-          data: data as Record<string, any>,
+          data: formData,
           status: 'submitted'
         });
-        toast.success('Form updated successfully');
-      } else {
-        // Create new form data
-        // Add required fields to match FormData type
-        const formDataToSubmit: Partial<FormData> = {
-          categoryId: options.categoryId,
-          schoolId: options.schoolId || '',
-          data: data as Record<string, any>,
-          status: 'submitted',
-        };
-        
-        result = await api.formData.createFormData(formDataToSubmit as Omit<FormData, "id">);
-        toast.success('Form submitted successfully');
-      }
 
-      return { success: true, data: result };
-    } catch (error) {
-      console.error('Error submitting form data:', error);
-      let errorMessage = 'Failed to submit form';
-      
-      if (error instanceof Error) {
-        errorMessage = error.message;
+        if (!result) {
+          throw new Error('Failed to update form data');
+        }
+
+        setIsSubmitting(false);
+        return {
+          success: true,
+          message: 'Form data updated successfully',
+          data: result
+        };
+      } else {
+        // Create new data
+        result = await api.formData.createFormData({
+          categoryId: options.categoryId,
+          schoolId: options.schoolId,
+          data: formData,
+          status: 'submitted',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+
+        if (!result) {
+          throw new Error('Failed to submit form data');
+        }
+
+        setIsSubmitting(false);
+        return {
+          success: true,
+          message: 'Form data submitted successfully',
+          data: result
+        };
       }
-      
-      setError(errorMessage);
-      toast.error(errorMessage);
-      return { success: false };
-    } finally {
+    } catch (error: any) {
       setIsSubmitting(false);
+      const errorMessage = error.message || 'An unknown error occurred';
+      setError(errorMessage);
+      return {
+        success: false,
+        message: errorMessage
+      };
     }
   };
 

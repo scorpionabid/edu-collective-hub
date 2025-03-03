@@ -55,7 +55,7 @@ export const FormSubmission = ({
       clearErrors();
       clearError();
     };
-  }, [categoryId]);
+  }, [categoryId, generateSchemaFromColumns, setValidationSchema, clearErrors, clearError]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,14 +65,14 @@ export const FormSubmission = ({
       return;
     }
 
-    const validationResult = validateForm(formData, validationSchema);
+    const validationResult = validateForm(formData);
     
     if (!validationResult.isValid) {
       return;
     }
     
     try {
-      const result = await submitFormData(formData, validationSchema, {
+      const result = await submitFormData(formData, {
         categoryId,
         schoolId: schoolId || "",
         id,
@@ -94,7 +94,7 @@ export const FormSubmission = ({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-    let finalValue = value;
+    let finalValue: any = value;
     
     // Handle different input types
     if (type === 'checkbox') {
@@ -135,14 +135,15 @@ export const FormSubmission = ({
   const renderFormFields = () => {
     if (!validationSchema) return null;
     
-    const fields = Object.keys(validationSchema.shape);
+    // Since validationSchema might not be a ZodObject directly, we need to be cautious
+    const fields = Object.keys(validationSchema instanceof z.ZodObject ? validationSchema.shape : {});
     
     return fields.map((fieldName) => {
       const error = errors[fieldName];
       let inputField;
       
       // Determine field type from schema
-      const fieldType = determineFieldType(fieldName, validationSchema);
+      const fieldType = determineFieldType(fieldName, validationSchema as z.ZodObject<any>);
       
       switch (fieldType) {
         case "text":
@@ -175,7 +176,7 @@ export const FormSubmission = ({
               type="checkbox"
               id={fieldName}
               name={fieldName}
-              checked={formData[fieldName] || false}
+              checked={!!formData[fieldName]}
               onChange={handleChange}
               className={`p-2 border rounded ${error ? "border-red-500" : "border-gray-300"}`}
             />
@@ -250,12 +251,17 @@ const determineFieldType = (fieldName: string, schema: z.ZodObject<any>) => {
   try {
     // This is a simple implementation - might need more sophisticated logic
     // depending on your schema structure
+    if (!schema || !schema.shape) return "text";
+    
     const fieldSchema = schema.shape[fieldName];
-    if (fieldSchema._def?.typeName === "ZodNumber") {
+    if (!fieldSchema) return "text";
+    
+    const typeName = fieldSchema._def?.typeName;
+    if (typeName === "ZodNumber") {
       return "number";
-    } else if (fieldSchema._def?.typeName === "ZodBoolean") {
+    } else if (typeName === "ZodBoolean") {
       return "boolean";
-    } else if (fieldSchema._def?.typeName === "ZodEnum") {
+    } else if (typeName === "ZodEnum") {
       return "select";
     } else {
       return "text";
