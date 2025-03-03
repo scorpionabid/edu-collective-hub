@@ -1,5 +1,5 @@
 
-import React, { createContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useState, useEffect, ReactNode, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { api } from '@/lib/api';
 import type { User, Session } from '@supabase/supabase-js';
@@ -21,6 +21,15 @@ export interface AuthContextType {
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Custom hook for easier context consumption
+export const useAuth = (): AuthContextType => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -129,14 +138,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signUp = async (email: string, password: string, firstName: string, lastName: string) => {
     try {
-      const result = await api.auth.signUp({ 
-        email, 
-        password, 
-        userData: { 
-          firstName, 
-          lastName, 
-          role: 'user' 
-        } 
+      const result = await api.auth.signUp({
+        email,
+        password,
+        userData: {
+          firstName,
+          lastName,
+          role: 'user'
+        }
       });
       
       if (!result.success) {
