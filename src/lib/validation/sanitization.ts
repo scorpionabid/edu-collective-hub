@@ -1,111 +1,105 @@
 
-import * as DOMPurify from 'dompurify';
-import { z } from 'zod';
+import * as z from 'zod';
+import DOMPurify from 'dompurify';
 
-// Configuration profiles for different sanitization levels
-const sanitizationProfiles = {
+// Define HTML profile configurations
+const htmlProfiles = {
   strict: {
-    allowedTags: ['b', 'i', 'em', 'strong', 'a', 'br'],
+    allowedTags: ['p', 'b', 'i', 'em', 'strong'],
     strip: true
   },
   basic: {
-    allowedTags: ['p', 'b', 'i', 'em', 'strong', 'a', 'br', 'ul', 'ol', 'li'],
+    allowedTags: ['p', 'b', 'i', 'em', 'strong', 'a', 'ul', 'ol', 'li'],
     strip: true
   },
   medium: {
-    allowedTags: ['p', 'b', 'i', 'em', 'strong', 'a', 'br', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
+    allowedTags: ['p', 'b', 'i', 'em', 'strong', 'a', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote'],
     strip: true
   },
   rich: {
     allowedTags: [
-      'p', 'b', 'i', 'em', 'strong', 'a', 'br', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-      'blockquote', 'pre', 'code', 'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'
+      'p', 'b', 'i', 'em', 'strong', 'a', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote',
+      'hr', 'br', 'div', 'span', 'code', 'pre', 'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'
     ],
-    allowedAttributes: {
-      'a': ['href', 'title', 'target'],
-      'img': ['src', 'alt', 'title', 'width', 'height']
-    },
     strip: true
   },
-  custom: (config: DOMPurify.Config) => ({
-    ...config,
+  custom: {
+    allowedTags: [],
     strip: true
-  })
-};
-
-// Sanitize HTML content with configurable options
-export const sanitizeHtml = (html: string, profile: keyof typeof sanitizationProfiles = 'strict'): string => {
-  let config = sanitizationProfiles[profile] || sanitizationProfiles.strict;
-  
-  // Apply the sanitization
-  if (typeof config === 'function') {
-    return DOMPurify.sanitize(html, config({}));
   }
-  
-  return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS: config.allowedTags,
-    ...(config.allowedAttributes ? { ALLOWED_ATTR: config.allowedAttributes } : {}),
-    KEEP_CONTENT: config.strip
-  });
 };
 
-// Sanitize plain text (strip all HTML)
-export const sanitizeText = (text: string): string => {
-  const config: DOMPurify.Config = {
-    ALLOWED_TAGS: [],
-    ALLOWED_ATTR: [],
-    KEEP_CONTENT: true
-  };
+// Singleton sanitization service
+const sanitizationService = {
+  // Sanitize HTML content
+  sanitizeHtml: (html: string, profile: keyof typeof htmlProfiles = 'basic'): string => {
+    if (!html) return '';
+    
+    const config = htmlProfiles[profile];
+    
+    // DOMPurify doesn't have sanitize property directly on the imported module
+    // It has the 'sanitize' method
+    return DOMPurify.sanitize(html, {
+      ALLOWED_TAGS: config.allowedTags,
+      KEEP_CONTENT: config.strip
+    });
+  },
   
-  return DOMPurify.sanitize(text, config);
-};
-
-// Create Zod transformers for sanitization
-export const createSanitizedStringSchema = (options?: {
-  required?: boolean;
-  minLength?: number;
-  maxLength?: number;
-  label?: string;
-  allowHtml?: boolean;
-  htmlProfile?: keyof typeof sanitizationProfiles;
-}) => {
-  const { 
-    required = true, 
-    minLength, 
-    maxLength, 
-    label = 'Field',
-    allowHtml = false,
-    htmlProfile = 'strict'
-  } = options || {};
+  // Simple text sanitization for plain text
+  sanitizeText: (text: string): string => {
+    if (!text) return '';
+    // Use DOMPurify with all tags stripped
+    return DOMPurify.sanitize(text, {
+      ALLOWED_TAGS: [],
+      KEEP_CONTENT: true
+    });
+  },
   
-  // Create the base string schema
-  let schema = z.string().transform(val => {
-    return allowHtml ? sanitizeHtml(val, htmlProfile) : sanitizeText(val);
-  });
-  
-  // Add length constraints if provided
-  if (minLength) {
-    schema = schema.refine(
-      (val) => val.length >= minLength,
-      { message: `${label} must be at least ${minLength} characters` }
-    );
+  // Create a Zod schema with sanitization for strings
+  createSanitizedStringSchema: (options?: {
+    required?: boolean;
+    minLength?: number;
+    maxLength?: number;
+    errorMessage?: string;
+    isHtml?: boolean;
+    htmlProfile?: keyof typeof htmlProfiles;
+  }): z.ZodType<string> => {
+    const {
+      required = true,
+      minLength,
+      maxLength,
+      errorMessage = 'Invalid input',
+      isHtml = false,
+      htmlProfile = 'basic'
+    } = options || {};
+    
+    // Start with a base string schema
+    let schema = z.string().transform(val => {
+      return isHtml 
+        ? sanitizationService.sanitizeHtml(val, htmlProfile)
+        : sanitizationService.sanitizeText(val);
+    });
+    
+    // Add validation constraints
+    if (minLength !== undefined) {
+      schema = schema.refine((val) => val.length >= minLength, {
+        message: `Must be at least ${minLength} characters`
+      });
+    }
+    
+    if (maxLength !== undefined) {
+      schema = schema.refine((val) => val.length <= maxLength, {
+        message: `Must be at most ${maxLength} characters`
+      });
+    }
+    
+    // Handle optional fields
+    if (!required) {
+      return z.optional(schema);
+    }
+    
+    return schema;
   }
-  
-  if (maxLength) {
-    schema = schema.refine(
-      (val) => val.length <= maxLength,
-      { message: `${label} must not exceed ${maxLength} characters` }
-    );
-  }
-  
-  // Make it required or optional
-  return required ? schema : schema.optional();
-};
-
-export const sanitizationService = {
-  sanitizeHtml,
-  sanitizeText,
-  createSanitizedStringSchema
 };
 
 export default sanitizationService;
