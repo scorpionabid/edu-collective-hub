@@ -1,4 +1,3 @@
-
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -293,19 +292,9 @@ const Reports = () => {
                     data={getFilteredSortedData()}
                     columns={columns}
                     filters={filters}
+                    setFilters={setFilters}
                     sortConfig={sortConfig}
-                    onSortChange={(columnName) =>
-                      setSortConfig((prev) => ({
-                        key: columnName,
-                        direction:
-                          prev?.key === columnName && prev.direction === "asc"
-                            ? "desc"
-                            : "asc",
-                      }))
-                    }
-                    onFilterChange={(columnName, value) =>
-                      setFilters((prev) => ({ ...prev, [columnName]: value }))
-                    }
+                    setSortConfig={setSortConfig}
                   />
                 )}
 

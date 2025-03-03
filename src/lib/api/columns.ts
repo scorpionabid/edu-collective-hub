@@ -6,7 +6,7 @@ import { Column } from "./types";
 export const columns = {
   getAll: async (categoryId: string) => {
     try {
-      // Execute a direct SQL query
+      // Use rpc function instead of direct table query
       const { data, error } = await supabase
         .rpc('get_columns_by_category', { category_id: categoryId });
       
@@ -29,7 +29,7 @@ export const columns = {
   
   create: async (column: Omit<Column, 'id'>) => {
     try {
-      // Execute a direct SQL insert
+      // Use rpc function instead of direct table insert
       const { data, error } = await supabase
         .rpc('create_column', {
           column_name: column.name,
@@ -44,12 +44,16 @@ export const columns = {
       
       toast.success('Column created successfully');
       
-      return data ? {
-        id: data.id,
-        name: data.name,
-        type: data.type,
-        categoryId: data.category_id
-      } : {
+      if (data) {
+        return {
+          id: data.id,
+          name: data.name,
+          type: data.type,
+          categoryId: data.category_id
+        };
+      }
+      
+      return {
         id: "0",
         name: column.name,
         type: column.type,
@@ -69,7 +73,7 @@ export const columns = {
   
   update: async (id: string, column: Partial<Column>) => {
     try {
-      // Execute a direct SQL update
+      // Use rpc function instead of direct table update
       const updateData: Record<string, any> = { column_id: id };
       if (column.name !== undefined) updateData.column_name = column.name;
       if (column.type !== undefined) updateData.column_type = column.type;
@@ -84,12 +88,16 @@ export const columns = {
       
       toast.success('Column updated successfully');
       
-      return data ? {
-        id: data.id,
-        name: data.name,
-        type: data.type,
-        categoryId: data.category_id
-      } : {
+      if (data) {
+        return {
+          id: data.id,
+          name: data.name,
+          type: data.type,
+          categoryId: data.category_id
+        };
+      }
+      
+      return {
         id,
         name: column.name || "Column",
         type: column.type || "text",
@@ -109,7 +117,7 @@ export const columns = {
   
   delete: async (id: string) => {
     try {
-      // Execute a direct SQL delete
+      // Use rpc function instead of direct table delete
       const { error } = await supabase
         .rpc('delete_column', { column_id: id });
       

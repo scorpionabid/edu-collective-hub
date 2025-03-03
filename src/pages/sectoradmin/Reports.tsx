@@ -212,19 +212,9 @@ const SectorReports = () => {
                     data={getFilteredSortedData()}
                     columns={columns}
                     filters={filters}
-                    onFilterChange={(columnName, value) =>
-                      setFilters((prev) => ({ ...prev, [columnName]: value }))
-                    }
+                    setFilters={setFilters}
                     sortConfig={sortConfig}
-                    onSortChange={(columnName) =>
-                      setSortConfig((prev) => ({
-                        key: columnName,
-                        direction:
-                          prev?.key === columnName && prev.direction === "asc"
-                            ? "desc"
-                            : "asc",
-                      }))
-                    }
+                    setSortConfig={setSortConfig}
                   />
                 )}
 

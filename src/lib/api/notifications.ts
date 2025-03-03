@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -453,71 +452,30 @@ export const getMassNotificationById = async (id: string): Promise<MassNotificat
 
 export const getNotificationRecipients = async (notificationId: string): Promise<MassNotificationRecipient[]> => {
   try {
-    const { data: recipients, error } = await supabase
+    const { data, error } = await supabase
       .from('mass_notification_recipients')
       .select('*')
       .eq('notification_id', notificationId);
-
+      
     if (error) {
-      toast.error(error.message);
+      console.error('Error fetching notification recipients:', error);
       throw error;
     }
-
-    // Get additional information for each recipient based on their type
-    const enhancedRecipients = await Promise.all(recipients.map(async recipient => {
-      let recipientName = '';
-      
-      try {
-        if (recipient.recipient_type === 'region') {
-          const { data } = await supabase
-            .from('regions')
-            .select('name')
-            .eq('id', recipient.recipient_id)
-            .single();
-          recipientName = data?.name || '';
-        } else if (recipient.recipient_type === 'sector') {
-          const { data } = await supabase
-            .from('sectors')
-            .select('name')
-            .eq('id', recipient.recipient_id)
-            .single();
-          recipientName = data?.name || '';
-        } else if (recipient.recipient_type === 'school') {
-          const { data } = await supabase
-            .from('schools')
-            .select('name')
-            .eq('id', recipient.recipient_id)
-            .single();
-          recipientName = data?.name || '';
-        } else if (recipient.recipient_type === 'profile') {
-          const { data } = await supabase
-            .from('profiles')
-            .select('first_name, last_name')
-            .eq('id', recipient.recipient_id)
-            .single();
-          recipientName = data ? `${data.first_name} ${data.last_name}` : '';
-        }
-      } catch (error) {
-        console.error(`Error fetching name for ${recipient.recipient_type} with ID ${recipient.recipient_id}:`, error);
-      }
-
-      return {
-        id: recipient.id,
-        notificationId: recipient.notification_id,
-        recipientType: recipient.recipient_type as "region" | "sector" | "school" | "profile",
-        recipientId: recipient.recipient_id,
-        recipientName,
-        status: recipient.status,
-        sentAt: recipient.sent_at,
-        readAt: recipient.read_at,
-        createdAt: recipient.created_at
-      };
-    }));
-
-    return enhancedRecipients;
+    
+    // Cast the status field to the correct type
+    return data?.map(recipient => ({
+      id: recipient.id,
+      notificationId: recipient.notification_id,
+      recipientType: recipient.recipient_type as "region" | "sector" | "school" | "profile",
+      recipientId: recipient.recipient_id,
+      recipientName: recipient.recipient_name || '',
+      status: recipient.status as "pending" | "sent" | "failed" | "read",
+      sentAt: recipient.sent_at,
+      readAt: recipient.read_at,
+      createdAt: recipient.created_at
+    })) || [];
   } catch (error) {
-    console.error(`Error fetching recipients for notification ${notificationId}:`, error);
-    toast.error('Bildiriş alıcılarını almaq alınmadı');
+    console.error('Error in getNotificationRecipients:', error);
     return [];
   }
 };

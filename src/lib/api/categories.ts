@@ -6,7 +6,7 @@ import { Category } from "./types";
 export const categories = {
   getAll: async () => {
     try {
-      // Use the type-safe execute() method with explicit SQL
+      // Use the rpc function instead of direct table query
       const { data, error } = await supabase
         .rpc('get_categories_with_columns');
       
@@ -38,7 +38,7 @@ export const categories = {
   
   getById: async (id: string) => {
     try {
-      // Use a function call or execute SQL directly for type safety
+      // Use rpc function instead of direct table query
       const { data, error } = await supabase
         .rpc('get_category_by_id', { category_id: id });
       
@@ -47,7 +47,7 @@ export const categories = {
         throw error;
       }
       
-      if (!data || data.length === 0) {
+      if (!data || !Array.isArray(data) || data.length === 0) {
         return null;
       }
       
@@ -82,7 +82,7 @@ export const categories = {
   
   create: async (category: Omit<Category, 'id' | 'columns'>) => {
     try {
-      // Execute a direct SQL insert for better type safety
+      // Use rpc function instead of direct table insert
       const { data, error } = await supabase
         .rpc('create_category', {
           category_name: category.name,
@@ -98,8 +98,19 @@ export const categories = {
       
       toast.success('Category created successfully');
       
-      return {
-        id: data?.id || "0", 
+      if (data) {
+        return {
+          id: data.id, 
+          name: data.name, 
+          columns: [],
+          regionId: data.region_id || "",
+          sectorId: data.sector_id || "",
+          schoolId: data.school_id || "" 
+        };
+      }
+      
+      return { 
+        id: "0", 
         name: category.name, 
         columns: [],
         regionId: category.regionId || "",
@@ -122,9 +133,9 @@ export const categories = {
   
   update: async (id: string, category: Partial<Category>) => {
     try {
-      // Execute a direct SQL update for better type safety
-      const updateData: Record<string, any> = { id };
-      if (category.name !== undefined) updateData.name = category.name;
+      // Use rpc function instead of direct table update
+      const updateData: Record<string, any> = { category_id: id };
+      if (category.name !== undefined) updateData.category_name = category.name;
       if (category.regionId !== undefined) updateData.region_id = category.regionId;
       if (category.sectorId !== undefined) updateData.sector_id = category.sectorId;
       if (category.schoolId !== undefined) updateData.school_id = category.schoolId;
@@ -138,6 +149,17 @@ export const categories = {
       }
       
       toast.success('Category updated successfully');
+      
+      if (data) {
+        return { 
+          id: data.id, 
+          name: data.name, 
+          columns: [],
+          regionId: data.region_id || "",
+          sectorId: data.sector_id || "",
+          schoolId: data.school_id || "" 
+        };
+      }
       
       return { 
         id, 
@@ -163,7 +185,7 @@ export const categories = {
   
   delete: async (id: string) => {
     try {
-      // Execute a direct SQL delete for better type safety
+      // Use rpc function instead of direct table delete
       const { error } = await supabase
         .rpc('delete_category', { category_id: id });
       

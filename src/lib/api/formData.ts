@@ -6,7 +6,7 @@ import { FormData } from "./types";
 export const formData = {
   getAll: async (schoolId?: string) => {
     try {
-      // Execute a direct SQL query with optional filtering
+      // Use rpc function instead of direct table query
       const params: Record<string, any> = {};
       if (schoolId) params.school_id_filter = schoolId;
       
@@ -36,7 +36,7 @@ export const formData = {
   
   getById: async (id: string) => {
     try {
-      // Execute a direct SQL query by ID
+      // Use rpc function instead of direct table query
       const { data, error } = await supabase
         .rpc('get_form_data_by_id', { form_id: id });
       
@@ -45,7 +45,7 @@ export const formData = {
         throw error;
       }
       
-      if (!data || data.length === 0) {
+      if (!data || !Array.isArray(data) || data.length === 0) {
         return null;
       }
       
@@ -68,7 +68,7 @@ export const formData = {
   
   submit: async (formData: Omit<FormData, 'id'>) => {
     try {
-      // Execute a direct SQL insert
+      // Use rpc function instead of direct table insert
       const { data, error } = await supabase
         .rpc('submit_form_data', {
           category_id: formData.categoryId,
@@ -85,16 +85,20 @@ export const formData = {
       
       toast.success('Form submitted successfully');
       
-      return data ? {
-        id: data.id,
-        categoryId: data.category_id,
-        schoolId: data.school_id,
-        data: data.data,
-        status: data.status,
-        submittedAt: data.submitted_at,
-        approvedAt: data.approved_at,
-        approvedBy: data.approved_by
-      } : {
+      if (data) {
+        return {
+          id: data.id,
+          categoryId: data.category_id,
+          schoolId: data.school_id,
+          data: data.data,
+          status: data.status,
+          submittedAt: data.submitted_at,
+          approvedAt: data.approved_at,
+          approvedBy: data.approved_by
+        };
+      }
+      
+      return {
         id: "0",
         categoryId: formData.categoryId,
         schoolId: formData.schoolId,
@@ -118,7 +122,7 @@ export const formData = {
   
   update: async (id: string, formData: Partial<FormData>) => {
     try {
-      // Execute a direct SQL update
+      // Use rpc function instead of direct table update
       const updateData: Record<string, any> = { form_id: id };
       if (formData.data !== undefined) updateData.form_data = formData.data;
       if (formData.status !== undefined) {
@@ -138,16 +142,20 @@ export const formData = {
       
       toast.success('Form updated successfully');
       
-      return data ? {
-        id: data.id,
-        categoryId: data.category_id,
-        schoolId: data.school_id,
-        data: data.data,
-        status: data.status,
-        submittedAt: data.submitted_at,
-        approvedAt: data.approved_at,
-        approvedBy: data.approved_by
-      } : {
+      if (data) {
+        return {
+          id: data.id,
+          categoryId: data.category_id,
+          schoolId: data.school_id,
+          data: data.data,
+          status: data.status,
+          submittedAt: data.submitted_at,
+          approvedAt: data.approved_at,
+          approvedBy: data.approved_by
+        };
+      }
+      
+      return {
         id,
         categoryId: formData.categoryId || "0",
         schoolId: formData.schoolId || "0",
@@ -169,7 +177,7 @@ export const formData = {
   
   approve: async (id: string, approvedBy: string) => {
     try {
-      // Execute a direct SQL update for approval
+      // Use rpc function instead of direct table update
       const { data, error } = await supabase
         .rpc('approve_form_data', {
           form_id: id,
@@ -183,16 +191,20 @@ export const formData = {
       
       toast.success('Form approved successfully');
       
-      return data ? {
-        id: data.id,
-        categoryId: data.category_id,
-        schoolId: data.school_id,
-        data: data.data,
-        status: data.status,
-        submittedAt: data.submitted_at,
-        approvedAt: data.approved_at,
-        approvedBy: data.approved_by
-      } : null;
+      if (data) {
+        return {
+          id: data.id,
+          categoryId: data.category_id,
+          schoolId: data.school_id,
+          data: data.data,
+          status: data.status,
+          submittedAt: data.submitted_at,
+          approvedAt: data.approved_at,
+          approvedBy: data.approved_by
+        };
+      }
+      
+      return null;
     } catch (error) {
       console.error('Error in approve formData:', error);
       toast.error('Failed to approve form');
@@ -202,7 +214,7 @@ export const formData = {
   
   reject: async (id: string) => {
     try {
-      // Execute a direct SQL update for rejection
+      // Use rpc function instead of direct table update
       const { data, error } = await supabase
         .rpc('reject_form_data', { form_id: id });
       
@@ -213,16 +225,20 @@ export const formData = {
       
       toast.success('Form rejected');
       
-      return data ? {
-        id: data.id,
-        categoryId: data.category_id,
-        schoolId: data.school_id,
-        data: data.data,
-        status: data.status,
-        submittedAt: data.submitted_at,
-        approvedAt: data.approved_at,
-        approvedBy: data.approved_by
-      } : null;
+      if (data) {
+        return {
+          id: data.id,
+          categoryId: data.category_id,
+          schoolId: data.school_id,
+          data: data.data,
+          status: data.status,
+          submittedAt: data.submitted_at,
+          approvedAt: data.approved_at,
+          approvedBy: data.approved_by
+        };
+      }
+      
+      return null;
     } catch (error) {
       console.error('Error in reject formData:', error);
       toast.error('Failed to reject form');

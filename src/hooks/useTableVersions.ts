@@ -12,39 +12,30 @@ export function useTableVersions(tableId: string) {
     enabled: !!tableId
   });
   
-  const currentVersionQuery = useQuery({
-    queryKey: ['currentTableVersion', tableId],
-    queryFn: () => api.versions.getCurrentTableVersion(tableId),
+  const latestVersionQuery = useQuery({
+    queryKey: ['latestTableVersion', tableId],
+    queryFn: () => api.versions.getLatestTableVersion(tableId),
     enabled: !!tableId
   });
   
   const createVersionMutation = useMutation({
-    mutationFn: ({ schema, description }: { schema: any, description?: string }) => 
-      api.versions.createTableVersion(tableId, schema, description),
+    mutationFn: ({ schema, createdBy }: { schema: any, createdBy: string }) => 
+      api.versions.createTableVersion(tableId, schema, createdBy),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tableVersions', tableId] });
-      queryClient.invalidateQueries({ queryKey: ['currentTableVersion', tableId] });
+      queryClient.invalidateQueries({ queryKey: ['latestTableVersion', tableId] });
     }
   });
   
-  const activateVersionMutation = useMutation({
-    mutationFn: (versionId: string) => api.versions.activateTableVersion(versionId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tableVersions', tableId] });
-      queryClient.invalidateQueries({ queryKey: ['currentTableVersion', tableId] });
-    }
-  });
+  // Removed activateVersionMutation since it doesn't exist in API
   
   return {
     versions: versionsQuery.data || [],
-    currentVersion: currentVersionQuery.data || null,
-    isLoading: versionsQuery.isLoading || currentVersionQuery.isLoading,
-    error: versionsQuery.error || currentVersionQuery.error,
-    createVersion: async (schema: any, description?: string) => {
-      await createVersionMutation.mutateAsync({ schema, description });
-    },
-    activateVersion: async (versionId: string) => {
-      await activateVersionMutation.mutateAsync(versionId);
+    currentVersion: latestVersionQuery.data,
+    isLoading: versionsQuery.isLoading || latestVersionQuery.isLoading,
+    error: versionsQuery.error || latestVersionQuery.error,
+    createVersion: async (schema: any, createdBy: string) => {
+      await createVersionMutation.mutateAsync({ schema, createdBy });
     },
     compareVersions: async (versionId1: string, versionId2: string) => {
       return api.versions.compareTableVersions(versionId1, versionId2);

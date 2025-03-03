@@ -13,8 +13,8 @@ export function useFormVersions(formEntryId: string) {
   });
   
   const createVersionMutation = useMutation({
-    mutationFn: ({ tableVersionId, data }: { tableVersionId: string, data: any }) => 
-      api.versions.createFormEntryVersion(formEntryId, tableVersionId, data),
+    mutationFn: ({ tableVersionId, data, createdBy }: { tableVersionId: string, data: any, createdBy: string }) => 
+      api.versions.createFormEntryVersion(formEntryId, tableVersionId, data, createdBy),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['formVersions', formEntryId] });
     }
@@ -24,11 +24,9 @@ export function useFormVersions(formEntryId: string) {
     versions: versionsQuery.data || [],
     isLoading: versionsQuery.isLoading,
     error: versionsQuery.error,
-    createVersion: async (tableVersionId: string, data: any) => {
-      await createVersionMutation.mutateAsync({ tableVersionId, data });
-    },
-    migrateData: async (data: any, fromVersionId: string, toVersionId: string) => {
-      return api.versions.migrateFormData(data, fromVersionId, toVersionId);
+    createVersion: async (tableVersionId: string, data: any, createdBy: string) => {
+      await createVersionMutation.mutateAsync({ tableVersionId, data, createdBy });
     }
+    // Removed migrateData function as it doesn't exist in the API
   };
 }
