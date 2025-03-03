@@ -1,40 +1,40 @@
 
 import { useState } from 'react';
 import { api } from '@/lib/api';
-import { 
-  MassNotification, 
-  CreateMassNotificationData, 
-  GetMassNotificationsParams 
-} from '@/lib/api/types';
+import { MassNotification, CreateMassNotificationData, GetMassNotificationsParams } from '@/lib/api/types';
 
-export const useMassNotifications = () => {
+export function useMassNotifications() {
   const [notifications, setNotifications] = useState<MassNotification[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  const [totalCount, setTotalCount] = useState(0);
 
-  const fetchNotifications = async (params?: GetMassNotificationsParams) => {
+  // Fetch mass notifications with optional filtering
+  const fetchMassNotifications = async (params?: GetMassNotificationsParams) => {
     setLoading(true);
     try {
       const data = await api.notifications.getMassNotifications(params);
       setNotifications(data);
-      return data;
-    } catch (err) {
-      setError(err as Error);
-      throw err;
+      setTotalCount(data.length);
+    } catch (error) {
+      console.error('Error fetching mass notifications:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const createNotification = async (notificationData: CreateMassNotificationData) => {
+  // Create a new mass notification
+  const createMassNotification = async (data: CreateMassNotificationData) => {
     setLoading(true);
     try {
-      const notification = await api.notifications.createMassNotification(notificationData);
-      setNotifications(prev => [notification, ...prev]);
-      return notification;
-    } catch (err) {
-      setError(err as Error);
-      throw err;
+      const result = await api.notifications.createMassNotification(data);
+      // Refresh the list if successful
+      if (result) {
+        await fetchMassNotifications();
+      }
+      return result;
+    } catch (error) {
+      console.error('Error creating mass notification:', error);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -43,8 +43,8 @@ export const useMassNotifications = () => {
   return {
     notifications,
     loading,
-    error,
-    fetchNotifications,
-    createNotification
+    totalCount,
+    fetchMassNotifications,
+    createMassNotification
   };
-};
+}

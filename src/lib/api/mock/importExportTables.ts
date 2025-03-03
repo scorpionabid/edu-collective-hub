@@ -1,35 +1,56 @@
+
 import { ImportJob, ExportJob } from '../types';
 import { supabase } from '@/integrations/supabase/client';
 
-// Create a mock of the Supabase client for import/export tables
-// that aren't actually in the database schema but we need to pretend they are
+// Create a mock function that mimics the Supabase API for import/export jobs
 export const getMockSupabase = () => {
-  // Create a thin wrapper around real supabase but intercept certain tables
   return {
     from: (table: string) => {
-      // If the table is one of our mocked tables, return a mock implementation
       if (table === 'import_jobs' || table === 'export_jobs') {
         return {
           select: () => ({
             eq: (column: string, value: any) => ({
               order: (column: string, { ascending = true } = {}) => ({
                 limit: (num: number) => ({
-                  single: () => Promise.resolve({ data: createMockJob(table, value), error: null }),
-                  range: (start: number, end: number) => Promise.resolve({ data: createMockJobs(table, 10), error: null })
+                  single: () => Promise.resolve({ 
+                    data: createMockJob(table, value), 
+                    error: null 
+                  }),
+                  range: (start: number, end: number) => Promise.resolve({ 
+                    data: createMockJobs(table, 10), 
+                    error: null 
+                  })
                 }),
               }),
             }),
-            range: (start: number, end: number) => Promise.resolve({ data: createMockJobs(table, end - start + 1), error: null })
+            range: (start: number, end: number) => Promise.resolve({ 
+              data: createMockJobs(table, end - start + 1), 
+              error: null 
+            })
           }),
           insert: (data: any) => ({
             select: () => ({
-              single: () => Promise.resolve({ data: { id: crypto.randomUUID(), ...data, created_at: new Date().toISOString() }, error: null })
+              single: () => Promise.resolve({ 
+                data: { 
+                  id: crypto.randomUUID(), 
+                  ...data, 
+                  created_at: new Date().toISOString() 
+                }, 
+                error: null 
+              })
             })
           }),
           update: (data: any) => ({
             eq: (column: string, value: any) => ({
               select: () => ({
-                single: () => Promise.resolve({ data: { id: value, ...data, updated_at: new Date().toISOString() }, error: null })
+                single: () => Promise.resolve({ 
+                  data: { 
+                    id: value, 
+                    ...data, 
+                    updated_at: new Date().toISOString() 
+                  }, 
+                  error: null 
+                })
               })
             })
           }),
@@ -62,7 +83,7 @@ function createMockJob(table: string, id: string): ImportJob | ExportJob {
       completedAt: Math.random() > 0.7 ? new Date().toISOString() : null,
       createdAt: new Date(Date.now() - 1000 * 60 * 60).toISOString(), // 1 hour ago
       errors: []
-    };
+    } as ImportJob;
   } else {
     return {
       id,
@@ -74,22 +95,29 @@ function createMockJob(table: string, id: string): ImportJob | ExportJob {
       completedAt: Math.random() > 0.7 ? new Date().toISOString() : null,
       filters: {},
       downloadUrl: Math.random() > 0.7 ? 'https://example.com/download/schools_export.xlsx' : undefined
-    };
+    } as ExportJob;
   }
 }
 
 // Helper function to create multiple mock jobs
 function createMockJobs(table: string, count: number): ImportJob[] | ExportJob[] {
-  return Array(count).fill(0).map(() => 
-    createMockJob(table, crypto.randomUUID())
-  );
+  if (table === 'import_jobs') {
+    return Array(count).fill(0).map(() => 
+      createMockJob(table, crypto.randomUUID()) as ImportJob
+    );
+  } else {
+    return Array(count).fill(0).map(() => 
+      createMockJob(table, crypto.randomUUID()) as ExportJob
+    );
+  }
 }
 
 // Create a mock implementation of the import/export API
 export const importExportTables = {
   // Import jobs
   getImportJobs: async (): Promise<ImportJob[]> => {
-    return createMockJobs('import_jobs', 10) as ImportJob[];
+    const mockJobs = createMockJobs('import_jobs', 10) as ImportJob[];
+    return mockJobs;
   },
   
   getImportJob: async (id: string): Promise<ImportJob> => {
@@ -97,9 +125,9 @@ export const importExportTables = {
   },
   
   createImportJob: async (data: { tableName: string, fileName: string, fileSize: number, totalRows: number }): Promise<ImportJob> => {
-    const mockJob = {
+    const mockJob: ImportJob = {
       id: crypto.randomUUID(),
-      userId: (await supabase.auth.getUser()).data.user?.id,
+      userId: (await supabase.auth.getUser()).data.user?.id || 'anonymous',
       tableName: data.tableName,
       fileName: data.fileName,
       fileSize: data.fileSize,
@@ -132,9 +160,9 @@ export const importExportTables = {
   },
   
   createExportJob: async (data: { tableName: string, filters?: any }): Promise<ExportJob> => {
-    const mockJob = {
+    const mockJob: ExportJob = {
       id: crypto.randomUUID(),
-      userId: (await supabase.auth.getUser()).data.user?.id,
+      userId: (await supabase.auth.getUser()).data.user?.id || 'anonymous',
       tableName: data.tableName,
       fileName: `${data.tableName}_export_${Date.now()}.xlsx`,
       status: 'pending',

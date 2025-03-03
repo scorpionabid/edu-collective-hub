@@ -1,67 +1,79 @@
 
 import { useState } from 'react';
 import { api } from '@/lib/api';
-import { 
-  NotificationGroup, 
-  CreateNotificationGroupData, 
-  UpdateNotificationGroupData 
-} from '@/lib/api/types';
+import { NotificationGroup, CreateNotificationGroupData, UpdateNotificationGroupData } from '@/lib/api/types';
 
-export const useNotificationGroups = () => {
+export function useNotificationGroups() {
   const [groups, setGroups] = useState<NotificationGroup[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
 
-  const fetchGroups = async () => {
+  // Fetch notification groups
+  const fetchNotificationGroups = async () => {
     setLoading(true);
     try {
       const data = await api.notifications.getNotificationGroups();
       setGroups(data);
-      return data;
-    } catch (err) {
-      setError(err as Error);
-      throw err;
+    } catch (error) {
+      console.error('Error fetching notification groups:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const createGroup = async (groupData: CreateNotificationGroupData) => {
+  // Create a new notification group
+  const createNotificationGroup = async (data: CreateNotificationGroupData) => {
     setLoading(true);
     try {
-      const group = await api.notifications.createNotificationGroup(groupData);
-      setGroups(prev => [...prev, group]);
-      return group;
-    } catch (err) {
-      setError(err as Error);
-      throw err;
+      const result = await api.notifications.createNotificationGroup(data);
+      if (result) {
+        // Refresh groups list
+        await fetchNotificationGroups();
+        return result;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error creating notification group:', error);
+      return null;
     } finally {
       setLoading(false);
     }
   };
 
-  const updateGroup = async (groupData: UpdateNotificationGroupData) => {
+  // Update an existing notification group
+  const updateNotificationGroup = async (data: UpdateNotificationGroupData) => {
     setLoading(true);
     try {
-      const updatedGroup = await api.notifications.updateNotificationGroup(groupData);
-      setGroups(prev => prev.map(g => g.id === updatedGroup.id ? updatedGroup : g));
-      return updatedGroup;
-    } catch (err) {
-      setError(err as Error);
-      throw err;
+      const result = await api.notifications.updateNotificationGroup(data.id, {
+        name: data.name,
+        description: data.description
+      });
+      if (result) {
+        // Refresh groups list
+        await fetchNotificationGroups();
+        return result;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error updating notification group:', error);
+      return null;
     } finally {
       setLoading(false);
     }
   };
 
-  const deleteGroup = async (id: string) => {
+  // Delete a notification group
+  const deleteNotificationGroup = async (id: string) => {
     setLoading(true);
     try {
-      await api.notifications.deleteNotificationGroup(id);
-      setGroups(prev => prev.filter(g => g.id !== id));
-    } catch (err) {
-      setError(err as Error);
-      throw err;
+      const success = await api.notifications.deleteNotificationGroup(id);
+      if (success) {
+        // Refresh groups list
+        await fetchNotificationGroups();
+      }
+      return success;
+    } catch (error) {
+      console.error('Error deleting notification group:', error);
+      return false;
     } finally {
       setLoading(false);
     }
@@ -70,10 +82,9 @@ export const useNotificationGroups = () => {
   return {
     groups,
     loading,
-    error,
-    fetchGroups,
-    createGroup,
-    updateGroup,
-    deleteGroup
+    fetchNotificationGroups,
+    createNotificationGroup,
+    updateNotificationGroup,
+    deleteNotificationGroup
   };
-};
+}

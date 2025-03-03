@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Category } from "./types";
@@ -11,7 +10,6 @@ interface RPCResponse<T> {
 export const categories = {
   getAll: async () => {
     try {
-      // Use the rpc function with proper type assertion
       const response = await supabase.rpc('get_categories_with_columns') as unknown as RPCResponse<any[]>;
       const { data, error } = response;
       
@@ -20,7 +18,6 @@ export const categories = {
         throw error;
       }
       
-      // Transform data to match the expected Category type
       return Array.isArray(data) ? data.map((category: any) => ({
         id: category.id,
         name: category.name,
@@ -34,7 +31,11 @@ export const categories = {
               type: column.type,
               categoryId: column.category_id
             })) 
-          : []
+          : [],
+        description: category.description || null,
+        createdAt: category.created_at,
+        updatedAt: category.updated_at,
+        createdBy: category.created_by || null
       })) : [];
     } catch (error) {
       console.error('Error in getAll categories:', error);
@@ -44,7 +45,6 @@ export const categories = {
   
   getById: async (id: string) => {
     try {
-      // Use rpc function with proper type assertion
       const response = await supabase.rpc('get_category_by_id', { category_id: id }) as unknown as RPCResponse<any[]>;
       const { data, error } = response;
       
@@ -57,7 +57,6 @@ export const categories = {
         return null;
       }
       
-      // Transform data to match the expected Category type
       const category = data[0];
       return {
         id: category.id,
@@ -72,7 +71,11 @@ export const categories = {
               type: column.type,
               categoryId: column.category_id
             }))
-          : []
+          : [],
+        description: category.description || null,
+        createdAt: category.created_at,
+        updatedAt: category.updated_at,
+        createdBy: category.created_by || null
       };
     } catch (error) {
       console.error('Error in getById category:', error);
@@ -87,9 +90,38 @@ export const categories = {
     }
   },
   
+  getCategoryColumns: async (categoryId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('columns')
+        .select('*')
+        .eq('category_id', categoryId)
+        .order('name');
+      
+      if (error) {
+        console.error('Error fetching category columns:', error);
+        throw error;
+      }
+      
+      return data.map((column: any) => ({
+        id: column.id,
+        name: column.name,
+        type: column.type,
+        categoryId: column.category_id,
+        required: column.required || false,
+        options: column.options || null,
+        description: column.description || null,
+        createdAt: column.created_at,
+        updatedAt: column.updated_at
+      }));
+    } catch (error) {
+      console.error('Error in getCategoryColumns:', error);
+      return [];
+    }
+  },
+  
   create: async (category: Omit<Category, 'id' | 'columns'>) => {
     try {
-      // Use rpc function with proper type assertion
       const response = await supabase.rpc('create_category', {
         category_name: category.name,
         region_id: category.regionId,
@@ -140,7 +172,6 @@ export const categories = {
   
   update: async (id: string, category: Partial<Category>) => {
     try {
-      // Use rpc function with proper type assertion
       const updateData: Record<string, any> = { category_id: id };
       if (category.name !== undefined) updateData.category_name = category.name;
       if (category.regionId !== undefined) updateData.region_id = category.regionId;
@@ -192,7 +223,6 @@ export const categories = {
   
   delete: async (id: string) => {
     try {
-      // Use rpc function with proper type assertion
       const response = await supabase.rpc('delete_category', { category_id: id }) as unknown as RPCResponse<any>;
       const { error } = response;
       

@@ -54,7 +54,7 @@ const FormSubmission: React.FC<FormSubmissionProps> = ({ onComplete }) => {
   const [formAction, setFormAction] = useState<'draft' | 'submit'>('draft');
   const [showErrors, setShowErrors] = useState(false);
   const { formErrors, setFormErrors, submitForm, submitting } = useValidatedFormSubmission(categoryId || '');
-  const { schema } = useFormValidation(categoryId || '');
+  const { schema: categorySchema } = useFormValidation(categoryId || '');
   const [date, setDate] = useState<Date | undefined>(new Date());
 
   useEffect(() => {
@@ -148,6 +148,27 @@ const FormSubmission: React.FC<FormSubmissionProps> = ({ onComplete }) => {
       ...prev,
       [name]: parsedValue,
     }));
+  };
+
+  const handleFormElementChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
+    let newValue: any = value;
+    
+    // Handle checkbox inputs differently
+    if (type === 'checkbox') {
+      newValue = (e.target as HTMLInputElement).checked;
+    }
+    
+    // Handle number inputs
+    if (type === 'number') {
+      newValue = value === '' ? '' : String(parseFloat(value));
+    }
+    
+    // Update formData with the new value
+    setFormData({
+      ...formData,
+      [name]: newValue
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

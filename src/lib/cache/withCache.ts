@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { CacheOptions } from "../api/types";
+import { Json } from "@/integrations/supabase/types";
 
 // Default cache duration (30 minutes)
 const DEFAULT_TTL = 30 * 60 * 1000;
@@ -58,12 +59,15 @@ export async function withCache<T>(
     // Ensure the result can be serialized to JSON
     const jsonResult = JSON.parse(JSON.stringify(result));
     
+    // Make sure jsonResult is a valid Json type for Supabase
+    const cacheValue = jsonResult as Json;
+    
     await supabase
       .from('cache_entries')
       .upsert(
         {
           cache_key: cacheKey,
-          cache_value: jsonResult,
+          cache_value: cacheValue,
           expires_at: expiresAt.toISOString(),
         },
         { onConflict: 'cache_key' }

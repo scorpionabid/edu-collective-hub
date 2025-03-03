@@ -155,16 +155,20 @@ export const deleteValidationRule = async (id: string): Promise<boolean> => {
   }
 };
 
-// Save validation schema for a category
+// Save validation schema for a category - use a mock implementation since category_schemas table might not exist
 export const saveValidationSchema = async (categoryId: string, schema: any): Promise<boolean> => {
   try {
+    // Store the schema in validation_rules table as a special rule type
     const { error } = await supabase
-      .from('category_schemas')
+      .from('validation_rules')
       .upsert({
         category_id: categoryId,
-        validation_schema: schema,
+        name: 'Schema Definition',
+        type: 'schema',
+        target_field: '*',
+        value: schema,
         updated_at: new Date().toISOString()
-      }, { onConflict: 'category_id' });
+      }, { onConflict: 'name,category_id,type' });
     
     if (error) throw error;
     
@@ -178,13 +182,15 @@ export const saveValidationSchema = async (categoryId: string, schema: any): Pro
   }
 };
 
-// Get validation schema for a category
+// Get validation schema for a category - use a mock implementation
 export const getValidationSchema = async (categoryId: string): Promise<any> => {
   try {
     const { data, error } = await supabase
-      .from('category_schemas')
-      .select('validation_schema')
+      .from('validation_rules')
+      .select('value')
       .eq('category_id', categoryId)
+      .eq('type', 'schema')
+      .eq('name', 'Schema Definition')
       .single();
     
     if (error) {
@@ -195,7 +201,7 @@ export const getValidationSchema = async (categoryId: string): Promise<any> => {
       throw error;
     }
     
-    return data.validation_schema;
+    return data.value;
   } catch (error) {
     console.error('Error fetching validation schema:', error);
     toast.error('Failed to load validation schema');

@@ -1,20 +1,41 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Tabs, 
-  TabsContent, 
-  TabsList, 
-  TabsTrigger 
-} from '@/components/ui/tabs';
+import { AdminLayout } from '@/components/layouts/AdminLayout';
 import { Button } from '@/components/ui/button';
-import AdminForm from '@/components/users/AdminForm';
-import ImportDialog from '@/components/users/ImportDialog';
-import { AdminList } from '@/components/users/AdminList';  // Fix import
-import { RegionList } from '@/components/users/RegionList'; // Fix import
-import { SchoolList } from '@/components/users/SchoolList'; // Fix import
-import { SectorList } from '@/components/users/SectorList';
-import { api } from '@/lib/api';
-import { useAuth } from '@/hooks/useAuth';
-import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AdminForm } from '@/components/users/AdminForm';
+import { ImportDialog } from '@/components/users/ImportDialog';
+import RegionList from '@/components/users/RegionList';
+import SchoolList from '@/components/users/SchoolList';
+import SectorList from '@/components/users/SectorList';
+
+interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
+interface RegionListProps {
+  regions: any[];
+  newAdmin: any;
+  setNewAdmin: (admin: any) => void;
+  handleAddAdmin: (admin: AdminUser) => void;
+  handleDeleteAdmin: (id: string) => void;
+  handleEditAdmin: (admin: AdminUser) => void;
+  loading: boolean;
+}
+
+interface SchoolListProps {
+  schools: any[];
+  newAdmin: any;
+  setNewAdmin: (admin: any) => void;
+  handleAddAdmin: (admin: AdminUser) => void;
+  handleDeleteAdmin: (id: string) => void;
+  handleEditAdmin: (admin: AdminUser) => void;
+  loading: boolean;
+}
 
 const Users = () => {
   const [activeTab, setActiveTab] = useState('admins');

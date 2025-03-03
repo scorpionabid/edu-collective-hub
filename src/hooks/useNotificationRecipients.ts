@@ -1,58 +1,58 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { NotificationStats } from '@/lib/api/types';
 
-export const useNotificationRecipients = () => {
+export function useNotificationRecipients(notificationId: string) {
   const [recipients, setRecipients] = useState<any[]>([]);
-  const [stats, setStats] = useState<NotificationStats | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState<NotificationStats>({
+    total: 0,
+    sent: 0,
+    pending: 0,
+    failed: 0,
+    read: 0,
+    delivered: 0,
+    totalSent: 0
+  });
 
-  const getRecipients = async (notificationId: string) => {
+  // Fetch recipients for a notification
+  const fetchRecipients = async () => {
     setLoading(true);
     try {
-      // This is a mock function or not implemented yet
-      // Will need to implement in api.notifications
-      console.log('Getting recipients for notification:', notificationId);
-      return [];
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      return [];
+      // This would be a real API call in a complete implementation
+      const data = await Promise.resolve([]); // Placeholder
+      setRecipients(data);
+    } catch (error) {
+      console.error('Error fetching notification recipients:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const getStats = async (notificationId: string) => {
-    setLoading(true);
+  // Fetch notification delivery stats
+  const fetchStats = async () => {
     try {
-      // This is a mock function or needs to be implemented
-      console.log('Getting stats for notification:', notificationId);
-      // Convert the response to match NotificationStats interface
-      const mockStats = {
-        totalSent: 100,
-        delivered: 90,
-        read: 80,
-        failed: 10,
-        pending: 0
-      };
-      setStats(mockStats);
-      return mockStats;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      return null;
-    } finally {
-      setLoading(false);
+      // This would be a real API call
+      const statsData = await api.notifications.getNotificationStats();
+      setStats(statsData);
+    } catch (error) {
+      console.error('Error fetching notification stats:', error);
     }
   };
+
+  useEffect(() => {
+    if (notificationId) {
+      fetchRecipients();
+      fetchStats();
+    }
+  }, [notificationId]);
 
   return {
     recipients,
-    stats,
     loading,
-    error,
-    getRecipients,
-    getStats
+    stats,
+    refreshRecipients: fetchRecipients,
+    refreshStats: fetchStats
   };
-};
+}

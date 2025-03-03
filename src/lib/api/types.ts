@@ -1,19 +1,26 @@
-// Only updating the ValidationRule interface
-export interface ValidationRule {
+// Only updating the Category interface and NotificationStats to match the required properties
+export interface Category {
   id: string;
   name: string;
-  type: string;
-  targetField: string;
-  condition: string;
-  value: any;
-  message: string;
-  sourceField?: string;
-  categoryId: string;
+  regionId: string | null;
+  sectorId: string | null;
+  schoolId: string | null;
+  description: string | null;
   createdAt: string;
   updatedAt: string;
-  roles?: string[];
-  validationFn?: string;
-  expression?: string;
+  createdBy: string | null;
+  columns?: Column[];
+}
+
+// Update NotificationStats to include all required properties
+export interface NotificationStats {
+  total: number;
+  sent: number;
+  pending: number;
+  failed: number;
+  read: number;
+  totalSent: number;
+  delivered: number;
 }
 
 // Add missing interfaces for notification-related hooks
@@ -84,17 +91,6 @@ export interface UserProfile {
   name?: string;
 }
 
-// Update NotificationStats to add missing fields
-export interface NotificationStats {
-  total: number;
-  pending: number;
-  sent: number;
-  failed: number;
-  read: number;
-  totalSent: number;
-  delivered: number;
-}
-
 // Adding missing interfaces and types
 export interface ImportError {
   row: number;
@@ -140,19 +136,6 @@ export interface Column {
   description: string | null;
   createdAt: string;
   updatedAt: string;
-}
-
-export interface Category {
-  id: string;
-  name: string;
-  regionId: string | null;
-  sectorId: string | null;
-  schoolId: string | null;
-  description: string | null;
-  createdAt: string;
-  updatedAt: string;
-  createdBy: string | null;
-  columns?: Column[];
 }
 
 export interface School {

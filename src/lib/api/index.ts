@@ -25,6 +25,9 @@ export const api = {
   categoryValidation
 };
 
+// Re-export individual modules directly to allow importing them directly
+export { categories, columns, formData, auth, regions, sectors, schools, profiles, versions, notifications, categoryValidation };
+
 // Re-export types - using `export type` to comply with isolatedModules
 export type { Column, Category } from './types';
 export type * from './types';

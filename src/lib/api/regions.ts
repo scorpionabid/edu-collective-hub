@@ -5,7 +5,7 @@ import { withCache } from "@/lib/cache/withCache";
 import { Region } from "./types";
 
 // Get all regions
-export const getAllRegions = async (): Promise<any> => {
+export const getAllRegions = async (): Promise<Region[]> => {
   try {
     const { data, error } = await supabase
       .from('regions')
@@ -28,7 +28,7 @@ export const getAllRegions = async (): Promise<any> => {
 };
 
 // Get all regions with caching
-export const getAllRegionsWithCache = async (): Promise<any> => {
+export const getAllRegionsWithCache = async (): Promise<Region[]> => {
   return withCache(
     async () => getAllRegions(),
     { enabled: true, ttl: 30 * 60 * 1000, invalidationTags: ['regions'] }
@@ -36,7 +36,7 @@ export const getAllRegionsWithCache = async (): Promise<any> => {
 };
 
 // Get a region by ID
-export const getRegionById = async (id: string): Promise<any> => {
+export const getRegionById = async (id: string): Promise<Region | null> => {
   try {
     const { data, error } = await supabase
       .from('regions')
@@ -164,11 +164,22 @@ export const getRegionNameById = async (id: string): Promise<string> => {
   }
 };
 
+// Get regions by ID - for compatibility
+export const getByRegionId = async (regionId: string): Promise<Region[]> => {
+  try {
+    const region = await getRegionById(regionId);
+    return region ? [region] : [];
+  } catch (error) {
+    return [];
+  }
+};
+
 // Export the regions API
 export const regions = {
   getAll: getAllRegions,
   getAllWithCache: getAllRegionsWithCache,
   getById: getRegionById,
+  getByRegionId,
   create: createRegion,
   update: updateRegion,
   delete: deleteRegion,
