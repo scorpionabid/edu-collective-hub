@@ -16,7 +16,7 @@ export const columns = {
       }
       
       // Transform the data to match the expected Column type
-      return Array.isArray(data) ? data.map(column => ({
+      return Array.isArray(data) ? data.map((column: any) => ({
         id: column.id,
         name: column.name,
         type: column.type,
@@ -45,7 +45,6 @@ export const columns = {
       
       toast.success('Column created successfully');
       
-      // Transform the data to match the expected Column type
       if (data) {
         return {
           id: data.id,
@@ -90,7 +89,6 @@ export const columns = {
       
       toast.success('Column updated successfully');
       
-      // Transform the data to match the expected Column type
       if (data) {
         return {
           id: data.id,

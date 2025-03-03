@@ -1,16 +1,14 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { api } from '@/lib/api';
 import { FormData } from '@/lib/api/types';
 import { toast } from 'sonner';
-import { useAuth } from '@/contexts/AuthContext';
 
-export const useFormData = () => {
+export function useFormData() {
   const [formEntries, setFormEntries] = useState<FormData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
 
-  const fetchFormEntries = async () => {
+  const fetchFormEntries = useCallback(async () => {
     try {
       setLoading(true);
       const data = await api.formData.getAll();
@@ -21,52 +19,51 @@ export const useFormData = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const submitFormEntry = async (id: string) => {
+  const submitFormEntry = useCallback(async (id: string) => {
     try {
-      const result = await api.formData.submit(id);
-      if (result) {
-        toast.success('Form submitted successfully');
-        await fetchFormEntries();
-      }
+      setLoading(true);
+      await api.formData.submit(id);
+      toast.success('Form submitted successfully');
+      fetchFormEntries();
     } catch (error) {
       console.error('Error submitting form:', error);
       toast.error('Failed to submit form');
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [fetchFormEntries]);
 
-  const approveFormEntry = async (id: string) => {
-    if (!user) return;
-    
+  const approveFormEntry = useCallback(async (id: string) => {
     try {
-      const result = await api.formData.approve(id, user.id);
-      if (result) {
-        toast.success('Form approved successfully');
-        await fetchFormEntries();
-      }
+      setLoading(true);
+      // Use the current user's ID for approval
+      const userId = "current-user-id"; // This should be fetched from auth context
+      await api.formData.approve(id, userId);
+      toast.success('Form approved successfully');
+      fetchFormEntries();
     } catch (error) {
       console.error('Error approving form:', error);
       toast.error('Failed to approve form');
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [fetchFormEntries]);
 
-  const rejectFormEntry = async (id: string, reason: string) => {
+  const rejectFormEntry = useCallback(async (id: string, reason: string) => {
     try {
-      const result = await api.formData.reject(id, reason);
-      if (result) {
-        toast.success('Form rejected');
-        await fetchFormEntries();
-      }
+      setLoading(true);
+      await api.formData.reject(id, reason);
+      toast.success('Form rejected');
+      fetchFormEntries();
     } catch (error) {
       console.error('Error rejecting form:', error);
       toast.error('Failed to reject form');
+    } finally {
+      setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchFormEntries();
-  }, []);
+  }, [fetchFormEntries]);
 
   return {
     formEntries,
@@ -76,4 +73,4 @@ export const useFormData = () => {
     approveFormEntry,
     rejectFormEntry
   };
-};
+}

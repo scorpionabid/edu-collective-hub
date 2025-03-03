@@ -165,9 +165,10 @@ export interface Region {
 export interface Sector {
   id: string;
   name: string;
-  regionId: string;
-  region_id?: string; // Include this for backward compatibility
+  region_id: string;
+  regionId?: string; // Added for consistency
   regionName?: string; // Added for UI display purposes
+  schoolCount?: number; // Added for UI display purposes
 }
 
 export interface School {
@@ -176,6 +177,7 @@ export interface School {
   sectorId?: string;
   sector_id?: string; // Include this for backward compatibility
   regionId?: string; // Added for easier region filtering
+  region_id?: string; // Include this for backward compatibility
   address?: string;
   phone?: string;
   email?: string;

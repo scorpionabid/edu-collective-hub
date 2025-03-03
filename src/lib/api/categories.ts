@@ -16,7 +16,7 @@ export const categories = {
       }
       
       // Transform data to match the expected Category type
-      return Array.isArray(data) ? data.map(category => ({
+      return Array.isArray(data) ? data.map((category: any) => ({
         id: category.id,
         name: category.name,
         regionId: category.region_id,

@@ -1,143 +1,156 @@
 
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { SectorList } from '@/components/sectors/SectorList';
-import { useAuth } from '@/contexts/AuthContext';
-import { api } from '@/lib/api';
-import { toast } from 'sonner';
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/AppSidebar";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PlusCircle } from "lucide-react";
+import { Sector } from "@/lib/api/types";
+import { api } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
+import { SectorList } from "@/components/sectors/SectorList";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 
-const Sectors = () => {
+const RegionSectors = () => {
   const { user } = useAuth();
-  const [sectors, setSectors] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [isAddDialogOpen, setAddDialogOpen] = useState(false);
-  const [newSectorName, setNewSectorName] = useState('');
+  const [sectors, setSectors] = useState<Sector[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [newSectorName, setNewSectorName] = useState("");
+  const [openDialog, setOpenDialog] = useState(false);
 
   useEffect(() => {
     fetchSectors();
   }, []);
 
   const fetchSectors = async () => {
+    if (!user) return;
+
     try {
-      setLoading(true);
-      
-      // Get the profile with regionId using user.id
-      const profileResponse = await api.profiles.getById(user?.id || '');
-      
-      // If we have a regionId in the profile, fetch sectors for that region
-      if (profileResponse && profileResponse.regionId) {
-        const sectorsResponse = await api.sectors.getByRegion(profileResponse.regionId);
-        setSectors(sectorsResponse);
-      } else {
-        // Fallback to fetching all sectors if no regionId is available
-        const allSectors = await api.sectors.getAll();
-        setSectors(allSectors);
-      }
+      setIsLoading(true);
+      const allSectors = await api.sectors.getAll();
+      // Filter sectors based on user's region
+      const filteredSectors = allSectors.filter(
+        sector => sector.region_id === user.regionId
+      );
+      setSectors(filteredSectors);
     } catch (error) {
-      console.error('Error fetching sectors:', error);
-      toast.error('Failed to fetch sectors');
+      console.error("Error fetching sectors:", error);
+      toast.error("Failed to load sectors");
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const handleAddSector = async () => {
-    if (!newSectorName.trim()) {
-      toast.error('Please enter a sector name');
+  const handleCreateSector = async () => {
+    if (!newSectorName.trim() || !user?.regionId) {
+      toast.error("Please enter a sector name");
       return;
     }
 
     try {
-      // Get the profile with regionId using user.id
-      const profileResponse = await api.profiles.getById(user?.id || '');
-      
-      if (!profileResponse || !profileResponse.regionId) {
-        toast.error('No region assigned to this user');
-        return;
-      }
-
+      setIsLoading(true);
       await api.sectors.create({
         name: newSectorName,
-        regionId: profileResponse.regionId
+        region_id: user.regionId
       });
-
-      toast.success('Sector added successfully');
-      setNewSectorName('');
-      setAddDialogOpen(false);
+      setNewSectorName("");
+      setOpenDialog(false);
+      toast.success("Sector created successfully");
       fetchSectors();
     } catch (error) {
-      console.error('Error adding sector:', error);
-      toast.error('Failed to add sector');
+      console.error("Error creating sector:", error);
+      toast.error("Failed to create sector");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleDeleteSector = async (sectorId: string) => {
     try {
+      setIsLoading(true);
       await api.sectors.delete(sectorId);
-      toast.success('Sector deleted successfully');
+      toast.success("Sector deleted successfully");
       fetchSectors();
     } catch (error) {
-      console.error('Error deleting sector:', error);
-      toast.error('Failed to delete sector');
+      console.error("Error deleting sector:", error);
+      toast.error("Failed to delete sector");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="container mx-auto px-4 py-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Sectors</h1>
-        <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Sector
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New Sector</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="name">Sector Name</Label>
-                <Input
-                  id="name"
-                  value={newSectorName}
-                  onChange={(e) => setNewSectorName(e.target.value)}
-                  placeholder="Enter sector name"
-                />
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full">
+        <AppSidebar />
+        <div className="flex-1">
+          <header className="bg-white shadow">
+            <div className="px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+              <div className="flex items-center gap-4">
+                <SidebarTrigger />
+                <h1 className="text-xl font-semibold">Region Sectors</h1>
               </div>
             </div>
-            <div className="flex justify-end">
-              <Button onClick={handleAddSector}>Save</Button>
+          </header>
+          <main className="p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-lg font-medium">Manage Sectors</h2>
+              <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <PlusCircle className="w-4 h-4 mr-2" />
+                    Create Sector
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <h2 className="text-xl font-semibold mb-4">Create New Sector</h2>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="sectorName">Sector Name</Label>
+                      <Input
+                        id="sectorName"
+                        value={newSectorName}
+                        onChange={(e) => setNewSectorName(e.target.value)}
+                        placeholder="Enter sector name"
+                      />
+                    </div>
+                    <Button
+                      onClick={handleCreateSector}
+                      disabled={isLoading || !newSectorName.trim()}
+                    >
+                      {isLoading ? "Creating..." : "Create Sector"}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
-          </DialogContent>
-        </Dialog>
-      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Manage Sectors</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <p>Loading sectors...</p>
-          ) : (
-            <SectorList 
-              sectors={sectors} 
-              onDelete={handleDeleteSector} 
-              onRefresh={fetchSectors}
-            />
-          )}
-        </CardContent>
-      </Card>
-    </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Sectors</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="flex justify-center my-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : (
+                  <SectorList 
+                    sectors={sectors} 
+                    onDelete={handleDeleteSector}
+                    onRefresh={fetchSectors}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
   );
 };
 
-export default Sectors;
+export default RegionSectors;
