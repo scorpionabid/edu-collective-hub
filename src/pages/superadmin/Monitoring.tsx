@@ -3,7 +3,7 @@ import React from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
-import MonitoringDashboard from '@/components/monitoring/MonitoringDashboard';
+import MonitoringDashboardImpl from '@/components/monitoring/MonitoringDashboardImpl';
 
 const Monitoring = () => {
   const { user } = useAuth();
@@ -35,7 +35,7 @@ const Monitoring = () => {
             </div>
           </header>
           <main className="p-6">
-            <MonitoringDashboard />
+            <MonitoringDashboardImpl />
           </main>
         </div>
       </div>

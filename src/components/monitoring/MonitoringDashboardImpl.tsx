@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
@@ -38,7 +39,7 @@ const mockSystemMetrics = [
   { name: 'Network', value: 1.8, max: 10, unit: 'Mbps', color: '#14b8a6' },
 ];
 
-const MonitoringDashboard = () => {
+const MonitoringDashboardImpl = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [timeRange, setTimeRange] = useState('24h');
   const [isLoading, setIsLoading] = useState(true);
@@ -501,4 +502,4 @@ const MonitoringDashboard = () => {
   );
 };
 
-export default MonitoringDashboard;
+export default MonitoringDashboardImpl;

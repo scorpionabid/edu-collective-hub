@@ -1,90 +1,258 @@
 
-import { onCLS, onFID, onLCP, onTTFB, Metric } from 'web-vitals';
+import { ReportHandler } from 'web-vitals';
 import { supabase } from '@/integrations/supabase/client';
-import * as Sentry from '@sentry/react';
+import { logger } from './logger';
+import { PerformanceMetric } from './types';
 
-// Report web vitals metrics to Supabase
-export const reportWebVitalsToSupabase = (metric: Metric, userId?: string) => {
-  const { name, value, delta, id, navigationType } = metric;
-  
-  // Get the current page path
-  const pagePath = window.location.pathname;
-  
-  // Get device and browser information
-  const deviceInfo = {
-    userAgent: navigator.userAgent,
-    language: navigator.language,
-    platform: navigator.platform,
-    screenWidth: window.screen.width,
-    screenHeight: window.screen.height,
-    devicePixelRatio: window.devicePixelRatio,
-  };
-  
-  // Get network information if available
-  const networkInfo = {
-    effectiveType: (navigator as any).connection?.effectiveType || 'unknown',
-    downlink: (navigator as any).connection?.downlink,
-    rtt: (navigator as any).connection?.rtt,
-  };
-  
-  let metricData: Record<string, any> = {
-    user_id: userId,
-    page_path: pagePath,
-    device_info: deviceInfo,
-    network_info: networkInfo,
-  };
-  
-  // Map the specific metric to the correct database field
-  switch (name) {
-    case 'CLS':
-      metricData.cls_score = value;
-      break;
-    case 'FID':
-      metricData.fid_ms = Math.round(value);
-      break;
-    case 'LCP':
-      metricData.lcp_ms = Math.round(value);
-      metricData.load_time_ms = Math.round(value); // As a proxy if we don't have more specific load time
-      break;
-    case 'TTFB':
-      metricData.ttfb_ms = Math.round(value);
-      break;
-    default:
-      // For other metrics
-      metricData.load_time_ms = Math.round(value);
-      metricData[`${name.toLowerCase()}_ms`] = Math.round(value);
-  }
-  
-  // Also report to Sentry for performance monitoring
-  if (process.env.NODE_ENV === 'production') {
-    Sentry.captureMessage(`Web Vital: ${name}`, {
-      level: 'info',
-      tags: { metric: name },
-      extra: {
-        value,
-        delta,
-        id,
-        navigationType,
-        ...metricData,
-      },
-    });
-  }
-  
-  // Only save to database if we have an actual load time (required field)
-  if (metricData.load_time_ms) {
-    supabase.from('performance_metrics').insert([metricData])
-      .then(({ error }) => {
-        if (error && process.env.NODE_ENV === 'development') {
-          console.error('Error saving performance metric:', error);
-        }
-      });
+let vitalsReported = false;
+
+/**
+ * Initialize Web Vitals monitoring
+ */
+export const initWebVitals = (): void => {
+  if (typeof window !== 'undefined') {
+    // Setup performance observer for navigation timing
+    setupPerformanceObserver();
+    
+    // Setup Core Web Vitals reporting
+    setupWebVitalsReporting();
+    
+    // Report initial page load
+    reportPageLoad();
+    
+    // Setup history change listener for SPA navigation
+    setupHistoryChangeListener();
   }
 };
 
-// Initialize web vitals monitoring
-export const initWebVitals = (userId?: string) => {
-  onCLS(metric => reportWebVitalsToSupabase(metric, userId));
-  onFID(metric => reportWebVitalsToSupabase(metric, userId));
-  onLCP(metric => reportWebVitalsToSupabase(metric, userId));
-  onTTFB(metric => reportWebVitalsToSupabase(metric, userId));
+/**
+ * Setup Performance Observer for navigation timing
+ */
+const setupPerformanceObserver = (): void => {
+  try {
+    const performanceObserver = new PerformanceObserver((list) => {
+      list.getEntries().forEach((entry) => {
+        if (entry.entryType === 'navigation') {
+          const navEntry = entry as PerformanceNavigationTiming;
+          reportNavigationTiming(navEntry);
+        }
+      });
+    });
+    
+    performanceObserver.observe({ entryTypes: ['navigation'] });
+  } catch (error) {
+    logger.warn('PerformanceObserver not supported', { error });
+  }
+};
+
+/**
+ * Setup Web Vitals reporting
+ */
+const setupWebVitalsReporting = (): void => {
+  try {
+    import('web-vitals').then(({ getCLS, getFID, getLCP, getTTFB, getFCP }) => {
+      getCLS(reportWebVital);
+      getFID(reportWebVital);
+      getLCP(reportWebVital);
+      getTTFB(reportWebVital);
+      getFCP(reportWebVital);
+    });
+  } catch (error) {
+    logger.error('Failed to load web-vitals', { error });
+  }
+};
+
+/**
+ * Setup history change listener for SPA navigation
+ */
+const setupHistoryChangeListener = (): void => {
+  // Create a callback for handling route changes
+  const handleRouteChange = () => {
+    // Wait a bit to allow the new page to render
+    setTimeout(() => {
+      reportPageLoad();
+    }, 300);
+  };
+
+  // Intercept history methods
+  const originalPushState = window.history.pushState;
+  const originalReplaceState = window.history.replaceState;
+
+  window.history.pushState = function() {
+    originalPushState.apply(this, arguments as any);
+    handleRouteChange();
+  };
+
+  window.history.replaceState = function() {
+    originalReplaceState.apply(this, arguments as any);
+    handleRouteChange();
+  };
+
+  // Handle popstate events
+  window.addEventListener('popstate', handleRouteChange);
+};
+
+/**
+ * Report navigation timing
+ */
+const reportNavigationTiming = (entry: PerformanceNavigationTiming): void => {
+  try {
+    const loadTime = Math.round(entry.loadEventEnd - entry.startTime);
+    const ttfb = Math.round(entry.responseStart - entry.requestStart);
+    
+    reportPerformanceMetric({
+      pagePath: window.location.pathname,
+      loadTimeMs: loadTime,
+      ttfbMs: ttfb
+    });
+  } catch (error) {
+    logger.warn('Error reporting navigation timing', { error });
+  }
+};
+
+/**
+ * Report page load metrics
+ */
+const reportPageLoad = (): void => {
+  try {
+    // Reset vitals reported flag for the new page
+    vitalsReported = false;
+    
+    // Use the performance API to measure page load time
+    if (window.performance && window.performance.timing) {
+      const { navigationStart, loadEventEnd } = window.performance.timing;
+      const loadTime = loadEventEnd - navigationStart;
+      
+      if (loadTime > 0) {
+        reportPerformanceMetric({
+          pagePath: window.location.pathname,
+          loadTimeMs: loadTime
+        });
+      }
+    }
+  } catch (error) {
+    logger.warn('Error reporting page load', { error });
+  }
+};
+
+/**
+ * Report Web Vitals metric
+ */
+const reportWebVital: ReportHandler = (metric): void => {
+  try {
+    const { name, value } = metric;
+    
+    // Only report core web vitals once per page load
+    if (vitalsReported && (name === 'CLS' || name === 'LCP' || name === 'FID')) {
+      return;
+    }
+    
+    // Create the metric object
+    const performanceMetric: Partial<PerformanceMetric> = {
+      pagePath: window.location.pathname,
+      loadTimeMs: 0 // Will be updated if we haven't reported load time yet
+    };
+    
+    // Add the specific metric
+    switch (name) {
+      case 'CLS':
+        performanceMetric.clsScore = value;
+        vitalsReported = true;
+        break;
+      case 'FID':
+        performanceMetric.fidMs = Math.round(value);
+        vitalsReported = true;
+        break;
+      case 'LCP':
+        performanceMetric.lcpMs = Math.round(value);
+        vitalsReported = true;
+        break;
+      case 'TTFB':
+        performanceMetric.ttfbMs = Math.round(value);
+        break;
+      default:
+        // Skip other metrics
+        return;
+    }
+    
+    // Report the metric
+    reportPerformanceMetric(performanceMetric);
+  } catch (error) {
+    logger.warn('Error reporting web vital', { error, metric });
+  }
+};
+
+/**
+ * Report performance metric to the backend
+ */
+const reportPerformanceMetric = async (metric: Partial<PerformanceMetric>): Promise<void> => {
+  try {
+    // Ensure we have a load time
+    if (!metric.loadTimeMs || metric.loadTimeMs <= 0) {
+      metric.loadTimeMs = getEstimatedLoadTime();
+    }
+    
+    // Add device and network info
+    metric.deviceInfo = getDeviceInfo();
+    metric.networkInfo = getNetworkInfo();
+    
+    // Get the current user if logged in
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      metric.userId = user.id;
+    }
+    
+    // Store the metric
+    const { error } = await supabase.from('performance_metrics').insert(metric);
+    
+    if (error) {
+      logger.warn('Failed to store performance metric', { error, metric });
+    }
+  } catch (error) {
+    // Don't let metrics tracking interrupt the application flow
+    logger.warn('Error tracking performance metric', { error });
+  }
+};
+
+/**
+ * Get estimated load time if performance API not available
+ */
+const getEstimatedLoadTime = (): number => {
+  // Default to a reasonable value
+  return 2000;
+};
+
+/**
+ * Get device information
+ */
+const getDeviceInfo = (): Record<string, any> => {
+  return {
+    userAgent: navigator.userAgent,
+    screenWidth: window.screen.width,
+    screenHeight: window.screen.height,
+    devicePixelRatio: window.devicePixelRatio,
+    platform: navigator.platform,
+    vendor: navigator.vendor
+  };
+};
+
+/**
+ * Get network information
+ */
+const getNetworkInfo = (): Record<string, any> => {
+  const result: Record<string, any> = {
+    onLine: navigator.onLine
+  };
+  
+  // Add Network Information API data if available
+  const nav: any = navigator;
+  if (nav.connection) {
+    const conn = nav.connection;
+    if (conn.effectiveType) result.effectiveType = conn.effectiveType;
+    if (conn.rtt) result.rtt = conn.rtt;
+    if (conn.downlink) result.downlink = conn.downlink;
+    if (conn.saveData) result.saveData = conn.saveData;
+  }
+  
+  return result;
 };

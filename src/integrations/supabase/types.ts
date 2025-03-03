@@ -9,39 +9,93 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      api_metrics: {
+        Row: {
+          duration_ms: number
+          endpoint: string
+          id: string
+          method: string
+          request_params: Json | null
+          request_size: number | null
+          response_size: number | null
+          response_summary: Json | null
+          status_code: number | null
+          timestamp: string
+          user_id: string | null
+        }
+        Insert: {
+          duration_ms: number
+          endpoint: string
+          id?: string
+          method: string
+          request_params?: Json | null
+          request_size?: number | null
+          response_size?: number | null
+          response_summary?: Json | null
+          status_code?: number | null
+          timestamp?: string
+          user_id?: string | null
+        }
+        Update: {
+          duration_ms?: number
+          endpoint?: string
+          id?: string
+          method?: string
+          request_params?: Json | null
+          request_size?: number | null
+          response_size?: number | null
+          response_summary?: Json | null
+          status_code?: number | null
+          timestamp?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
+          component: string | null
           created_at: string
+          duration_ms: number | null
           id: string
           ip_address: string | null
+          metadata: Json | null
           new_data: Json | null
           old_data: Json | null
           record_id: string | null
+          success: boolean | null
           table_name: string
           user_agent: string | null
           user_id: string | null
         }
         Insert: {
           action: string
+          component?: string | null
           created_at?: string
+          duration_ms?: number | null
           id?: string
           ip_address?: string | null
+          metadata?: Json | null
           new_data?: Json | null
           old_data?: Json | null
           record_id?: string | null
+          success?: boolean | null
           table_name: string
           user_agent?: string | null
           user_id?: string | null
         }
         Update: {
           action?: string
+          component?: string | null
           created_at?: string
+          duration_ms?: number | null
           id?: string
           ip_address?: string | null
+          metadata?: Json | null
           new_data?: Json | null
           old_data?: Json | null
           record_id?: string | null
+          success?: boolean | null
           table_name?: string
           user_agent?: string | null
           user_id?: string | null
@@ -320,6 +374,51 @@ export type Database = {
           },
         ]
       }
+      error_logs: {
+        Row: {
+          browser_info: Json | null
+          component: string | null
+          error_context: Json | null
+          error_message: string
+          error_stack: string | null
+          id: string
+          page_path: string | null
+          resolution_notes: string | null
+          resolved: boolean | null
+          severity: string
+          timestamp: string
+          user_id: string | null
+        }
+        Insert: {
+          browser_info?: Json | null
+          component?: string | null
+          error_context?: Json | null
+          error_message: string
+          error_stack?: string | null
+          id?: string
+          page_path?: string | null
+          resolution_notes?: string | null
+          resolved?: boolean | null
+          severity: string
+          timestamp?: string
+          user_id?: string | null
+        }
+        Update: {
+          browser_info?: Json | null
+          component?: string | null
+          error_context?: Json | null
+          error_message?: string
+          error_stack?: string | null
+          id?: string
+          page_path?: string | null
+          resolution_notes?: string | null
+          resolved?: boolean | null
+          severity?: string
+          timestamp?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       form_entry_versions: {
         Row: {
           created_at: string | null
@@ -439,6 +538,36 @@ export type Database = {
         }
         Relationships: []
       }
+      monitoring_metrics: {
+        Row: {
+          component: string | null
+          id: string
+          metric_name: string
+          metric_type: string
+          metric_value: number
+          tags: Json | null
+          timestamp: string
+        }
+        Insert: {
+          component?: string | null
+          id?: string
+          metric_name: string
+          metric_type: string
+          metric_value: number
+          tags?: Json | null
+          timestamp?: string
+        }
+        Update: {
+          component?: string | null
+          id?: string
+          metric_name?: string
+          metric_type?: string
+          metric_value?: number
+          tags?: Json | null
+          timestamp?: string
+        }
+        Relationships: []
+      }
       notification_group_members: {
         Row: {
           created_at: string | null
@@ -522,6 +651,48 @@ export type Database = {
           id?: string
           token?: string
           used_at?: string | null
+        }
+        Relationships: []
+      }
+      performance_metrics: {
+        Row: {
+          cls_score: number | null
+          device_info: Json | null
+          fid_ms: number | null
+          id: string
+          lcp_ms: number | null
+          load_time_ms: number
+          network_info: Json | null
+          page_path: string
+          timestamp: string
+          ttfb_ms: number | null
+          user_id: string | null
+        }
+        Insert: {
+          cls_score?: number | null
+          device_info?: Json | null
+          fid_ms?: number | null
+          id?: string
+          lcp_ms?: number | null
+          load_time_ms: number
+          network_info?: Json | null
+          page_path: string
+          timestamp?: string
+          ttfb_ms?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          cls_score?: number | null
+          device_info?: Json | null
+          fid_ms?: number | null
+          id?: string
+          lcp_ms?: number | null
+          load_time_ms?: number
+          network_info?: Json | null
+          page_path?: string
+          timestamp?: string
+          ttfb_ms?: number | null
+          user_id?: string | null
         }
         Relationships: []
       }
