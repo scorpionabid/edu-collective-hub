@@ -332,4 +332,4 @@ export const versions = {
   }
 };
 
-export default versions;
+export { versions };

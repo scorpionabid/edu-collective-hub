@@ -9,12 +9,12 @@ export function useProfile() {
   
   const profileQuery = useQuery({
     queryKey: ['profile', user?.id],
-    queryFn: () => user ? api.auth.getProfile(user.id) : null,
+    queryFn: () => user ? api.profiles.getByUserId(user.id) : null,
     enabled: !!user
   });
   
   const updateProfile = useMutation({
-    mutationFn: (profile: any) => user ? api.auth.updateProfile(user.id, profile) : Promise.reject('No user'),
+    mutationFn: (profile: any) => user ? api.profiles.update(profileQuery.data?.id, profile) : Promise.reject('No user'),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profile', user?.id] });
     }
