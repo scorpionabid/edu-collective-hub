@@ -1,4 +1,3 @@
-
 export interface Column {
   id: string;
   name: string;
@@ -26,6 +25,8 @@ export interface UserProfile {
   schoolId?: string;
   createdAt: string;
   email?: string;
+  name?: string;
+  profile?: any;
 }
 
 // Redis cache related types

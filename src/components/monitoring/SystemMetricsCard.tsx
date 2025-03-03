@@ -6,11 +6,11 @@ import 'react-circular-progressbar/dist/styles.css';
 import { 
   Cpu, 
   HardDrive, 
-  Memory, 
+  Database, 
   Users, 
   Activity, 
   Server, 
-  Database, 
+  Ram, 
   Network 
 } from 'lucide-react';
 
@@ -37,7 +37,8 @@ export function SystemMetricsCard({
       case 'HardDrive':
         return <HardDrive size={24} />;
       case 'Memory':
-        return <Memory size={24} />;
+      case 'Ram':
+        return <Ram size={24} />;
       case 'Users':
         return <Users size={24} />;
       case 'Activity':
@@ -57,7 +58,7 @@ export function SystemMetricsCard({
   // High values for CPU, Memory, Disk are bad (red)
   // High values for Users, etc. are good (green)
   const getColor = () => {
-    if (['Cpu', 'Memory', 'HardDrive', 'Database'].includes(icon)) {
+    if (['Cpu', 'Memory', 'Ram', 'HardDrive', 'Database'].includes(icon)) {
       if (value > 80) return '#ef4444'; // red
       if (value > 60) return '#f59e0b'; // amber
       return '#10b981'; // green
@@ -101,4 +102,3 @@ export function SystemMetricsCard({
     </Card>
   );
 }
-

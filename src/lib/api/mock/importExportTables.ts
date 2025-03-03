@@ -1,123 +1,73 @@
 
+// Mock implementation for import/export tables
 import { supabase } from '@/integrations/supabase/client';
+import { ImportJob, ExportJob } from '@/lib/monitoring/types';
 
-/**
- * This is a temporary mock solution for handling import/export jobs without creating actual tables.
- * In production, you would need to create actual import_jobs and export_jobs tables in Supabase.
- */
+// This is a mock implementation since the import_jobs and export_jobs tables
+// don't exist in the supabase schema
+const importJobs: Record<string, ImportJob> = {};
+const exportJobs: Record<string, ExportJob> = {};
 
-// Mock storage for jobs
-const mockImportJobs = new Map();
-const mockExportJobs = new Map();
-
-export const mockImportJobsTable = {
-  async insert(data) {
-    const id = data.id || crypto.randomUUID();
-    const job = { ...data, id };
-    mockImportJobs.set(id, job);
-    return { data: job, error: null };
-  },
-  
-  async select() {
-    return {
-      eq(field, value) {
-        return {
-          single() {
-            const job = Array.from(mockImportJobs.values())
-              .find(job => job[field] === value);
-            return { data: job, error: job ? null : { message: 'Not found' } };
-          },
-          order() {
-            return {
-              limit(limit) {
-                const jobs = Array.from(mockImportJobs.values())
-                  .filter(job => job[field] === value)
-                  .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                  .slice(0, limit);
-                return { data: jobs, error: null };
-              }
-            };
-          }
-        };
-      },
-      order() {
-        return {
-          limit(limit) {
-            const jobs = Array.from(mockImportJobs.values())
-              .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-              .slice(0, limit);
-            return { data: jobs, error: null };
-          }
-        };
-      }
-    };
-  },
-  
-  async update(data) {
-    return {
-      eq(field, value) {
-        const job = Array.from(mockImportJobs.values())
-          .find(job => job[field] === value);
-        
-        if (!job) {
-          return { data: null, error: { message: 'Not found' } };
-        }
-        
-        const updatedJob = { ...job, ...data };
-        mockImportJobs.set(job.id, updatedJob);
-        return { data: updatedJob, error: null };
-      }
-    };
-  }
-};
-
-export const mockExportJobsTable = {
-  async insert(data) {
-    const id = data.id || crypto.randomUUID();
-    const job = { ...data, id };
-    mockExportJobs.set(id, job);
-    return { data: job, error: null };
-  },
-  
-  async select() {
-    return {
-      eq(field, value) {
-        return {
-          single() {
-            const job = Array.from(mockExportJobs.values())
-              .find(job => job[field] === value);
-            return { data: job, error: job ? null : { message: 'Not found' } };
-          }
-        };
-      }
-    };
-  },
-  
-  async update(data) {
-    return {
-      eq(field, value) {
-        const job = Array.from(mockExportJobs.values())
-          .find(job => job[field] === value);
-        
-        if (!job) {
-          return { data: null, error: { message: 'Not found' } };
-        }
-        
-        const updatedJob = { ...job, ...data };
-        mockExportJobs.set(job.id, updatedJob);
-        return { data: updatedJob, error: null };
-      }
-    };
-  }
-};
-
-// Monkey patch the supabase instance to handle these tables
+// Mock the fetch function for import jobs
 const originalFrom = supabase.from.bind(supabase);
-supabase.from = function(table) {
+supabase.from = (table: string) => {
   if (table === 'import_jobs') {
-    return mockImportJobsTable;
+    return {
+      select: () => ({
+        eq: () => ({
+          single: async () => ({ data: null, error: null }),
+          order: () => ({
+            limit: async () => ({ data: Object.values(importJobs), error: null })
+          })
+        }),
+        order: () => ({
+          limit: async () => ({ data: Object.values(importJobs), error: null })
+        })
+      }),
+      insert: async (data: any) => {
+        const id = crypto.randomUUID();
+        const job = { ...data, id };
+        importJobs[id] = job as ImportJob;
+        return { data: job, error: null };
+      },
+      update: async (data: any) => {
+        if (data.id && importJobs[data.id]) {
+          importJobs[data.id] = { ...importJobs[data.id], ...data };
+          return { data: importJobs[data.id], error: null };
+        }
+        return { data: null, error: 'Job not found' };
+      }
+    } as any;
   } else if (table === 'export_jobs') {
-    return mockExportJobsTable;
+    return {
+      select: () => ({
+        eq: () => ({
+          single: async () => ({ data: null, error: null }),
+          order: () => ({
+            limit: async () => ({ data: Object.values(exportJobs), error: null })
+          })
+        }),
+        order: () => ({
+          limit: async () => ({ data: Object.values(exportJobs), error: null })
+        })
+      }),
+      insert: async (data: any) => {
+        const id = crypto.randomUUID();
+        const job = { ...data, id };
+        exportJobs[id] = job as ExportJob;
+        return { data: job, error: null };
+      },
+      update: async (data: any) => {
+        if (data.id && exportJobs[data.id]) {
+          exportJobs[data.id] = { ...exportJobs[data.id], ...data };
+          return { data: exportJobs[data.id], error: null };
+        }
+        return { data: null, error: 'Job not found' };
+      }
+    } as any;
   }
+
   return originalFrom(table);
 };
+
+console.log('Import/Export tables mock initialized');

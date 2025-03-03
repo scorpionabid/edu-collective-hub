@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { TableVersion, FormEntryVersion, VersionDiff } from "./types";
@@ -14,7 +13,27 @@ export const versions = {
         .order('version_number', { ascending: false });
 
       if (error) throw error;
-      return data as TableVersion[];
+      
+      // Convert the snake_case DB fields to camelCase for frontend
+      return data.map(item => ({
+        id: item.id,
+        tableId: item.table_id,
+        versionNumber: item.version_number,
+        schema: item.schema,
+        isActive: item.is_active,
+        startedAt: item.started_at,
+        endedAt: item.ended_at,
+        createdAt: item.created_at,
+        createdBy: item.created_by,
+        // Keep the original fields too for compatibility
+        table_id: item.table_id,
+        version_number: item.version_number,
+        is_active: item.is_active,
+        started_at: item.started_at,
+        ended_at: item.ended_at,
+        created_at: item.created_at,
+        created_by: item.created_by
+      }));
     } catch (error) {
       console.error('Error fetching table versions:', error);
       toast.error('Failed to load table versions');
@@ -32,7 +51,26 @@ export const versions = {
         .single();
 
       if (error) throw error;
-      return data as TableVersion;
+      
+      return {
+        id: data.id,
+        tableId: data.table_id,
+        versionNumber: data.version_number,
+        schema: data.schema,
+        isActive: data.is_active,
+        startedAt: data.started_at,
+        endedAt: data.ended_at,
+        createdAt: data.created_at,
+        createdBy: data.created_by,
+        // Keep the original fields too for compatibility
+        table_id: data.table_id,
+        version_number: data.version_number,
+        is_active: data.is_active,
+        started_at: data.started_at,
+        ended_at: data.ended_at,
+        created_at: data.created_at,
+        created_by: data.created_by
+      };
     } catch (error) {
       console.error('Error fetching active table version:', error);
       toast.error('Failed to load active table version');
@@ -79,7 +117,26 @@ export const versions = {
       if (error) throw error;
       
       toast.success('Table version created successfully');
-      return data as TableVersion;
+      
+      return {
+        id: data.id,
+        tableId: data.table_id,
+        versionNumber: data.version_number,
+        schema: data.schema,
+        isActive: data.is_active,
+        startedAt: data.started_at,
+        endedAt: data.ended_at,
+        createdAt: data.created_at,
+        createdBy: data.created_by,
+        // Keep the original fields too for compatibility
+        table_id: data.table_id,
+        version_number: data.version_number,
+        is_active: data.is_active,
+        started_at: data.started_at,
+        ended_at: data.ended_at,
+        created_at: data.created_at,
+        created_by: data.created_by
+      };
     } catch (error) {
       console.error('Error creating table version:', error);
       toast.error('Failed to create table version');
@@ -136,7 +193,22 @@ export const versions = {
         .order('version_number', { ascending: false });
 
       if (error) throw error;
-      return data as FormEntryVersion[];
+      
+      return data.map(item => ({
+        id: item.id,
+        formEntryId: item.form_entry_id,
+        versionNumber: item.version_number,
+        data: item.data,
+        tableVersionId: item.table_version_id,
+        createdAt: item.created_at,
+        createdBy: item.created_by,
+        // Keep the original fields too for compatibility
+        form_entry_id: item.form_entry_id,
+        version_number: item.version_number,
+        table_version_id: item.table_version_id,
+        created_at: item.created_at,
+        created_by: item.created_by
+      }));
     } catch (error) {
       console.error('Error fetching form entry versions:', error);
       toast.error('Failed to load form entry versions');
@@ -154,7 +226,22 @@ export const versions = {
         .single();
 
       if (error) throw error;
-      return data as FormEntryVersion;
+      
+      return {
+        id: data.id,
+        formEntryId: data.form_entry_id,
+        versionNumber: data.version_number,
+        data: data.data,
+        tableVersionId: data.table_version_id,
+        createdAt: data.created_at,
+        createdBy: data.created_by,
+        // Keep the original fields too for compatibility
+        form_entry_id: data.form_entry_id,
+        version_number: data.version_number,
+        table_version_id: data.table_version_id,
+        created_at: data.created_at,
+        created_by: data.created_by
+      };
     } catch (error) {
       console.error('Error fetching form entry version:', error);
       toast.error('Failed to load form entry version');
@@ -193,7 +280,22 @@ export const versions = {
       if (error) throw error;
       
       toast.success('Form entry version created successfully');
-      return newVersion as FormEntryVersion;
+      
+      return {
+        id: newVersion.id,
+        formEntryId: newVersion.form_entry_id,
+        versionNumber: newVersion.version_number,
+        data: newVersion.data,
+        tableVersionId: newVersion.table_version_id,
+        createdAt: newVersion.created_at,
+        createdBy: newVersion.created_by,
+        // Keep the original fields too for compatibility
+        form_entry_id: newVersion.form_entry_id,
+        version_number: newVersion.version_number,
+        table_version_id: newVersion.table_version_id,
+        created_at: newVersion.created_at,
+        created_by: newVersion.created_by
+      };
     } catch (error) {
       console.error('Error creating form entry version:', error);
       toast.error('Failed to create form entry version');

@@ -1,32 +1,66 @@
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
-import { FormEntryVersion } from "@/lib/api/types";
+import { useState } from 'react';
+import { api } from '@/lib/api';
+import { FormEntryVersion } from '@/lib/api/types';
 
-export function useFormVersions(formEntryId: string) {
-  const queryClient = useQueryClient();
-  
-  const versionsQuery = useQuery({
-    queryKey: ['formVersions', formEntryId],
-    queryFn: () => api.versions.getFormEntryVersions(formEntryId),
-    enabled: !!formEntryId
-  });
-  
-  const createVersionMutation = useMutation({
-    mutationFn: ({ tableVersionId, data, createdBy }: { tableVersionId: string, data: any, createdBy: string }) => 
-      api.versions.createFormEntryVersion(formEntryId, tableVersionId, data, createdBy),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['formVersions', formEntryId] });
+export const useFormVersions = () => {
+  const [versions, setVersions] = useState<FormEntryVersion[]>([]);
+  const [currentVersion, setCurrentVersion] = useState<FormEntryVersion | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const getFormVersions = async (formEntryId: string) => {
+    setLoading(true);
+    try {
+      const data = await api.versions.getFormEntryVersions(formEntryId);
+      setVersions(data);
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      return [];
+    } finally {
+      setLoading(false);
     }
-  });
-  
-  return {
-    versions: versionsQuery.data || [],
-    isLoading: versionsQuery.isLoading,
-    error: versionsQuery.error,
-    createVersion: async (tableVersionId: string, data: any, createdBy: string) => {
-      await createVersionMutation.mutateAsync({ tableVersionId, data, createdBy });
-    }
-    // Removed migrateData function as it doesn't exist in the API
   };
-}
+
+  const getFormVersion = async (formEntryId: string, versionNumber: number) => {
+    setLoading(true);
+    try {
+      const data = await api.versions.getFormEntryVersion(formEntryId, versionNumber);
+      setCurrentVersion(data);
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createFormVersion = async (formEntryId: string, formData: any, tableVersionId?: string) => {
+    setLoading(true);
+    try {
+      const data = await api.versions.createFormEntryVersion(formEntryId, formData, tableVersionId);
+      if (data) {
+        // Re-fetch the versions list if creation was successful
+        getFormVersions(formEntryId);
+      }
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return {
+    versions,
+    currentVersion,
+    loading,
+    error,
+    getFormVersions,
+    getFormVersion,
+    createFormVersion
+  };
+};

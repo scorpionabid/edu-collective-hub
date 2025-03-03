@@ -1,44 +1,123 @@
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
-import { TableVersion, VersionDiff } from "@/lib/api/types";
+import { useState } from 'react';
+import { api } from '@/lib/api';
+import { TableVersion, VersionDiff, FormEntryVersion } from '@/lib/api/types';
 
-export function useTableVersions(tableId: string) {
-  const queryClient = useQueryClient();
-  
-  const versionsQuery = useQuery({
-    queryKey: ['tableVersions', tableId],
-    queryFn: () => api.versions.getTableVersions(tableId),
-    enabled: !!tableId
-  });
-  
-  const latestVersionQuery = useQuery({
-    queryKey: ['latestTableVersion', tableId],
-    queryFn: () => api.versions.getLatestTableVersion(tableId),
-    enabled: !!tableId
-  });
-  
-  const createVersionMutation = useMutation({
-    mutationFn: ({ schema, createdBy }: { schema: any, createdBy: string }) => 
-      api.versions.createTableVersion(tableId, schema, createdBy),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tableVersions', tableId] });
-      queryClient.invalidateQueries({ queryKey: ['latestTableVersion', tableId] });
-    }
-  });
-  
-  // Removed activateVersionMutation since it doesn't exist in API
-  
-  return {
-    versions: versionsQuery.data || [],
-    currentVersion: latestVersionQuery.data,
-    isLoading: versionsQuery.isLoading || latestVersionQuery.isLoading,
-    error: versionsQuery.error || latestVersionQuery.error,
-    createVersion: async (schema: any, createdBy: string) => {
-      await createVersionMutation.mutateAsync({ schema, createdBy });
-    },
-    compareVersions: async (versionId1: string, versionId2: string) => {
-      return api.versions.compareTableVersions(versionId1, versionId2);
+export const useTableVersions = () => {
+  const [versions, setVersions] = useState<TableVersion[]>([]);
+  const [activeVersion, setActiveVersion] = useState<TableVersion | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const getTableVersions = async (tableId: string) => {
+    setLoading(true);
+    try {
+      const data = await api.versions.getTableVersions(tableId);
+      setVersions(data);
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      return [];
+    } finally {
+      setLoading(false);
     }
   };
-}
+
+  const getActiveVersion = async (tableId: string) => {
+    setLoading(true);
+    try {
+      const data = await api.versions.getActiveTableVersion(tableId);
+      setActiveVersion(data);
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createTableVersion = async (tableId: string, schema: any) => {
+    setLoading(true);
+    try {
+      const data = await api.versions.createTableVersion(tableId, schema);
+      if (data) {
+        // Update the versions list if creation was successful
+        getTableVersions(tableId);
+      }
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const compareVersions = async (tableId: string, version1: number, version2: number) => {
+    setLoading(true);
+    try {
+      const data = await api.versions.compareVersions(tableId, version1, version2);
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Form entry version methods
+  const getFormEntryVersions = async (formEntryId: string) => {
+    setLoading(true);
+    try {
+      const data = await api.versions.getFormEntryVersions(formEntryId);
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getFormEntryVersion = async (formEntryId: string, versionNumber: number) => {
+    setLoading(true);
+    try {
+      const data = await api.versions.getFormEntryVersion(formEntryId, versionNumber);
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createFormEntryVersion = async (formEntryId: string, data: any, tableVersionId?: string) => {
+    setLoading(true);
+    try {
+      const result = await api.versions.createFormEntryVersion(formEntryId, data, tableVersionId);
+      return result;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return {
+    versions,
+    activeVersion,
+    loading,
+    error,
+    getTableVersions,
+    getActiveVersion,
+    createTableVersion,
+    compareVersions,
+    getFormEntryVersions,
+    getFormEntryVersion,
+    createFormEntryVersion
+  };
+};

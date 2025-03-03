@@ -1,61 +1,72 @@
 
-import { useState, useEffect, useCallback } from "react";
-import { User } from "@supabase/supabase-js";
-import { auth, UserProfile } from "@/lib/api/auth";
-import { toast } from "sonner";
+import { useState, useEffect } from 'react';
+import { api } from '@/lib/api';
+import { UserProfile } from '@/lib/api/types';
+import { toast } from 'sonner';
 
-export const useUserProfile = (user: User | null) => {
+export const useUserProfile = (userId?: string) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const fetchProfile = useCallback(async () => {
-    if (!user) {
-      setProfile(null);
+  useEffect(() => {
+    if (userId) {
+      fetchUserProfile(userId);
+    } else {
       setLoading(false);
-      return;
     }
+  }, [userId]);
 
+  const fetchUserProfile = async (uid: string) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const userProfile = await auth.getProfile(user.id);
-      setProfile(userProfile);
-    } catch (error) {
-      console.error("Error fetching user profile:", error);
-      toast.error("Failed to load user profile");
+      const response = await api.auth.getUserProfile(uid);
+      if (response.success && response.profile) {
+        setProfile(response.profile);
+      } else if (response.error) {
+        setError(response.error);
+        toast.error('Failed to load user profile');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      toast.error('Failed to load user profile');
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  };
 
-  const updateProfile = async (
-    profileData: Partial<Omit<UserProfile, "id" | "userId" | "createdAt">>
-  ) => {
-    if (!user || !profile) return null;
-
+  const updateUserProfile = async (profileData: Partial<UserProfile>) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const updatedProfile = await auth.updateProfile(user.id, profileData);
-      if (updatedProfile) {
-        setProfile(updatedProfile);
-        toast.success("Profile updated successfully");
+      if (!profile?.id) {
+        throw new Error('No profile to update');
       }
-      return updatedProfile;
-    } catch (error) {
-      console.error("Error updating profile:", error);
-      toast.error("Failed to update profile");
+      
+      const response = await api.auth.updateUserProfile(profile.id, profileData);
+      if (response.success && response.profile) {
+        setProfile(response.profile);
+        toast.success('Profile updated successfully');
+        return response.profile;
+      } else if (response.error) {
+        setError(response.error);
+        toast.error('Failed to update profile');
+        return null;
+      }
+      return null;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      toast.error('Failed to update profile');
       return null;
     } finally {
       setLoading(false);
     }
   };
 
-  const refreshProfile = useCallback(() => {
-    fetchProfile();
-  }, [fetchProfile]);
-
-  useEffect(() => {
-    fetchProfile();
-  }, [fetchProfile]);
-
-  return { profile, loading, updateProfile, refreshProfile };
+  return {
+    profile,
+    loading,
+    error,
+    fetchUserProfile,
+    updateUserProfile
+  };
 };
