@@ -20,12 +20,6 @@ export const createStringSchema = (options?: {
   
   let schema = z.string();
   
-  if (required) {
-    schema = schema.min(1, `${label} is required`);
-  } else {
-    schema = schema.optional();
-  }
-  
   if (minLength) {
     schema = schema.min(minLength, `${label} must be at least ${minLength} characters`);
   }
@@ -34,7 +28,11 @@ export const createStringSchema = (options?: {
     schema = schema.max(maxLength, `${label} must not exceed ${maxLength} characters`);
   }
   
-  return schema;
+  if (!required) {
+    return schema.optional();
+  }
+  
+  return schema.min(1, `${label} is required`);
 };
 
 export const createEmailSchema = (options?: { required?: boolean; label?: string }) => {
@@ -43,7 +41,7 @@ export const createEmailSchema = (options?: { required?: boolean; label?: string
   let schema = z.string().email(`Invalid ${label.toLowerCase()} address`);
   
   if (!required) {
-    schema = schema.optional();
+    return schema.optional();
   }
   
   return schema;
@@ -73,7 +71,7 @@ export const createNumberSchema = (options?: {
   }
   
   if (!required) {
-    schema = schema.optional();
+    return schema.optional();
   }
   
   return schema;

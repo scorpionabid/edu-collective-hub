@@ -16,6 +16,39 @@ type AnySupabaseClient = typeof supabase & {
   from: (table: string) => any;
 };
 
+// Define a custom type for our mock implementation
+interface MockQueryBuilder {
+  select: () => {
+    eq: (column: string, value: any) => {
+      order: () => {
+        single: () => Promise<{ data: ImportJob | null; error: any }>;
+        range: () => Promise<{ data: ImportJob[]; error: any }>;
+      };
+      single: () => Promise<{ data: ImportJob | null; error: any }>;
+    };
+    order: () => {
+      range: () => Promise<{ data: ImportJob[]; error: any }>;
+    };
+  };
+  insert: (newJob: Partial<ImportJob>) => {
+    select: () => {
+      single: () => Promise<{ data: ImportJob; error: any }>;
+    };
+  };
+  update: (updates: Partial<ImportJob>) => {
+    eq: (column: string, value: any) => {
+      select: () => {
+        single: () => Promise<{ data: ImportJob | null; error: any }>;
+      };
+    };
+  };
+  delete: () => {
+    eq: (column: string, value: any) => {
+      then: (callback: () => void) => Promise<void>;
+    };
+  };
+}
+
 // Override the from method with our custom implementation
 (supabase as AnySupabaseClient).from = (table: string) => {
   // If accessing import_jobs or export_jobs, use our mock implementation
@@ -26,7 +59,7 @@ type AnySupabaseClient = typeof supabase & {
           order: () => ({
             single: async () => {
               const job = mockImportJobs.find(job => job[column as keyof ImportJob] === value);
-              return { data: job, error: null };
+              return { data: job || null, error: null };
             },
             range: async () => {
               const jobs = mockImportJobs.filter(job => job[column as keyof ImportJob] === value);
@@ -35,7 +68,7 @@ type AnySupabaseClient = typeof supabase & {
           }),
           single: async () => {
             const job = mockImportJobs.find(job => job[column as keyof ImportJob] === value);
-            return { data: job, error: null };
+            return { data: job || null, error: null };
           }
         }),
         order: () => ({
@@ -94,7 +127,7 @@ type AnySupabaseClient = typeof supabase & {
           }
         })
       })
-    };
+    } as MockQueryBuilder;
   } else if (table === 'export_jobs') {
     return {
       select: () => ({
@@ -102,7 +135,7 @@ type AnySupabaseClient = typeof supabase & {
           order: () => ({
             single: async () => {
               const job = mockExportJobs.find(job => job[column as keyof ExportJob] === value);
-              return { data: job, error: null };
+              return { data: job || null, error: null };
             },
             range: async () => {
               const jobs = mockExportJobs.filter(job => job[column as keyof ExportJob] === value);
@@ -111,7 +144,7 @@ type AnySupabaseClient = typeof supabase & {
           }),
           single: async () => {
             const job = mockExportJobs.find(job => job[column as keyof ExportJob] === value);
-            return { data: job, error: null };
+            return { data: job || null, error: null };
           }
         }),
         order: () => ({
@@ -168,7 +201,7 @@ type AnySupabaseClient = typeof supabase & {
           }
         })
       })
-    };
+    } as any;
   }
 
   // Use the original implementation for all other tables

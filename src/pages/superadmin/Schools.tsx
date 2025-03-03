@@ -1,401 +1,266 @@
 
-import React, { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { toast } from "sonner";
-import { api } from "@/lib/api";
-import { School } from "@/lib/api/types";
-import { Plus, School2, Building } from "lucide-react";
+import React, { useState, useEffect } from 'react';
+import { AdminLayout } from '@/components/layouts/AdminLayout';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { api } from '@/lib/api';
+import { DataTable } from '@/components/ui/data-table';
+import SchoolForm from '@/components/schools/SchoolForm';
+import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
+import { School, Sector, Region } from '@/lib/api/types';
 
-import { SchoolForm } from "@/components/schools/SchoolForm";
-
-const Schools = () => {
+const SchoolsPage = () => {
+  const { user } = useAuth();
   const [schools, setSchools] = useState<School[]>([]);
-  const [sectors, setSectors] = useState<any[]>([]);
-  const [regions, setRegions] = useState<any[]>([]);
-  const [isAddDialogOpen, setAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setEditDialogOpen] = useState(false);
+  const [sectors, setSectors] = useState<Sector[]>([]);
+  const [regions, setRegions] = useState<Region[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSchool, setEditingSchool] = useState<School | null>(null);
-  const [selectedRegion, setSelectedRegion] = useState<string>("");
-  const [selectedSector, setSelectedSector] = useState<string>("");
+  const [selectedSector, setSelectedSector] = useState<string>('');
+  const [selectedRegion, setSelectedRegion] = useState<string>('');
+  const [filteredSectors, setFilteredSectors] = useState<Sector[]>([]);
 
   useEffect(() => {
-    fetchSchools();
-    fetchSectors();
-    fetchRegions();
+    fetchData();
   }, []);
 
-  const fetchSchools = async () => {
-    try {
-      const schoolsData = await api.schools.getAll();
-      const schoolsWithInfo = await Promise.all(
-        schoolsData.map(async (school) => {
-          const sector = school.sector_id 
-            ? await api.sectors.getById(school.sector_id)
-            : null;
-          
-          const region = sector?.region_id
-            ? await api.regions.getById(sector.region_id)
-            : null;
-          
-          return {
-            ...school,
-            sectorName: sector?.name || "Unknown",
-            regionId: region?.id || "",
-            regionName: region?.name || "Unknown"
-          };
-        })
-      );
-      
-      setSchools(schoolsWithInfo);
-    } catch (error) {
-      console.error("Error fetching schools:", error);
-      toast.error("Məktəblərin siyahısını əldə etmək mümkün olmadı.");
+  useEffect(() => {
+    // Filter sectors based on selected region
+    if (selectedRegion) {
+      setFilteredSectors(sectors.filter(sector => sector.regionId === selectedRegion));
+      setSelectedSector(''); // Reset sector selection when region changes
+    } else {
+      setFilteredSectors(sectors);
     }
-  };
+  }, [selectedRegion, sectors]);
 
-  const fetchSectors = async () => {
+  useEffect(() => {
+    // Filter schools based on selections
+    filterSchools();
+  }, [selectedSector, selectedRegion, schools]);
+
+  const fetchData = async () => {
+    setIsLoading(true);
     try {
-      const sectorsData = await api.sectors.getAll();
+      const [schoolsData, sectorsData, regionsData] = await Promise.all([
+        api.schools.getAll(),
+        api.sectors.getAll(),
+        api.regions.getAll()
+      ]);
+      setSchools(schoolsData);
       setSectors(sectorsData);
-    } catch (error) {
-      console.error("Error fetching sectors:", error);
-      toast.error("Sektorların siyahısını əldə etmək mümkün olmadı.");
-    }
-  };
-
-  const fetchRegions = async () => {
-    try {
-      const regionsData = await api.regions.getAll();
       setRegions(regionsData);
     } catch (error) {
-      console.error("Error fetching regions:", error);
-      toast.error("Regionların siyahısını əldə etmək mümkün olmadı.");
+      console.error('Error fetching data:', error);
+      toast.error('Failed to load data.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleAddSchool = async (schoolData: Omit<School, 'id'>) => {
+  const filterSchools = () => {
+    let filtered = [...schools];
+    
+    if (selectedSector) {
+      filtered = filtered.filter(school => school.sectorId === selectedSector);
+    }
+    
+    if (selectedRegion && !selectedSector) {
+      filtered = filtered.filter(school => {
+        const sector = sectors.find(s => s.id === school.sectorId);
+        return sector?.regionId === selectedRegion;
+      });
+    }
+    
+    setFilteredSchools(filtered);
+  };
+
+  const [filteredSchools, setFilteredSchools] = useState<School[]>([]);
+
+  const handleCreateSchool = async (schoolData: Omit<School, 'id'>) => {
     try {
       await api.schools.create({
         name: schoolData.name,
-        sector_id: schoolData.sector_id || "",
+        sectorId: schoolData.sectorId,
         address: schoolData.address,
         email: schoolData.email,
-        phone: schoolData.phone
+        phone: schoolData.phone,
+        createdAt: new Date().toISOString()
       });
       
-      setAddDialogOpen(false);
-      toast.success("Məktəb uğurla yaradıldı");
-      fetchSchools();
+      fetchData();
+      setIsDialogOpen(false);
+      toast.success('School created successfully!');
     } catch (error) {
-      console.error("Error creating school:", error);
-      toast.error("Məktəbi yaratmaq mümkün olmadı");
+      console.error('Error creating school:', error);
+      toast.error('Failed to create school.');
     }
   };
 
-  const handleEditSchool = async (id: string, schoolData: Partial<School>) => {
+  const handleUpdateSchool = async (schoolData: Omit<School, 'id'>) => {
+    if (!editingSchool) return;
+    
     try {
-      if (!editingSchool) return;
-      
-      await api.schools.update(id, {
+      await api.schools.update(editingSchool.id, {
         name: schoolData.name,
-        sector_id: schoolData.sector_id || editingSchool.sector_id,
+        sectorId: schoolData.sectorId,
         address: schoolData.address,
         email: schoolData.email,
         phone: schoolData.phone
       });
       
-      setEditDialogOpen(false);
+      fetchData();
+      setIsDialogOpen(false);
       setEditingSchool(null);
-      toast.success("Məktəb uğurla yeniləndi");
-      fetchSchools();
+      toast.success('School updated successfully!');
     } catch (error) {
-      console.error("Error updating school:", error);
-      toast.error("Məktəbi yeniləmək mümkün olmadı");
+      console.error('Error updating school:', error);
+      toast.error('Failed to update school.');
     }
   };
 
-  const handleDeleteSchool = async (id: string) => {
-    try {
-      await api.schools.delete(id);
-      toast.success("Məktəb uğurla silindi");
-      fetchSchools();
-    } catch (error) {
-      console.error("Error deleting school:", error);
-      toast.error("Məktəbi silmək mümkün olmadı");
+  const handleDeleteSchool = async (school: School) => {
+    if (window.confirm(`Are you sure you want to delete ${school.name}?`)) {
+      try {
+        await api.schools.delete(school.id);
+        fetchData();
+        toast.success('School deleted successfully!');
+      } catch (error) {
+        console.error('Error deleting school:', error);
+        toast.error('Failed to delete school.');
+      }
     }
   };
 
-  const filteredSchools = schools.filter(school => {
-    if (selectedRegion && selectedSector) {
-      return school.regionId === selectedRegion && school.sector_id === selectedSector;
-    } else if (selectedRegion) {
-      return school.regionId === selectedRegion;
-    } else if (selectedSector) {
-      return school.sector_id === selectedSector;
-    }
-    return true;
-  });
-
-  return (
-    <div className="container mx-auto py-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">Məktəblər</h1>
-        <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Yeni Məktəb
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Yeni Məktəb Yaradın</DialogTitle>
-              <DialogDescription>
-                Məktəbin məlumatlarını daxil edin
-              </DialogDescription>
-            </DialogHeader>
-            <SchoolForm 
-              onSubmit={handleAddSchool}
-              sectors={sectors}
-              regions={regions} 
-            />
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <div>
-          <label className="block text-sm font-medium mb-1">Region</label>
-          <select
-            className="w-full rounded-md border border-input p-2"
-            value={selectedRegion}
-            onChange={(e) => {
-              setSelectedRegion(e.target.value);
-              setSelectedSector("");
+  const columns = [
+    {
+      header: 'School Name',
+      accessorKey: 'name',
+    },
+    {
+      header: 'Region',
+      accessorKey: 'regionName',
+      cell: ({ row }: { row: { original: School } }) => {
+        const sector = sectors.find(s => s.id === row.original.sectorId);
+        const region = regions.find(r => r.id === sector?.regionId);
+        return region?.name || '-';
+      },
+    },
+    {
+      header: 'Sector',
+      accessorKey: 'sectorName',
+      cell: ({ row }: { row: { original: School } }) => {
+        const sector = sectors.find(s => s.id === row.original.sectorId);
+        return sector?.name || '-';
+      },
+    },
+    {
+      header: 'Email',
+      accessorKey: 'email',
+    },
+    {
+      header: 'Phone',
+      accessorKey: 'phone',
+    },
+    {
+      header: 'Actions',
+      id: 'actions',
+      cell: ({ row }: { row: { original: School } }) => (
+        <div className="flex space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setEditingSchool(row.original);
+              setIsDialogOpen(true);
             }}
           >
-            <option value="">All Regions</option>
-            {regions.map((region) => (
-              <option key={region.id} value={region.id}>
-                {region.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Sector</label>
-          <select
-            className="w-full rounded-md border border-input p-2"
-            value={selectedSector}
-            onChange={(e) => setSelectedSector(e.target.value)}
-            disabled={!selectedRegion}
+            Edit
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => handleDeleteSchool(row.original)}
           >
-            <option value="">All Sectors</option>
-            {sectors
-              .filter(
-                (sector) => !selectedRegion || sector.region_id === selectedRegion
-              )
-              .map((sector) => (
+            Delete
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <AdminLayout>
+      <div className="container mx-auto py-6">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold">Schools Management</h1>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button
+                onClick={() => setEditingSchool(null)}
+              >
+                Add New School
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[600px]">
+              <DialogHeader>
+                <DialogTitle>{editingSchool ? 'Edit School' : 'Add New School'}</DialogTitle>
+              </DialogHeader>
+              <SchoolForm
+                onSubmit={editingSchool ? handleUpdateSchool : handleCreateSchool}
+                initialData={editingSchool || undefined}
+                sectors={filteredSectors.length > 0 ? filteredSectors : sectors}
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        <div className="mb-6 flex flex-wrap gap-4">
+          <div className="w-full md:w-64">
+            <label className="block text-sm font-medium mb-1">Filter by Region</label>
+            <select
+              className="w-full p-2 border rounded"
+              value={selectedRegion}
+              onChange={(e) => setSelectedRegion(e.target.value)}
+            >
+              <option value="">All Regions</option>
+              {regions.map((region) => (
+                <option key={region.id} value={region.id}>
+                  {region.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="w-full md:w-64">
+            <label className="block text-sm font-medium mb-1">Filter by Sector</label>
+            <select
+              className="w-full p-2 border rounded"
+              value={selectedSector}
+              onChange={(e) => setSelectedSector(e.target.value)}
+              disabled={filteredSectors.length === 0}
+            >
+              <option value="">All Sectors</option>
+              {filteredSectors.map((sector) => (
                 <option key={sector.id} value={sector.id}>
                   {sector.name}
                 </option>
               ))}
-          </select>
+            </select>
+          </div>
         </div>
+
+        <DataTable
+          columns={columns}
+          data={filteredSchools}
+          loading={isLoading}
+          pagination
+        />
       </div>
-
-      <Tabs defaultValue="all">
-        <TabsList className="mb-4">
-          <TabsTrigger value="all">Bütün Məktəblər</TabsTrigger>
-          <TabsTrigger value="active">Aktiv Məktəblər</TabsTrigger>
-          <TabsTrigger value="inactive">Deaktiv Məktəblər</TabsTrigger>
-        </TabsList>
-        <TabsContent value="all">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredSchools.map((school) => (
-              <Card key={school.id}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg font-medium">
-                    {school.name}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-col gap-2 text-sm text-muted-foreground mb-4">
-                    <div className="flex items-center">
-                      <Building className="mr-2 h-4 w-4" />
-                      <span>Sektor: {school.sectorName}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Building className="mr-2 h-4 w-4" />
-                      <span>Region: {school.regionName}</span>
-                    </div>
-                    {school.address && (
-                      <div className="flex items-center">
-                        <Building className="mr-2 h-4 w-4" />
-                        <span>Ünvan: {school.address}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex justify-end space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setEditingSchool(school);
-                        setEditDialogOpen(true);
-                      }}
-                    >
-                      Redaktə et
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleDeleteSchool(school.id)}
-                    >
-                      Sil
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-        <TabsContent value="active">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredSchools
-              .filter((school) => true) // Filter condition for active schools
-              .map((school) => (
-                <Card key={school.id}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg font-medium">
-                      {school.name}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex flex-col gap-2 text-sm text-muted-foreground mb-4">
-                      <div className="flex items-center">
-                        <Building className="mr-2 h-4 w-4" />
-                        <span>Sektor: {school.sectorName}</span>
-                      </div>
-                      <div className="flex items-center">
-                        <Building className="mr-2 h-4 w-4" />
-                        <span>Region: {school.regionName}</span>
-                      </div>
-                      {school.address && (
-                        <div className="flex items-center">
-                          <Building className="mr-2 h-4 w-4" />
-                          <span>Ünvan: {school.address}</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex justify-end space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setEditingSchool(school);
-                          setEditDialogOpen(true);
-                        }}
-                      >
-                        Redaktə et
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDeleteSchool(school.id)}
-                      >
-                        Sil
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-          </div>
-        </TabsContent>
-        <TabsContent value="inactive">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredSchools
-              .filter((school) => false) // Filter condition for inactive schools
-              .map((school) => (
-                <Card key={school.id}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg font-medium">
-                      {school.name}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex flex-col gap-2 text-sm text-muted-foreground mb-4">
-                      <div className="flex items-center">
-                        <Building className="mr-2 h-4 w-4" />
-                        <span>Sektor: {school.sectorName}</span>
-                      </div>
-                      <div className="flex items-center">
-                        <Building className="mr-2 h-4 w-4" />
-                        <span>Region: {school.regionName}</span>
-                      </div>
-                      {school.address && (
-                        <div className="flex items-center">
-                          <Building className="mr-2 h-4 w-4" />
-                          <span>Ünvan: {school.address}</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex justify-end space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setEditingSchool(school);
-                          setEditDialogOpen(true);
-                        }}
-                      >
-                        Redaktə et
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDeleteSchool(school.id)}
-                      >
-                        Sil
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-          </div>
-        </TabsContent>
-      </Tabs>
-
-      <Dialog open={isEditDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Məktəbi Redaktə edin</DialogTitle>
-            <DialogDescription>
-              Məktəbin məlumatlarını yeniləyin
-            </DialogDescription>
-          </DialogHeader>
-          {editingSchool && (
-            <SchoolForm
-              school={editingSchool}
-              onSubmit={(data) => handleEditSchool(editingSchool.id, data)}
-              sectors={sectors}
-              regions={regions}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
+    </AdminLayout>
   );
 };
 
-export default Schools;
+export default SchoolsPage;

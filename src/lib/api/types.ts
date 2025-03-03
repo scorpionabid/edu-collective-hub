@@ -190,8 +190,8 @@ export interface PaginatedResponse<T> {
   page: number;
   pageSize: number;
   totalPages: number;
-  metadata?: any; // Added to fix TypeScript errors
-  filter?: any; // Added to fix TypeScript errors
+  metadata?: any;
+  filter?: any;
 }
 
 // Additional types for API request parameters
@@ -203,6 +203,7 @@ export interface PaginationParams {
 export interface SortParams {
   field?: string;
   direction?: 'asc' | 'desc';
+  column?: string; // Added to support existing code
 }
 
 export interface FilterParams {
@@ -214,6 +215,8 @@ export interface QueryOptions {
   sort?: SortParams;
   filter?: FilterParams;
   includes?: string[];
+  filters?: FilterParams; // Added to support existing code
+  cache?: boolean; // Added to support cache operations
 }
 
 // Import/Export types
@@ -255,7 +258,7 @@ export interface ColumnDefinition {
   label: string;
   type: string;
   required: boolean;
-  options: string[];
+  options: string[] | any; // Modified to accept any type for flexibility
   defaultValue?: any;
 }
 
@@ -295,10 +298,29 @@ export interface CacheOptions {
   ttl?: number;
   key?: string;
   invalidateOn?: string[];
+  enabled?: boolean; // Added to support existing code
+  invalidationTags?: string[]; // Added to support existing code
 }
 
 export interface CacheManager {
   get: <T>(key: string) => Promise<T | null>;
   set: <T>(key: string, value: T, ttl?: number) => Promise<void>;
   invalidate: (keys: string[]) => Promise<void>;
+}
+
+// Validation related types
+export interface ValidationRule {
+  id: string;
+  name: string;
+  description?: string;
+  type: "custom" | "dependency" | "simple" | "complex" | string; // Made more flexible to handle string values
+  targetField: string;
+  condition: "pattern" | "max" | "min" | "required" | "custom" | "exists" | "equals" | string; // Made more flexible
+  value?: any;
+  message: string;
+  sourceField?: string;
+  expression?: string;
+  validationFn?: string;
+  roles?: string[];
+  categoryId?: string;
 }
