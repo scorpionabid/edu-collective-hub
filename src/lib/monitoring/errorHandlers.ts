@@ -2,7 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from './logger';
 import { ErrorLog } from './types';
-import { captureException, captureMessage } from '@sentry/react';
+import * as Sentry from '@sentry/react';
 
 interface TrackErrorOptions {
   errorMessage: string;
@@ -34,7 +34,7 @@ export const trackError = async ({
     // Report to Sentry if it's a critical or high severity error
     if (severity === 'critical' || severity === 'high') {
       if (errorStack) {
-        captureException(new Error(errorMessage), {
+        Sentry.captureException(new Error(errorMessage), {
           extra: {
             errorContext,
             component,
@@ -43,7 +43,7 @@ export const trackError = async ({
           }
         });
       } else {
-        captureMessage(errorMessage, {
+        Sentry.captureMessage(errorMessage, {
           level: 'error',
           extra: {
             errorContext,
@@ -55,7 +55,7 @@ export const trackError = async ({
       }
     }
     
-    // Create the error log object
+    // Create the DB fields using snake_case for direct insertion
     const log = {
       error_message: errorMessage,
       error_stack: errorStack,
