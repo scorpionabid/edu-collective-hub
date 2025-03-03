@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { CacheOptions } from "../api/types";
 
@@ -54,7 +55,7 @@ export async function withCache<T>(
     // Store the result in the cache
     const expiresAt = new Date(Date.now() + ttl);
     
-    // Convert result to JSON before storing
+    // Ensure the result can be serialized to JSON
     const jsonResult = JSON.parse(JSON.stringify(result));
     
     await supabase

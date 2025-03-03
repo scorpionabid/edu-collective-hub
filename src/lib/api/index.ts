@@ -21,7 +21,8 @@ export const api = {
   schools,
   profiles,
   versions,
-  notifications
+  notifications,
+  categoryValidation
 };
 
 // Re-export types - using `export type` to comply with isolatedModules
