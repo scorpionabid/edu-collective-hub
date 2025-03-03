@@ -19,7 +19,9 @@ export const useUserProfile = (user: User | null) => {
     try {
       setLoading(true);
       const userProfile = await auth.getUserProfile(user.id);
-      setProfile(userProfile);
+      if (userProfile) {
+        setProfile(userProfile);
+      }
       setError(null);
     } catch (err: any) {
       console.error('Error fetching user profile:', err);
@@ -34,7 +36,9 @@ export const useUserProfile = (user: User | null) => {
 
     try {
       const updatedProfile = await auth.updateUserProfile(user.id, profileData);
-      setProfile(updatedProfile);
+      if (updatedProfile) {
+        setProfile(updatedProfile);
+      }
       return updatedProfile;
     } catch (err) {
       console.error('Error updating profile:', err);

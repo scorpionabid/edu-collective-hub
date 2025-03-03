@@ -27,7 +27,7 @@ export function PermissionGuard({
   const { hasPermission } = usePermission();
   
   // Check if the user has permission for the action on the target
-  if (hasPermission(action, target)) {
+  if (hasPermission(action as any, target)) {
     return <>{children}</>;
   }
   

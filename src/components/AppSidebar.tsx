@@ -23,11 +23,12 @@ import {
   Database,
   User
 } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 import { Link, useLocation } from "react-router-dom";
+import { getUserDisplayName } from "@/utils/authUtils";
 
 export function AppSidebar() {
-  const { user, logout } = useAuth();
+  const { user, profile, logout } = useAuth();
   const location = useLocation();
 
   // Menu items based on user role
@@ -38,7 +39,7 @@ export function AppSidebar() {
     ];
 
     // Super admin menu items
-    if (user?.role === 'superadmin') {
+    if (profile?.role === 'superadmin') {
       return [
         { title: "Dashboard", icon: LayoutDashboard, href: "/superadmin/dashboard" },
         { title: "Users", icon: Users, href: "/superadmin/users" },
@@ -52,7 +53,7 @@ export function AppSidebar() {
     }
     
     // Region admin menu items
-    else if (user?.role === 'regionadmin') {
+    else if (profile?.role === 'regionadmin') {
       return [
         { title: "Dashboard", icon: LayoutDashboard, href: "/regionadmin/dashboard" },
         { title: "Sectors", icon: Building, href: "/regionadmin/sectors" },
@@ -64,7 +65,7 @@ export function AppSidebar() {
     }
     
     // Sector admin menu items
-    else if (user?.role === 'sectoradmin') {
+    else if (profile?.role === 'sectoradmin') {
       return [
         { title: "Dashboard", icon: LayoutDashboard, href: "/sectoradmin/dashboard" },
         { title: "Schools", icon: School, href: "/sectoradmin/schools" },
@@ -78,7 +79,7 @@ export function AppSidebar() {
     }
     
     // School admin menu items
-    else if (user?.role === 'schooladmin') {
+    else if (profile?.role === 'schooladmin') {
       return [
         { title: "Dashboard", icon: LayoutDashboard, href: "/schooladmin/dashboard" },
         { title: "Data Entry", icon: FileText, href: "/schooladmin/data-entry" }, 
@@ -93,13 +94,14 @@ export function AppSidebar() {
   };
 
   const menuItems = getMenuItems();
+  const displayName = profile ? getUserDisplayName(profile) : '';
 
   return (
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>
-            {user ? `${user.name} (${user.role})` : 'Menu'}
+            {profile ? `${displayName} (${profile.role})` : 'Menu'}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>

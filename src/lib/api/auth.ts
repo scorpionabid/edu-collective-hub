@@ -187,13 +187,14 @@ export const auth = {
       
       if (!data) return null;
       
+      // Convert database fields to camelCase for the frontend
       return {
         id: data.id,
         userId: data.user_id,
         firstName: data.first_name,
         lastName: data.last_name,
-        email: data.email,
-        role: data.role,
+        email: data.email || '', // Ensure email exists
+        role: data.role as 'superadmin' | 'regionadmin' | 'sectoradmin' | 'schooladmin',
         regionId: data.region_id,
         sectorId: data.sector_id,
         schoolId: data.school_id,
@@ -231,13 +232,14 @@ export const auth = {
       
       toast.success('Profil uğurla yeniləndi');
       
+      // Convert database fields to camelCase for the frontend
       return {
         id: data.id,
         userId: data.user_id,
         firstName: data.first_name,
         lastName: data.last_name,
-        email: data.email,
-        role: data.role,
+        email: data.email || '', // Ensure email exists
+        role: data.role as 'superadmin' | 'regionadmin' | 'sectoradmin' | 'schooladmin',
         regionId: data.region_id,
         sectorId: data.sector_id,
         schoolId: data.school_id,

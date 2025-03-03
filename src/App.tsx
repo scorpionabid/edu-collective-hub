@@ -1,10 +1,12 @@
+
 import { Route, Routes, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import Index from "@/pages/Index";
 import Login from "@/pages/Login";
 import NotFound from "@/pages/NotFound";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 import { PermissionProvider } from "@/contexts/PermissionContext";
+import { roleDashboardPaths } from "@/types/auth";
 
 // SuperAdmin pages
 import SuperAdminDashboard from "@/pages/superadmin/Dashboard";
@@ -52,7 +54,7 @@ const ProtectedRoute = ({
   children: React.ReactNode,
   allowedRoles?: string[]
 }) => {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
   
   if (loading) {
     return <div>Loading...</div>;
@@ -64,9 +66,9 @@ const ProtectedRoute = ({
   }
   
   // If roles are specified and user's role is not in the allowed roles, redirect to appropriate dashboard
-  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
+  if (allowedRoles.length > 0 && profile && !allowedRoles.includes(profile.role)) {
     // Get the dashboard path for the user's role
-    const redirectPath = roleDashboardPaths[user.role as keyof typeof roleDashboardPaths] || "/login";
+    const redirectPath = roleDashboardPaths[profile.role] || "/login";
     return <Navigate to={redirectPath} replace />;
   }
   
@@ -74,7 +76,7 @@ const ProtectedRoute = ({
 };
 
 function App() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   
   return (
     <>
@@ -82,9 +84,9 @@ function App() {
         <Route 
           path="/" 
           element={
-            user ? (
+            user && profile ? (
               // Redirect to the appropriate dashboard based on user role
-              <Navigate to={roleDashboardPaths[user.role as keyof typeof roleDashboardPaths] || "/login"} replace />
+              <Navigate to={roleDashboardPaths[profile.role] || "/login"} replace />
             ) : (
               <Navigate to="/login" replace />
             )

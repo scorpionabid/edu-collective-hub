@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from "react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,11 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { AlertCircle } from "lucide-react";
+import { roleDashboardPaths } from "@/types/auth";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const { login, user } = useAuth();
+  const { login, user, profile } = useAuth();
   const [resetEmail, setResetEmail] = useState("");
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
@@ -22,25 +22,11 @@ const Login = () => {
   
   // If user is already logged in, redirect to appropriate dashboard
   useEffect(() => {
-    if (user) {
-      switch (user.role) {
-        case 'superadmin':
-          navigate('/dashboard');
-          break;
-        case 'regionadmin':
-          navigate('/region-dashboard');
-          break;
-        case 'sectoradmin':
-          navigate('/sector-dashboard');
-          break;
-        case 'schooladmin':
-          navigate('/school-dashboard');
-          break;
-        default:
-          break;
-      }
+    if (user && profile) {
+      const redirectPath = roleDashboardPaths[profile.role] || "/login";
+      navigate(redirectPath);
     }
-  }, [user, navigate]);
+  }, [user, profile, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
