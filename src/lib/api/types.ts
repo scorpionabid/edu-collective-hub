@@ -72,3 +72,86 @@ export interface VersionDiff {
     }
   };
 }
+
+// Notification System Types
+export interface NotificationGroup {
+  id: string;
+  name: string;
+  description?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CreateNotificationGroupData {
+  name: string;
+  description?: string;
+}
+
+export interface UpdateNotificationGroupData {
+  name?: string;
+  description?: string;
+}
+
+export interface NotificationGroupMember {
+  id: string;
+  groupId: string;
+  memberType: 'region' | 'sector' | 'school' | 'profile';
+  memberId: string;
+  memberName?: string;
+  createdAt: string;
+}
+
+export interface AddGroupMemberData {
+  memberType: 'region' | 'sector' | 'school' | 'profile';
+  memberId: string;
+}
+
+export interface MassNotification {
+  id: string;
+  title: string;
+  message: string;
+  notificationType: 'email' | 'sms' | 'app' | 'all';
+  deliveryStatus: 'pending' | 'in-progress' | 'completed' | 'failed';
+  sentCount: number;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface CreateMassNotificationData {
+  title: string;
+  message: string;
+  notificationType: 'email' | 'sms' | 'app' | 'all';
+  recipients: {
+    type: 'group' | 'region' | 'sector' | 'school' | 'profile';
+    id: string;
+  }[];
+}
+
+export interface MassNotificationRecipient {
+  id: string;
+  notificationId: string;
+  recipientType: 'region' | 'sector' | 'school' | 'profile';
+  recipientId: string;
+  recipientName?: string;
+  status: 'pending' | 'sent' | 'failed' | 'read';
+  sentAt?: string;
+  readAt?: string;
+  createdAt: string;
+}
+
+export interface NotificationStats {
+  total: number;
+  pending: number;
+  sent: number;
+  failed: number;
+  read: number;
+}
+
+export interface GetMassNotificationsParams {
+  limit?: number;
+  status?: 'pending' | 'in-progress' | 'completed' | 'failed';
+  createdBy?: string;
+  createdAfter?: string;
+  createdBefore?: string;
+}

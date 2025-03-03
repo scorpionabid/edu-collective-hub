@@ -9,6 +9,7 @@ import { schools } from './schools';
 import { sectors } from './sectors';
 import { versions } from './versions';
 import { realtime } from './realtime';
+import { notifications } from './notifications';
 
 export const api = {
   auth,
@@ -20,5 +21,27 @@ export const api = {
   schools,
   sectors,
   versions,
-  realtime
+  realtime,
+  notifications
 };
+
+// Re-export types
+export type {
+  Category,
+  Column,
+  FormData,
+  Profile,
+  TableVersion,
+  FormEntryVersion,
+  VersionDiff,
+  NotificationGroup,
+  CreateNotificationGroupData,
+  UpdateNotificationGroupData,
+  NotificationGroupMember,
+  AddGroupMemberData,
+  MassNotification,
+  CreateMassNotificationData,
+  MassNotificationRecipient,
+  NotificationStats,
+  GetMassNotificationsParams
+} from './types';
