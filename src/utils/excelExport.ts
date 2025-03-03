@@ -1,116 +1,173 @@
-import * as ExcelJS from 'exceljs';
+
+import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
-import { ExportOptions } from '@/lib/api/types';
-import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { ExportOptions } from '@/lib/api/types';
 
-// Function to convert data to Excel format
-export const convertToExcelData = (data: any[], headers: string[]): any[][] => {
-  const excelData: any[][] = [headers];
-  data.forEach(item => {
-    const row: any[] = headers.map(header => item[header] || '');
-    excelData.push(row);
-  });
-  return excelData;
-};
-
-// Function to export data to Excel
+/**
+ * Exports data to Excel format and triggers browser download
+ * @param data Array of objects to export
+ * @param columns Array of column names to include
+ * @param fileName Name of the output file (without extension)
+ * @param options Additional export options
+ */
 export const exportToExcel = async (
-  data: any[],
-  headers: string[],
-  options: ExportOptions = {}
-): Promise<void> => {
-  const { fileName = 'data.xlsx', sheetName = 'Sheet1' } = options;
-
+  data: any[], 
+  columns: string[], 
+  fileName: string, 
+  options?: Partial<ExportOptions>
+) => {
   const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet(sheetName);
-
-  // Add headers
-  sheet.addRow(headers);
-
+  const worksheet = workbook.addWorksheet(options?.sheetName || 'Sheet 1');
+  
+  // Format columns with headers if requested
+  if (options?.includeHeaders !== false) {
+    const headerRow = worksheet.addRow(
+      columns.map(col => {
+        // Handle complex column names or use the column name directly
+        const label = typeof col === 'object' ? col.label || col.name : col;
+        return label.charAt(0).toUpperCase() + label.slice(1).replace(/([A-Z])/g, ' $1');
+      })
+    );
+    
+    // Apply header styling if provided
+    if (options?.headerStyle) {
+      headerRow.eachCell(cell => {
+        Object.assign(cell, options.headerStyle);
+      });
+    }
+  }
+  
   // Add data rows
   data.forEach(item => {
-    const row = headers.map(header => item[header] || '');
-    sheet.addRow(row);
+    const rowData = columns.map(col => {
+      // Handle nested properties
+      if (typeof col === 'string' && col.includes('.')) {
+        return col.split('.').reduce((obj, key) => obj && obj[key] !== undefined ? obj[key] : '', item);
+      }
+      
+      const colName = typeof col === 'object' ? col.name : col;
+      return item[colName] !== undefined ? item[colName] : '';
+    });
+    
+    const row = worksheet.addRow(rowData);
+    
+    // Apply cell styling if provided
+    if (options?.cellStyle) {
+      row.eachCell(cell => {
+        Object.assign(cell, options.cellStyle);
+      });
+    }
   });
-
-  // Generate Excel file
+  
+  // Auto-fit columns
+  worksheet.columns.forEach(column => {
+    const lengths = column.values?.filter(v => v !== undefined).map(v => v.toString().length) || [];
+    const maxLength = Math.max(...lengths, 10);
+    column.width = maxLength + 2;
+  });
+  
+  // Generate the Excel file
   const buffer = await workbook.xlsx.writeBuffer();
-
-  // Save the file
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  saveAs(blob, fileName);
+  saveAs(blob, `${fileName}.xlsx`);
+  
+  return { success: true };
 };
 
-// Function to start the Excel export job
-export const startExcelExport = async (
-  tableName: string,
-  queryParams: any,
-  options: ExportOptions = {}
-): Promise<string | null> => {
+// The following functions are used by ExcelExportButton
+export const startExcelExport = async (tableId: string, filters = {}) => {
   try {
+    const { data: authUser } = await supabase.auth.getUser();
+    const userId = authUser?.user?.id;
+
+    if (!userId) {
+      throw new Error('User not authenticated');
+    }
+
     const { data, error } = await supabase
       .from('export_jobs')
       .insert({
-        table_name: tableName,
-        query_params: queryParams,
-        file_name: options.fileName || `${tableName}_${new Date().toISOString()}.xlsx`,
         status: 'waiting',
+        table_name: tableId,
+        query_params: filters,
+        created_by: userId,
         progress: 0,
-        total_rows: 0,
         processed_rows: 0,
-        created_by: supabase.auth.user()?.id,
+        total_rows: 0,
+        file_name: `${tableId}_export_${new Date().toISOString().split('T')[0]}.xlsx`
       })
-      .select('id')
+      .select()
       .single();
 
-    if (error) {
-      toast.error(`Failed to start export: ${error.message}`);
-      return null;
-    }
-
-    toast.success('Export started successfully!');
-    return data.id;
+    if (error) throw error;
+    
+    return { 
+      success: true, 
+      jobId: data.id 
+    };
   } catch (error: any) {
-    toast.error(`Unexpected error starting export: ${error.message}`);
-    return null;
+    console.error('Failed to start export:', error);
+    return { 
+      success: false, 
+      error: error.message 
+    };
   }
 };
 
-// Function to check the export status
-export const checkExportStatus = async (jobId: string): Promise<any> => {
+export const checkExportStatus = async (jobId: string) => {
   try {
     const { data, error } = await supabase
       .from('export_jobs')
       .select('*')
       .eq('id', jobId)
       .single();
-
-    if (error) {
-      console.error('Error checking export status:', error);
-      return null;
+      
+    if (error) throw error;
+    
+    if (data.status === 'complete' && data.file_url) {
+      return {
+        success: true,
+        status: data.status,
+        progress: data.progress,
+        fileUrl: data.file_url
+      };
+    } else if (data.status === 'error') {
+      return {
+        success: false,
+        error: data.error_message || 'Export failed'
+      };
+    } else {
+      return {
+        success: true,
+        status: data.status,
+        progress: data.progress,
+        processed: data.processed_rows,
+        total: data.total_rows
+      };
     }
-
-    return data;
-  } catch (error) {
-    console.error('Unexpected error checking export status:', error);
-    return null;
+  } catch (error: any) {
+    console.error('Failed to check export status:', error);
+    return { 
+      success: false, 
+      error: error.message 
+    };
   }
 };
 
-// Function to download the exported file
-export const downloadExportedFile = (job: any): void => {
-  if (job?.status === 'complete' && job?.file_url) {
-    const link = document.createElement('a');
-    link.href = job.file_url;
-    link.download = job.file_name || 'exported_data.xlsx';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success('File downloaded successfully!');
-  } else if (job?.status === 'error') {
-    toast.error(`Export failed: ${job?.error_message || 'Unknown error'}`);
-  } else {
-    toast.info(`Export is in progress: ${job?.processed_rows || 0} / ${job?.total_rows || 0} rows processed.`);
+export const downloadExportedFile = async (fileUrl: string) => {
+  try {
+    window.open(fileUrl, '_blank');
+    return { success: true };
+  } catch (error: any) {
+    console.error('Failed to download file:', error);
+    return { 
+      success: false, 
+      error: error.message 
+    };
   }
 };
+
+// Better naming for export list function (replacing exportListToExcel)
+export { exportToExcel as exportListToExcel };

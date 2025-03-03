@@ -1,4 +1,3 @@
-
 import {
   Sidebar,
   SidebarContent,
@@ -22,7 +21,7 @@ import {
   FileText,
   Database,
   User,
-  Activity as ActivityIcon
+  Activity
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Link, useLocation } from "react-router-dom";
@@ -49,7 +48,7 @@ export function AppSidebar() {
         { title: "Schools", icon: School, href: "/superadmin/schools" },
         { title: "Reports", icon: BookOpen, href: "/superadmin/reports" },
         { title: "Tables", icon: Table, href: "/superadmin/tables" },
-        { title: "Monitoring", icon: ActivityIcon, href: "/superadmin/monitoring" },
+        { title: "Monitoring", icon: Activity, href: "/superadmin/monitoring" },
         ...defaultItems
       ];
     }

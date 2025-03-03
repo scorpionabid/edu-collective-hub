@@ -1,328 +1,314 @@
 import React, { useState } from 'react';
-import { 
-  Table, 
-  TableBody, 
-  TableCaption, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import {
-  Eye,
-  ArrowUpDown,
-  ArrowDown,
-  ArrowUp,
-  Clock,
-  FileJson
-} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
 import { AuditLogEntry } from '@/lib/monitoring/types';
+import { Checkbox } from "@/components/ui/checkbox";
+import { DownloadCloud, Eye, RefreshCw } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface AuditLogTableProps {
   logs: AuditLogEntry[];
 }
 
 const AuditLogTable: React.FC<AuditLogTableProps> = ({ logs }) => {
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sortColumn, setSortColumn] = useState<keyof AuditLogEntry>('timestamp');
+  const [selectedLogs, setSelectedLogs] = useState<string[]>([]);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [selectedLogDetails, setSelectedLogDetails] = useState<AuditLogEntry | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortColumn, setSortColumn] = useState<'action' | 'table' | 'user' | 'timestamp'>('timestamp');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  const [selectedLog, setSelectedLog] = useState<AuditLogEntry | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'diff' | 'old' | 'new'>('diff');
-  
-  const itemsPerPage = 10;
-  const totalPages = Math.ceil(logs.length / itemsPerPage);
-  
-  // Handle sorting
-  const handleSort = (column: keyof AuditLogEntry) => {
-    if (column === sortColumn) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortColumn(column);
-      setSortDirection('asc');
-    }
+  const [actionFilter, setActionFilter] = useState<string>('');
+
+  const getTimestamp = (log: AuditLogEntry) => {
+    return log.timestamp || log.created_at || '';
   };
-  
-  // Apply sorting and pagination
-  const sortedLogs = [...logs].sort((a, b) => {
-    const aValue = a[sortColumn];
-    const bValue = b[sortColumn];
+
+  const filteredLogs = logs.filter(log => {
+    const term = searchTerm.toLowerCase();
+    const action = log.action.toLowerCase();
+    const table = (log.tableName || log.table_name || '').toLowerCase();
+    const user = (log.userId || log.user_id || '').toLowerCase();
     
-    if (aValue === undefined || bValue === undefined) {
-      return 0;
+    const matchesSearch = term
+      ? action.includes(term) || table.includes(term) || user.includes(term)
+      : true;
+    
+    const matchesAction = actionFilter ? log.action === actionFilter : true;
+    
+    return matchesSearch && matchesAction;
+  });
+
+  const sortedLogs = [...filteredLogs].sort((a, b) => {
+    const aValue = (log: AuditLogEntry) => {
+      switch (sortColumn) {
+        case 'action': return log.action;
+        case 'table': return log.tableName || log.table_name || '';
+        case 'user': return log.userId || log.user_id || '';
+        case 'timestamp': return getTimestamp(log);
+        default: return '';
+      }
+    };
+
+    const aVal = aValue(a);
+    const bVal = aValue(b);
+
+    if (aVal < bVal) {
+      return sortDirection === 'asc' ? -1 : 1;
     }
-    
-    if (typeof aValue === 'string' && typeof bValue === 'string') {
-      return sortDirection === 'asc' 
-        ? aValue.localeCompare(bValue) 
-        : bValue.localeCompare(aValue);
+    if (aVal > bVal) {
+      return sortDirection === 'asc' ? 1 : -1;
     }
-    
-    const aNum = Number(aValue);
-    const bNum = Number(bValue);
-    
-    if (!isNaN(aNum) && !isNaN(bNum)) {
-      return sortDirection === 'asc' ? aNum - bNum : bNum - aNum;
-    }
-    
     return 0;
   });
-  
-  const paginatedLogs = sortedLogs.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-  
-  // Handle view log details
-  const handleViewLog = (log: AuditLogEntry) => {
-    setSelectedLog(log);
-    setIsDialogOpen(true);
+
+  const toggleLogSelection = (logId: string, checked: boolean) => {
+    setSelectedLogs(prev => {
+      if (checked) {
+        return [...prev, logId];
+      } else {
+        return prev.filter(id => id !== logId);
+      }
+    });
   };
-  
-  // Get color by action type
-  const getActionColor = (action: string) => {
-    switch (action.toUpperCase()) {
-      case 'INSERT':
-        return 'bg-green-100 text-green-800';
-      case 'UPDATE':
-        return 'bg-blue-100 text-blue-800';
-      case 'DELETE':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+
+  const toggleAllSelection = (checked: boolean) => {
+    if (checked) {
+      setSelectedLogs(filteredLogs.map(log => log.id as string));
+    } else {
+      setSelectedLogs([]);
     }
   };
-  
-  // Format JSON diff for display
-  const formatJsonDiff = (oldData: any, newData: any) => {
-    if (!oldData && !newData) return null;
-    
-    if (viewMode === 'old' && oldData) {
-      return <pre className="text-xs overflow-auto max-h-96 p-4 bg-gray-50 rounded">{JSON.stringify(oldData, null, 2)}</pre>;
-    }
-    
-    if (viewMode === 'new' && newData) {
-      return <pre className="text-xs overflow-auto max-h-96 p-4 bg-gray-50 rounded">{JSON.stringify(newData, null, 2)}</pre>;
-    }
-    
-    // Simple diff view
-    if (oldData && newData) {
-      const allKeys = new Set([...Object.keys(oldData), ...Object.keys(newData)]);
-      return (
-        <div className="text-xs overflow-auto max-h-96 p-4 bg-gray-50 rounded">
-          <table className="w-full">
-            <thead>
-              <tr>
-                <th className="text-left font-semibold p-1">Field</th>
-                <th className="text-left font-semibold p-1">Old Value</th>
-                <th className="text-left font-semibold p-1">New Value</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Array.from(allKeys).map(key => {
-                const oldVal = oldData[key];
-                const newVal = newData[key];
-                const isChanged = JSON.stringify(oldVal) !== JSON.stringify(newVal);
-                
-                return (
-                  <tr key={key} className={isChanged ? "bg-yellow-50" : ""}>
-                    <td className="p-1 border-t border-gray-200">{key}</td>
-                    <td className={`p-1 border-t border-gray-200 ${isChanged ? "line-through text-red-600" : ""}`}>
-                      {typeof oldVal === 'object' 
-                        ? JSON.stringify(oldVal) 
-                        : String(oldVal !== undefined ? oldVal : '')}
-                    </td>
-                    <td className={`p-1 border-t border-gray-200 ${isChanged ? "text-green-600" : ""}`}>
-                      {typeof newVal === 'object' 
-                        ? JSON.stringify(newVal) 
-                        : String(newVal !== undefined ? newVal : '')}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      );
-    }
-    
-    // Only old data (DELETE)
-    if (oldData) {
-      return <pre className="text-xs overflow-auto max-h-96 p-4 bg-gray-50 rounded text-red-600">{JSON.stringify(oldData, null, 2)}</pre>;
-    }
-    
-    // Only new data (INSERT)
-    if (newData) {
-      return <pre className="text-xs overflow-auto max-h-96 p-4 bg-gray-50 rounded text-green-600">{JSON.stringify(newData, null, 2)}</pre>;
-    }
-    
-    return null;
+
+  const openDetailsDialog = (log: AuditLogEntry) => {
+    setSelectedLogDetails(log);
+    setDetailsDialogOpen(true);
   };
-  
+
+  const closeDetailsDialog = () => {
+    setDetailsDialogOpen(false);
+    setSelectedLogDetails(null);
+  };
+
+  const handleDownload = () => {
+    alert('Download functionality not implemented yet.');
+  };
+
+  const getActionVariant = (action: string) => {
+    switch (action) {
+      case 'create': return 'success';
+      case 'update': return 'warning';
+      case 'delete': return 'destructive';
+      default: return 'default';
+    }
+  };
+
   return (
-    <>
-      <div className="rounded-md border">
-        <Table>
-          <TableCaption>Audit trail of system activities</TableCaption>
-          <TableHeader>
-            <TableRow>
-              <TableHead onClick={() => handleSort('action')} className="cursor-pointer w-[100px]">
-                <div className="flex items-center">
-                  Action
-                  {sortColumn === 'action' && (
-                    sortDirection === 'asc' ? <ArrowUp className="ml-1 h-4 w-4" /> : <ArrowDown className="ml-1 h-4 w-4" />
-                  )}
-                </div>
-              </TableHead>
-              <TableHead onClick={() => handleSort('tableName')} className="cursor-pointer">
-                <div className="flex items-center">
-                  Table
-                  {sortColumn === 'tableName' && (
-                    sortDirection === 'asc' ? <ArrowUp className="ml-1 h-4 w-4" /> : <ArrowDown className="ml-1 h-4 w-4" />
-                  )}
-                </div>
-              </TableHead>
-              <TableHead>Record ID</TableHead>
-              <TableHead onClick={() => handleSort('timestamp')} className="cursor-pointer">
-                <div className="flex items-center whitespace-nowrap">
-                  <Clock className="mr-1 h-4 w-4" /> Timestamp
-                  {sortColumn === 'timestamp' && (
-                    sortDirection === 'asc' ? <ArrowUp className="ml-1 h-4 w-4" /> : <ArrowDown className="ml-1 h-4 w-4" />
-                  )}
-                </div>
-              </TableHead>
-              <TableHead>User</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {paginatedLogs.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                  No audit logs found
-                </TableCell>
-              </TableRow>
-            ) : (
-              paginatedLogs.map((log) => (
-                <TableRow key={log.id}>
-                  <TableCell>
-                    <Badge variant="outline" className={getActionColor(log.action)}>
-                      {log.action}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{log.tableName}</TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {log.recordId ? log.recordId.substring(0, 8) + '...' : '-'}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {log.timestamp ? format(new Date(log.timestamp), 'yyyy-MM-dd HH:mm:ss') : 'N/A'}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {log.userId ? log.userId.substring(0, 8) + '...' : 'System'}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => handleViewLog(log)}
-                      disabled={!log.oldData && !log.newData}
-                    >
-                      <Eye className="h-4 w-4 mr-1" /> View
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      
-      {/* Pagination controls */}
-      {totalPages > 1 && (
-        <div className="flex justify-end items-center mt-4 space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
-          >
-            Previous
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <div>
+          <CardTitle>Audit Logs</CardTitle>
+          <CardDescription>
+            System activity and user actions
+          </CardDescription>
+        </div>
+        <div className="flex space-x-2">
+          <Button variant="outline" size="sm" onClick={handleDownload}>
+            <DownloadCloud className="mr-2 h-4 w-4" />
+            Download
           </Button>
-          <span className="text-sm text-muted-foreground">
-            Page {currentPage} of {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
-          >
-            Next
+          <Button variant="outline" size="sm" onClick={() => alert('Refresh not implemented')}>
+            <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+            Refresh
           </Button>
         </div>
-      )}
-      
-      {/* Detail Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="flex flex-col-reverse sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="search">Search:</Label>
+              <Input
+                id="search"
+                placeholder="Search logs..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="max-w-xs"
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="action-filter">Filter by Action:</Label>
+              <Select value={actionFilter} onValueChange={setActionFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="All Actions" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Actions</SelectItem>
+                  {[...new Set(logs.map(log => log.action))].map(action => (
+                    <SelectItem key={action} value={action}>{action}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          <div className="rounded-md border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={selectedLogs.length === filteredLogs.length && filteredLogs.length > 0}
+                      onCheckedChange={toggleAllSelection}
+                    />
+                  </TableHead>
+                  <TableHead>Action</TableHead>
+                  <TableHead>Table</TableHead>
+                  <TableHead>User</TableHead>
+                  <TableHead>Timestamp</TableHead>
+                  <TableHead className="text-right">Details</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredLogs.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-24 text-center">
+                      No audit logs found.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  sortedLogs.map((log) => (
+                    <TableRow key={log.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedLogs.includes(log.id as string)}
+                          onCheckedChange={(checked) => toggleLogSelection(log.id as string, !!checked)}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getActionVariant(log.action)}>
+                          {log.action}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{log.tableName || log.table_name}</TableCell>
+                      <TableCell>{log.userId || log.user_id || 'N/A'}</TableCell>
+                      <TableCell>{getTimestamp(log) ? format(new Date(getTimestamp(log)), 'MMM d, yyyy HH:mm:ss') : 'N/A'}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openDetailsDialog(log)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      </CardContent>
+
+      <Dialog open={detailsDialogOpen} onOpenChange={closeDetailsDialog}>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Audit Log Detail</DialogTitle>
+            <DialogTitle>Audit Log Details</DialogTitle>
             <DialogDescription>
-              {selectedLog?.action} operation on table <span className="font-semibold">{selectedLog?.tableName}</span>{" "}
-              at {selectedLog?.timestamp ? format(new Date(selectedLog.timestamp), 'yyyy-MM-dd HH:mm:ss') : '-'}
+              Details for the selected audit log entry.
             </DialogDescription>
           </DialogHeader>
-          
-          {/* View mode selector */}
-          {(selectedLog?.oldData || selectedLog?.newData) && (
-            <div className="flex gap-2 mb-4">
-              <Button 
-                variant={viewMode === 'diff' ? 'default' : 'outline'} 
-                size="sm"
-                onClick={() => setViewMode('diff')}
-              >
-                <FileJson className="h-4 w-4 mr-1" /> Diff View
-              </Button>
-              {selectedLog?.oldData && (
-                <Button 
-                  variant={viewMode === 'old' ? 'default' : 'outline'} 
-                  size="sm"
-                  onClick={() => setViewMode('old')}
-                >
-                  <FileJson className="h-4 w-4 mr-1" /> Old Data
-                </Button>
-              )}
-              {selectedLog?.newData && (
-                <Button 
-                  variant={viewMode === 'new' ? 'default' : 'outline'} 
-                  size="sm"
-                  onClick={() => setViewMode('new')}
-                >
-                  <FileJson className="h-4 w-4 mr-1" /> New Data
-                </Button>
-              )}
+          <ScrollArea className="h-[400px] w-full">
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="action" className="text-right">Action:</Label>
+                <Input id="action" value={selectedLogDetails?.action || 'N/A'} readOnly className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="table" className="text-right">Table:</Label>
+                <Input id="table" value={selectedLogDetails?.tableName || selectedLogDetails?.table_name || 'N/A'} readOnly className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="user" className="text-right">User ID:</Label>
+                <Input id="user" value={selectedLogDetails?.userId || selectedLogDetails?.user_id || 'N/A'} readOnly className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="timestamp" className="text-right">Timestamp:</Label>
+                <Input
+                  id="timestamp"
+                  value={getTimestamp(selectedLogDetails) ? format(new Date(getTimestamp(selectedLogDetails)), 'MMM d, yyyy HH:mm:ss') : 'N/A'}
+                  readOnly
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="old-data" className="text-right mt-2">Old Data:</Label>
+                <div className="col-span-3">
+                  <pre className="rounded-md bg-muted p-4 font-mono text-sm">
+                    {selectedLogDetails?.oldData ? JSON.stringify(selectedLogDetails.oldData, null, 2) : 'N/A'}
+                  </pre>
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="new-data" className="text-right mt-2">New Data:</Label>
+                <div className="col-span-3">
+                  <pre className="rounded-md bg-muted p-4 font-mono text-sm">
+                    {selectedLogDetails?.newData ? JSON.stringify(selectedLogDetails.newData, null, 2) : 'N/A'}
+                  </pre>
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="ip-address" className="text-right">IP Address:</Label>
+                <Input id="ip-address" value={selectedLogDetails?.ipAddress || selectedLogDetails?.ip_address || 'N/A'} readOnly className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="user-agent" className="text-right">User Agent:</Label>
+                <Input id="user-agent" value={selectedLogDetails?.userAgent || selectedLogDetails?.user_agent || 'N/A'} readOnly className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="component" className="text-right">Component:</Label>
+                <Input id="component" value={selectedLogDetails?.component || 'N/A'} readOnly className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="duration" className="text-right">Duration (ms):</Label>
+                <Input id="duration" value={selectedLogDetails?.durationMs?.toString() || selectedLogDetails?.duration_ms?.toString() || 'N/A'} readOnly className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="success" className="text-right">Success:</Label>
+                <Input id="success" value={selectedLogDetails?.success ? 'Yes' : 'No'} readOnly className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="metadata" className="text-right mt-2">Metadata:</Label>
+                <div className="col-span-3">
+                  <pre className="rounded-md bg-muted p-4 font-mono text-sm">
+                    {selectedLogDetails?.metadata ? JSON.stringify(selectedLogDetails.metadata, null, 2) : 'N/A'}
+                  </pre>
+                </div>
+              </div>
             </div>
-          )}
-          
-          {/* Data diff */}
-          {selectedLog && formatJsonDiff(selectedLog.oldData, selectedLog.newData)}
-          
-          {/* Metadata */}
-          {selectedLog?.metadata && (
-            <div className="mt-4">
-              <h3 className="text-sm font-semibold mb-2">Additional Metadata</h3>
-              <pre className="text-xs overflow-auto max-h-40 p-4 bg-gray-50 rounded">
-                {JSON.stringify(selectedLog.metadata, null, 2)}
-              </pre>
-            </div>
-          )}
+          </ScrollArea>
         </DialogContent>
       </Dialog>
-    </>
+    </Card>
   );
 };
 

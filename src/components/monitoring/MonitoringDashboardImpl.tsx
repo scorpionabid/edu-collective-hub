@@ -96,7 +96,17 @@ const MonitoringDashboardImpl = () => {
         clsScore: item.cls_score,
         deviceInfo: item.device_info as Record<string, any>,
         networkInfo: item.network_info as Record<string, any>,
-        timestamp: item.timestamp
+        timestamp: item.timestamp,
+        // Include DB column mappings for type compatibility
+        page_path: item.page_path,
+        load_time_ms: item.load_time_ms,
+        user_id: item.user_id,
+        ttfb_ms: item.ttfb_ms,
+        lcp_ms: item.lcp_ms,
+        fid_ms: item.fid_ms,
+        cls_score: item.cls_score,
+        device_info: item.device_info,
+        network_info: item.network_info
       }));
 
       setPerformanceMetrics(mappedPerfData);
@@ -121,7 +131,15 @@ const MonitoringDashboardImpl = () => {
         browserInfo: item.browser_info as Record<string, any>,
         timestamp: item.timestamp,
         resolved: item.resolved,
-        resolutionNotes: item.resolution_notes
+        resolutionNotes: item.resolution_notes,
+        // Include DB column mappings for type compatibility
+        user_id: item.user_id,
+        error_message: item.error_message,
+        error_stack: item.error_stack,
+        error_context: item.error_context,
+        page_path: item.page_path,
+        browser_info: item.browser_info,
+        resolution_notes: item.resolution_notes
       }));
 
       setErrorLogs(mappedErrorData);
@@ -145,7 +163,15 @@ const MonitoringDashboardImpl = () => {
         userId: item.user_id,
         timestamp: item.timestamp,
         requestParams: item.request_params as Record<string, any>,
-        responseSummary: item.response_summary as Record<string, any>
+        responseSummary: item.response_summary as Record<string, any>,
+        // Include DB column mappings for type compatibility
+        status_code: item.status_code,
+        duration_ms: item.duration_ms,
+        request_size: item.request_size,
+        response_size: item.response_size,
+        user_id: item.user_id,
+        request_params: item.request_params,
+        response_summary: item.response_summary
       }));
 
       setApiMetrics(mappedApiData);
@@ -172,7 +198,17 @@ const MonitoringDashboardImpl = () => {
         durationMs: item.duration_ms,
         success: item.success,
         metadata: item.metadata as Record<string, any>,
-        timestamp: item.created_at
+        timestamp: item.created_at,
+        // Include DB column mappings for type compatibility
+        table_name: item.table_name,
+        record_id: item.record_id,
+        user_id: item.user_id,
+        old_data: item.old_data,
+        new_data: item.new_data,
+        ip_address: item.ip_address,
+        user_agent: item.user_agent,
+        duration_ms: item.duration_ms,
+        created_at: item.created_at
       }));
 
       setAuditLogs(mappedAuditData);

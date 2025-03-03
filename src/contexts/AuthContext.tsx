@@ -111,11 +111,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (email: string, password: string) => {
     try {
-      const result = await trackApiCall(
-        'auth/login',
-        'POST',
-        async () => await api.auth.login(email, password)
-      );
+      const result = await api.auth.login(email, password);
       
       if (!result.success) {
         throw new Error(result.error || 'Login failed');
@@ -133,19 +129,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signUp = async (email: string, password: string, firstName: string, lastName: string) => {
     try {
-      const result = await trackApiCall(
-        'auth/signUp',
-        'POST',
-        async () => await api.auth.signUp({ 
-          email, 
-          password, 
-          userData: { 
-            firstName, 
-            lastName, 
-            role: 'user' 
-          } 
-        })
-      );
+      const result = await api.auth.signUp({ 
+        email, 
+        password, 
+        userData: { 
+          firstName, 
+          lastName, 
+          role: 'user' 
+        } 
+      });
       
       if (!result.success) {
         throw new Error(result.error || 'Registration failed');
@@ -172,11 +164,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       logger.clearUserId();
       clearSentryUser();
       
-      await trackApiCall(
-        'auth/logout',
-        'POST',
-        async () => await api.auth.signOut()
-      );
+      await api.auth.signOut();
     } catch (error: any) {
       logger.error('Logout failed', { 
         errorMessage: error.message,
@@ -187,11 +175,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const resetPassword = async (email: string) => {
     try {
-      const result = await trackApiCall(
-        'auth/resetPassword',
-        'POST',
-        async () => await api.auth.resetPassword(email)
-      );
+      const result = await api.auth.resetPassword(email);
       
       if (!result.success) {
         throw new Error(result.error || 'Password reset failed');
@@ -209,11 +193,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const updatePassword = async (password: string) => {
     try {
-      const result = await trackApiCall(
-        'auth/updatePassword',
-        'POST',
-        async () => await api.auth.updatePassword(password)
-      );
+      const result = await api.auth.updatePassword(password);
       
       if (!result.success) {
         throw new Error(result.error || 'Password update failed');
@@ -231,11 +211,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const updateProfile = async (profileData: Partial<Omit<UserProfile, 'id' | 'userId' | 'createdAt'>>) => {
     try {
-      const result = await trackApiCall(
-        'auth/updateProfile',
-        'PUT',
-        async () => await api.auth.updateProfile(profileData)
-      );
+      const result = await api.auth.updateProfile(profileData);
       
       if (!result.success) {
         throw new Error(result.error || 'Profile update failed');
