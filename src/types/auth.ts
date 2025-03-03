@@ -1,6 +1,14 @@
 
-import { Session, User } from '@supabase/supabase-js';
+import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { UserProfile } from '@/lib/api/auth';
+
+// Extend the Supabase User type with our additional properties
+export interface User extends SupabaseUser {
+  role?: string;
+  regionId?: string;
+  sectorId?: string;
+  schoolId?: string;
+}
 
 export interface AuthState {
   session: Session | null;

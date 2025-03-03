@@ -161,7 +161,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         session,
-        user,
+        user: user ? {
+          ...user,
+          regionId: profile?.regionId,
+          sectorId: profile?.sectorId,
+          schoolId: profile?.schoolId,
+          role: profile?.role
+        } : null,
         profile,
         loading: contextLoading,
         login,

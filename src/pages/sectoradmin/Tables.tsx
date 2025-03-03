@@ -2,14 +2,13 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/hooks/useAuth';
+import { AdminLayout } from '@/components/layouts/AdminLayout';
 
 const SectorTables = () => {
   const { user } = useAuth();
   
   return (
-    <div className="container mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold mb-6">Sector Tables</h1>
-      
+    <AdminLayout title="Sector Tables">
       <Card>
         <CardHeader>
           <CardTitle>Tables for Sector Admin</CardTitle>
@@ -19,7 +18,7 @@ const SectorTables = () => {
           <p className="mt-4">Table management interface will be implemented here</p>
         </CardContent>
       </Card>
-    </div>
+    </AdminLayout>
   );
 };
 

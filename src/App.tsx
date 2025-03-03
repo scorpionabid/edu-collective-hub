@@ -6,7 +6,7 @@ import Login from "@/pages/Login";
 import NotFound from "@/pages/NotFound";
 import { useAuth } from "@/hooks/useAuth";
 import { PermissionProvider } from "@/contexts/PermissionContext";
-import { roleDashboardPaths } from "@/types/auth";
+import { roleDashboardPaths as dashboardPaths } from "@/types/auth";
 
 // SuperAdmin pages
 import SuperAdminDashboard from "@/pages/superadmin/Dashboard";
@@ -38,14 +38,6 @@ import SchoolDashboard from "@/pages/schooladmin/Dashboard";
 import SchoolProfile from "@/pages/schooladmin/Profile";
 import SchoolImport from "@/pages/schooladmin/Import";
 
-// Role paths mapping for redirects
-const roleDashboardPaths = {
-  superadmin: "/superadmin/dashboard",
-  regionadmin: "/regionadmin/dashboard",
-  sectoradmin: "/sectoradmin/dashboard",
-  schooladmin: "/schooladmin/dashboard"
-};
-
 // Protected route component
 const ProtectedRoute = ({ 
   children, 
@@ -68,7 +60,7 @@ const ProtectedRoute = ({
   // If roles are specified and user's role is not in the allowed roles, redirect to appropriate dashboard
   if (allowedRoles.length > 0 && profile && !allowedRoles.includes(profile.role)) {
     // Get the dashboard path for the user's role
-    const redirectPath = roleDashboardPaths[profile.role] || "/login";
+    const redirectPath = dashboardPaths[profile.role] || "/login";
     return <Navigate to={redirectPath} replace />;
   }
   
@@ -86,7 +78,7 @@ function App() {
           element={
             user && profile ? (
               // Redirect to the appropriate dashboard based on user role
-              <Navigate to={roleDashboardPaths[profile.role] || "/login"} replace />
+              <Navigate to={dashboardPaths[profile.role] || "/login"} replace />
             ) : (
               <Navigate to="/login" replace />
             )

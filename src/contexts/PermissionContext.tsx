@@ -1,6 +1,7 @@
 
 import React, { createContext, useContext, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { User } from '@/types/auth';
 
 // Define permission types
 type PermissionAction = 
@@ -103,7 +104,7 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
       hasPermission: (action: PermissionAction, target?: string): boolean => {
         if (!user) return false;
         
-        const userRole = user.role as keyof typeof rolePermissions;
+        const userRole = (user.role || 'schooladmin') as keyof typeof rolePermissions;
         if (!rolePermissions[userRole]) return false;
         
         const allowedTargets = rolePermissions[userRole][action] || [];
