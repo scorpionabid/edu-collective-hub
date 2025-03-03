@@ -1,15 +1,3 @@
-
-// Common types used across API modules
-
-export interface Category {
-  id: string;
-  name: string;
-  regionId?: string;
-  sectorId?: string;
-  schoolId?: string;
-  columns: Column[];
-}
-
 export interface Column {
   id: string;
   name: string;
@@ -17,170 +5,72 @@ export interface Column {
   categoryId: string;
 }
 
-export interface FormData {
-  id?: string;
-  categoryId: string;
+export interface Category {
+  id: string;
+  name: string;
+  regionId: string;
+  sectorId: string;
   schoolId: string;
-  data: Record<string, any>;
-  status: 'draft' | 'submitted' | 'approved' | 'rejected';
-  submittedAt?: string;
-  approvedAt?: string;
-  approvedBy?: string;
+  columns: Column[];
 }
 
-export interface Profile {
+export interface UserProfile {
   id: string;
+  userId: string;
   firstName: string;
   lastName: string;
-  email: string;
   role: string;
   regionId?: string;
   sectorId?: string;
   schoolId?: string;
-  userId?: string;
-}
-
-export interface TableVersion {
-  id: string;
-  tableId: string;
-  versionNumber: number;
-  schema: any;
-  isActive: boolean;
-  startedAt: string;
-  endedAt: string | null;
-  createdBy: string;
   createdAt: string;
 }
 
-export interface FormEntryVersion {
-  id: string;
-  formEntryId: string;
-  versionNumber: number;
-  tableVersionId: string;
-  data: any;
-  createdBy: string;
-  createdAt: string;
+// Redis cache related types
+export interface CacheConfig {
+  ttl: number; // Time to live in seconds
 }
 
-export interface VersionDiff {
-  added: string[];
-  removed: string[];
-  modified: {
-    [key: string]: {
-      before: any;
-      after: any;
-    }
+export interface CacheOptions {
+  enabled: boolean;
+  ttl?: number; // Time to live in seconds
+  invalidationTags?: string[];
+}
+
+export interface CacheManager {
+  get: <T>(key: string) => Promise<T | null>;
+  set: <T>(key: string, data: T, ttl?: number) => Promise<void>;
+  invalidate: (tags: string[]) => Promise<void>;
+}
+
+// Pagination related types
+export interface PaginationParams {
+  page: number;
+  pageSize: number;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  metadata: {
+    total: number;
+    page: number;
+    pageSize: number;
+    pageCount: number;
   };
 }
 
-// Notification System Types
-export interface NotificationGroup {
-  id: string;
-  name: string;
-  description?: string;
-  createdBy: string;
-  createdAt: string;
-  updatedAt?: string;
+export interface SortParams {
+  column: string;
+  direction: 'asc' | 'desc';
 }
 
-export interface CreateNotificationGroupData {
-  name: string;
-  description?: string;
+export interface FilterParams {
+  [key: string]: any;
 }
 
-export interface UpdateNotificationGroupData {
-  name?: string;
-  description?: string;
-}
-
-export interface NotificationGroupMember {
-  id: string;
-  groupId: string;
-  memberType: 'region' | 'sector' | 'school' | 'profile';
-  memberId: string;
-  memberName?: string;
-  createdAt: string;
-}
-
-export interface AddGroupMemberData {
-  memberType: 'region' | 'sector' | 'school' | 'profile';
-  memberId: string;
-}
-
-export interface MassNotification {
-  id: string;
-  title: string;
-  message: string;
-  notificationType: 'email' | 'sms' | 'app' | 'all';
-  deliveryStatus: 'pending' | 'in-progress' | 'completed' | 'failed';
-  sentCount: number;
-  createdBy: string;
-  createdAt: string;
-}
-
-export interface CreateMassNotificationData {
-  title: string;
-  message: string;
-  notificationType: 'email' | 'sms' | 'app' | 'all';
-  recipients: {
-    type: 'group' | 'region' | 'sector' | 'school' | 'profile';
-    id: string;
-  }[];
-}
-
-export interface MassNotificationRecipient {
-  id: string;
-  notificationId: string;
-  recipientType: 'region' | 'sector' | 'school' | 'profile';
-  recipientId: string;
-  recipientName?: string;
-  status: 'pending' | 'sent' | 'failed' | 'read';
-  sentAt?: string;
-  readAt?: string;
-  createdAt: string;
-}
-
-export interface NotificationStats {
-  total: number;
-  pending: number;
-  sent: number;
-  failed: number;
-  read: number;
-}
-
-export interface GetMassNotificationsParams {
-  limit?: number;
-  status?: 'pending' | 'in-progress' | 'completed' | 'failed';
-  createdBy?: string;
-  createdAfter?: string;
-  createdBefore?: string;
-}
-
-// Add Region type
-export interface Region {
-  id: string;
-  name: string;
-}
-
-export interface Sector {
-  id: string;
-  name: string;
-  region_id: string;
-  regionId?: string; // Added for consistency
-  regionName?: string; // Added for UI display purposes
-  schoolCount?: number; // Added for UI display purposes
-}
-
-export interface School {
-  id: string;
-  name: string;
-  sectorId?: string;
-  sector_id?: string; // Include this for backward compatibility
-  regionId?: string; // Added for easier region filtering
-  region_id?: string; // Include this for backward compatibility
-  address?: string;
-  phone?: string;
-  email?: string;
-  sectorName?: string; // Added for UI display purposes
-  regionName?: string; // Added for UI display purposes
+export interface QueryOptions {
+  pagination?: PaginationParams;
+  sort?: SortParams;
+  filters?: FilterParams;
+  cache?: CacheOptions;
 }

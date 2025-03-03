@@ -1,36 +1,143 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { Column, Category } from "@/lib/api/types";
-import * as XLSX from 'xlsx';
+import { Column, Category, PaginationParams, SortParams, FilterParams } from "@/lib/api/types";
+import { usePaginatedData } from "./usePaginatedData";
+import { useQuery } from "@tanstack/react-query";
+import { exportToExcel } from "@/utils/excelExport";
 
 export const useReportData = () => {
+  // Basic state
   const [selectedRegion, setSelectedRegion] = useState<string>("");
   const [selectedSector, setSelectedSector] = useState<string>("");
+  const [selectedSchool, setSelectedSchool] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
+  
+  // Data states
   const [filteredSectors, setFilteredSectors] = useState<any[]>([]);
+  const [filteredSchools, setFilteredSchools] = useState<any[]>([]);
   const [columns, setColumns] = useState<Column[]>([]);
-  const [data, setData] = useState<any[]>([]);
-  const [filters, setFilters] = useState<{ [key: string]: string }>({});
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
-
+  const [categories, setCategories] = useState<Category[]>([]);
+  
+  // Loading state 
+  const [loading, setLoading] = useState<boolean>(false);
+  
+  // Use the enhanced pagination hook for data
+  const {
+    data,
+    metadata,
+    isLoading: dataLoading,
+    filters,
+    sort,
+    pagination,
+    handleFilterChange,
+    handleSortChange,
+    handlePageChange,
+    handlePageSizeChange,
+    refetch
+  } = usePaginatedData({
+    queryKey: ['reports', selectedCategory],
+    queryFn: (options) => {
+      // Add the category filter
+      if (selectedCategory) {
+        options.filters = {
+          ...options.filters,
+          category_id: selectedCategory
+        };
+      }
+      
+      // Add school filter if selected
+      if (selectedSchool) {
+        options.filters = {
+          ...options.filters,
+          school_id: selectedSchool
+        };
+      }
+      
+      return api.formData.getAllByCategory(selectedCategory, options);
+    },
+    enabled: !!selectedCategory,
+    initialPagination: { page: 1, pageSize: 50 },
+    initialSort: { column: 'created_at', direction: 'desc' }
+  });
+  
+  // Fetch regions
+  const { data: regions = [] } = useQuery({
+    queryKey: ['regions'],
+    queryFn: api.regions.getAll,
+    staleTime: 1000 * 60 * 15 // 15 minutes
+  });
+  
   // Update filtered sectors when region changes
-  const updateFilteredSectors = (sectors: any[], regionId: string) => {
+  const updateFilteredSectors = useCallback(async (regionId: string) => {
     if (regionId) {
-      const filtered = sectors.filter(
-        (sector) => sector.region_id === regionId
-      );
-      setFilteredSectors(filtered);
-      setSelectedSector("");
-      setSelectedCategory("");
+      setLoading(true);
+      try {
+        const sectors = await api.sectors.getByRegion(regionId);
+        setFilteredSectors(sectors);
+        // Clear selections
+        setSelectedSector("");
+        setSelectedSchool("");
+        setSelectedCategory("");
+      } catch (error) {
+        console.error('Failed to fetch sectors:', error);
+        toast.error('Failed to load sectors');
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      setFilteredSectors([]);
     }
-  };
-
+  }, []);
+  
+  // Update filtered schools when sector changes
+  const updateFilteredSchools = useCallback(async (sectorId: string) => {
+    if (sectorId) {
+      setLoading(true);
+      try {
+        const schools = await api.schools.getBySector(sectorId);
+        setFilteredSchools(schools);
+        // Clear selections
+        setSelectedSchool("");
+        setSelectedCategory("");
+      } catch (error) {
+        console.error('Failed to fetch schools:', error);
+        toast.error('Failed to load schools');
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      setFilteredSchools([]);
+    }
+  }, []);
+  
+  // Fetch categories
+  const fetchCategories = useCallback(async (sectorId: string) => {
+    if (!sectorId) return;
+    
+    setLoading(true);
+    try {
+      // Fetch categories for the selected sector
+      const categoriesData = await api.categories.getAll();
+      // Filter categories by sector
+      const filteredCategories = categoriesData.filter(
+        (category) => category.sectorId === sectorId
+      );
+      setCategories(filteredCategories);
+    } catch (error) {
+      console.error('Failed to fetch categories:', error);
+      toast.error('Failed to load categories');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  
   // Fetch category columns
-  const fetchCategoryColumns = async (categoryId: string) => {
+  const fetchCategoryColumns = useCallback(async (categoryId: string) => {
     if (!categoryId) return;
     
+    setLoading(true);
     try {
       const category = await api.categories.getById(categoryId);
       if (category && category.columns) {
@@ -43,98 +150,96 @@ export const useReportData = () => {
     } catch (error) {
       console.error('Error fetching category columns:', error);
       toast.error('Failed to load category columns');
+    } finally {
+      setLoading(false);
     }
-  };
-
-  // Handle filtering
-  const handleFilter = (columnName: string, value: string) => {
-    setFilters((prev) => ({
-      ...prev,
-      [columnName]: value,
-    }));
-  };
-
-  // Handle sorting
-  const handleSort = (columnName: string) => {
-    setSortConfig((prev) => ({
-      key: columnName,
-      direction:
-        prev?.key === columnName && prev.direction === "asc" ? "desc" : "asc",
-    }));
-  };
-
-  // Filter and sort data
-  const filteredAndSortedData = () => {
-    let result = [...data];
-
-    Object.keys(filters).forEach((key) => {
-      if (filters[key]) {
-        result = result.filter((item) => {
-          const value = item.data ? item.data[key] : item[key];
-          return String(value)
-            .toLowerCase()
-            .includes(filters[key].toLowerCase());
-        });
-      }
-    });
-
-    if (sortConfig) {
-      result.sort((a, b) => {
-        const aValue = a.data ? a.data[sortConfig.key] : a[sortConfig.key];
-        const bValue = b.data ? b.data[sortConfig.key] : b[sortConfig.key];
-        
-        if (aValue < bValue) {
-          return sortConfig.direction === "asc" ? -1 : 1;
-        }
-        if (aValue > bValue) {
-          return sortConfig.direction === "asc" ? 1 : -1;
-        }
-        return 0;
-      });
-    }
-
-    return result;
-  };
-
-  // Export to Excel
+  }, []);
+  
+  // Filtered and sorted data handled by usePaginatedData hook
+  const filteredAndSortedData = data;
+  
+  // Export to Excel with batching for large datasets
   const handleExportToExcel = () => {
-    const exportData = filteredAndSortedData().map(item => {
-      const flatItem: Record<string, any> = {};
-      columns.forEach(column => {
-        flatItem[column.name] = item.data[column.name] || '';
-      });
-      return flatItem;
-    });
-
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Report");
+    if (!columns.length) {
+      toast.error('No columns selected for export');
+      return;
+    }
     
-    XLSX.writeFile(wb, "report.xlsx");
+    if (!filteredAndSortedData.length) {
+      toast.error('No data available for export');
+      return;
+    }
     
-    toast.success('Report exported successfully');
+    // Get the category name for the filename
+    const categoryName = categories.find(c => c.id === selectedCategory)?.name || 'report';
+    
+    try {
+      exportToExcel(filteredAndSortedData, columns, categoryName);
+      toast.success('Export initiated - file will download shortly');
+    } catch (error) {
+      console.error('Error exporting data:', error);
+      toast.error('Failed to export data');
+    }
   };
-
+  
+  // Effects
+  useEffect(() => {
+    if (selectedRegion) {
+      updateFilteredSectors(selectedRegion);
+    }
+  }, [selectedRegion, updateFilteredSectors]);
+  
+  useEffect(() => {
+    if (selectedSector) {
+      updateFilteredSchools(selectedSector);
+      fetchCategories(selectedSector);
+    }
+  }, [selectedSector, updateFilteredSchools, fetchCategories]);
+  
+  useEffect(() => {
+    if (selectedCategory) {
+      fetchCategoryColumns(selectedCategory);
+    }
+  }, [selectedCategory, fetchCategoryColumns]);
+  
   return {
+    // Selections
     selectedRegion,
     setSelectedRegion,
     selectedSector,
     setSelectedSector,
+    selectedSchool,
+    setSelectedSchool,
     selectedCategory,
     setSelectedCategory,
+    
+    // Data sources
+    regions,
     filteredSectors,
-    setFilteredSectors,
+    filteredSchools,
+    categories,
     columns,
-    setColumns,
-    data,
-    setData,
+    
+    // State
+    loading: loading || dataLoading,
+    
+    // Filtering, sorting and pagination
     filters,
-    sortConfig,
+    sort,
+    pagination,
+    handleFilterChange,
+    handleSortChange,
+    handlePageChange,
+    handlePageSizeChange,
+    
+    // Data and utilities
+    data: filteredAndSortedData,
+    metadata,
+    refetch,
     updateFilteredSectors,
+    updateFilteredSchools,
+    fetchCategories,
     fetchCategoryColumns,
-    handleFilter,
-    handleSort,
-    filteredAndSortedData,
     handleExportToExcel
   };
 };

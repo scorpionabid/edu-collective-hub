@@ -1,42 +1,55 @@
-
+import { Suspense, lazy } from "react";
 import { Route, Routes, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { PermissionProvider } from "@/contexts/PermissionContext";
+import { roleDashboardPaths } from "@/types/auth";
+
+// Load index page eagerly since it's the first page
 import Index from "@/pages/Index";
 import Login from "@/pages/Login";
 import NotFound from "@/pages/NotFound";
-import { useAuth } from "@/hooks/useAuth";
-import { PermissionProvider } from "@/contexts/PermissionContext";
-import { roleDashboardPaths as dashboardPaths } from "@/types/auth";
 
+// Lazy load all other pages for better performance
 // SuperAdmin pages
-import SuperAdminDashboard from "@/pages/superadmin/Dashboard";
-import Users from "@/pages/superadmin/Users";
-import Regions from "@/pages/superadmin/Regions";
-import Sectors from "@/pages/superadmin/Sectors";
-import Schools from "@/pages/superadmin/Schools";
-import SuperAdminReports from "@/pages/superadmin/Reports";
-import Tables from "@/pages/superadmin/Tables";
-import Settings from "@/pages/Settings";
+const SuperAdminDashboard = lazy(() => import("@/pages/superadmin/Dashboard"));
+const Users = lazy(() => import("@/pages/superadmin/Users"));
+const Regions = lazy(() => import("@/pages/superadmin/Regions"));
+const Sectors = lazy(() => import("@/pages/superadmin/Sectors"));
+const Schools = lazy(() => import("@/pages/superadmin/Schools"));
+const SuperAdminReports = lazy(() => import("@/pages/superadmin/Reports"));
+const Tables = lazy(() => import("@/pages/superadmin/Tables"));
+const Settings = lazy(() => import("@/pages/Settings"));
 
 // RegionAdmin pages
-import RegionDashboard from "@/pages/regionadmin/Dashboard";
-import RegionSectors from "@/pages/regionadmin/Sectors";
-import RegionSchools from "@/pages/regionadmin/Schools";
-import RegionTables from "@/pages/regionadmin/Tables";
-import RegionReports from "@/pages/regionadmin/Reports";
+const RegionDashboard = lazy(() => import("@/pages/regionadmin/Dashboard"));
+const RegionSectors = lazy(() => import("@/pages/regionadmin/Sectors"));
+const RegionSchools = lazy(() => import("@/pages/regionadmin/Schools"));
+const RegionTables = lazy(() => import("@/pages/regionadmin/Tables"));
+const RegionReports = lazy(() => import("@/pages/regionadmin/Reports"));
 
 // SectorAdmin pages
-import SectorDashboard from "@/pages/sectoradmin/Dashboard";
-import SectorReports from "@/pages/sectoradmin/Reports";
-import SectorTables from "@/pages/sectoradmin/Tables";
-import SectorUsers from "@/pages/sectoradmin/Users";
-import SectorCategories from "@/pages/sectoradmin/Categories";
-import SectorForms from "@/pages/sectoradmin/Forms";
+const SectorDashboard = lazy(() => import("@/pages/sectoradmin/Dashboard"));
+const SectorReports = lazy(() => import("@/pages/sectoradmin/Reports"));
+const SectorTables = lazy(() => import("@/pages/sectoradmin/Tables"));
+const SectorUsers = lazy(() => import("@/pages/sectoradmin/Users"));
+const SectorCategories = lazy(() => import("@/pages/sectoradmin/Categories"));
+const SectorForms = lazy(() => import("@/pages/sectoradmin/Forms"));
 
 // SchoolAdmin pages
-import SchoolDashboard from "@/pages/schooladmin/Dashboard";
-import SchoolProfile from "@/pages/schooladmin/Profile";
-import SchoolImport from "@/pages/schooladmin/Import";
+const SchoolDashboard = lazy(() => import("@/pages/schooladmin/Dashboard"));
+const SchoolProfile = lazy(() => import("@/pages/schooladmin/Profile"));
+const SchoolImport = lazy(() => import("@/pages/schooladmin/Import"));
+
+// Loading component
+const LoadingFallback = () => (
+  <div className="flex items-center justify-center h-screen w-full">
+    <div className="space-y-4 text-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+      <p className="text-muted-foreground">Loading...</p>
+    </div>
+  </div>
+);
 
 // Protected route component
 const ProtectedRoute = ({ 
@@ -49,7 +62,7 @@ const ProtectedRoute = ({
   const { user, profile, loading } = useAuth();
   
   if (loading) {
-    return <div>Loading...</div>;
+    return <LoadingFallback />;
   }
   
   // If user is not authenticated, redirect to login
@@ -60,7 +73,7 @@ const ProtectedRoute = ({
   // If roles are specified and user's role is not in the allowed roles, redirect to appropriate dashboard
   if (allowedRoles.length > 0 && profile && !allowedRoles.includes(profile.role)) {
     // Get the dashboard path for the user's role
-    const redirectPath = dashboardPaths[profile.role] || "/login";
+    const redirectPath = roleDashboardPaths[profile.role] || "/login";
     return <Navigate to={redirectPath} replace />;
   }
   
@@ -78,7 +91,7 @@ function App() {
           element={
             user && profile ? (
               // Redirect to the appropriate dashboard based on user role
-              <Navigate to={dashboardPaths[profile.role] || "/login"} replace />
+              <Navigate to={roleDashboardPaths[profile.role] || "/login"} replace />
             ) : (
               <Navigate to="/login" replace />
             )
@@ -86,7 +99,7 @@ function App() {
         />
         <Route path="/login" element={<Login />} />
         
-        {/* Wrap all the protected routes with PermissionProvider */}
+        {/* Wrap all the protected routes with PermissionProvider and Suspense */}
         <PermissionProvider>
           {/* Legacy path redirects */}
           <Route path="/dashboard" element={<Navigate to="/superadmin/dashboard" replace />} />
@@ -119,7 +132,9 @@ function App() {
             path="/superadmin/dashboard"
             element={
               <ProtectedRoute allowedRoles={['superadmin']}>
-                <SuperAdminDashboard />
+                <Suspense fallback={<LoadingFallback />}>
+                  <SuperAdminDashboard />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -127,7 +142,9 @@ function App() {
             path="/superadmin/users"
             element={
               <ProtectedRoute allowedRoles={['superadmin']}>
-                <Users />
+                <Suspense fallback={<LoadingFallback />}>
+                  <Users />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -135,7 +152,9 @@ function App() {
             path="/superadmin/regions"
             element={
               <ProtectedRoute allowedRoles={['superadmin']}>
-                <Regions />
+                <Suspense fallback={<LoadingFallback />}>
+                  <Regions />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -143,7 +162,9 @@ function App() {
             path="/superadmin/sectors"
             element={
               <ProtectedRoute allowedRoles={['superadmin', 'regionadmin']}>
-                <Sectors />
+                <Suspense fallback={<LoadingFallback />}>
+                  <Sectors />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -151,7 +172,9 @@ function App() {
             path="/superadmin/schools"
             element={
               <ProtectedRoute allowedRoles={['superadmin', 'regionadmin']}>
-                <Schools />
+                <Suspense fallback={<LoadingFallback />}>
+                  <Schools />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -159,7 +182,9 @@ function App() {
             path="/superadmin/reports"
             element={
               <ProtectedRoute allowedRoles={['superadmin']}>
-                <SuperAdminReports />
+                <Suspense fallback={<LoadingFallback />}>
+                  <SuperAdminReports />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -167,7 +192,9 @@ function App() {
             path="/superadmin/tables"
             element={
               <ProtectedRoute allowedRoles={['superadmin']}>
-                <Tables />
+                <Suspense fallback={<LoadingFallback />}>
+                  <Tables />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -175,7 +202,9 @@ function App() {
             path="/settings"
             element={
               <ProtectedRoute>
-                <Settings />
+                <Suspense fallback={<LoadingFallback />}>
+                  <Settings />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -185,7 +214,9 @@ function App() {
             path="/regionadmin/dashboard"
             element={
               <ProtectedRoute allowedRoles={['regionadmin']}>
-                <RegionDashboard />
+                <Suspense fallback={<LoadingFallback />}>
+                  <RegionDashboard />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -193,7 +224,9 @@ function App() {
             path="/regionadmin/sectors"
             element={
               <ProtectedRoute allowedRoles={['regionadmin']}>
-                <RegionSectors />
+                <Suspense fallback={<LoadingFallback />}>
+                  <RegionSectors />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -201,7 +234,9 @@ function App() {
             path="/regionadmin/schools"
             element={
               <ProtectedRoute allowedRoles={['regionadmin']}>
-                <RegionSchools />
+                <Suspense fallback={<LoadingFallback />}>
+                  <RegionSchools />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -209,7 +244,9 @@ function App() {
             path="/regionadmin/tables"
             element={
               <ProtectedRoute allowedRoles={['regionadmin']}>
-                <RegionTables />
+                <Suspense fallback={<LoadingFallback />}>
+                  <RegionTables />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -217,7 +254,9 @@ function App() {
             path="/regionadmin/reports"
             element={
               <ProtectedRoute allowedRoles={['regionadmin']}>
-                <RegionReports />
+                <Suspense fallback={<LoadingFallback />}>
+                  <RegionReports />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -227,7 +266,9 @@ function App() {
             path="/sectoradmin/dashboard"
             element={
               <ProtectedRoute allowedRoles={['sectoradmin']}>
-                <SectorDashboard />
+                <Suspense fallback={<LoadingFallback />}>
+                  <SectorDashboard />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -235,7 +276,9 @@ function App() {
             path="/sectoradmin/tables"
             element={
               <ProtectedRoute allowedRoles={['sectoradmin']}>
-                <SectorTables />
+                <Suspense fallback={<LoadingFallback />}>
+                  <SectorTables />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -243,7 +286,9 @@ function App() {
             path="/sectoradmin/users"
             element={
               <ProtectedRoute allowedRoles={['sectoradmin']}>
-                <SectorUsers />
+                <Suspense fallback={<LoadingFallback />}>
+                  <SectorUsers />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -251,7 +296,9 @@ function App() {
             path="/sectoradmin/categories"
             element={
               <ProtectedRoute allowedRoles={['sectoradmin']}>
-                <SectorCategories />
+                <Suspense fallback={<LoadingFallback />}>
+                  <SectorCategories />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -259,7 +306,9 @@ function App() {
             path="/sectoradmin/forms"
             element={
               <ProtectedRoute allowedRoles={['sectoradmin']}>
-                <SectorForms />
+                <Suspense fallback={<LoadingFallback />}>
+                  <SectorForms />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -267,7 +316,9 @@ function App() {
             path="/sectoradmin/reports"
             element={
               <ProtectedRoute allowedRoles={['sectoradmin']}>
-                <SectorReports />
+                <Suspense fallback={<LoadingFallback />}>
+                  <SectorReports />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -277,7 +328,9 @@ function App() {
             path="/schooladmin/dashboard"
             element={
               <ProtectedRoute allowedRoles={['schooladmin']}>
-                <SchoolDashboard />
+                <Suspense fallback={<LoadingFallback />}>
+                  <SchoolDashboard />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -285,7 +338,9 @@ function App() {
             path="/schooladmin/profile"
             element={
               <ProtectedRoute allowedRoles={['schooladmin']}>
-                <SchoolProfile />
+                <Suspense fallback={<LoadingFallback />}>
+                  <SchoolProfile />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -293,7 +348,9 @@ function App() {
             path="/schooladmin/import"
             element={
               <ProtectedRoute allowedRoles={['schooladmin']}>
-                <SchoolImport />
+                <Suspense fallback={<LoadingFallback />}>
+                  <SchoolImport />
+                </Suspense>
               </ProtectedRoute>
             }
           />

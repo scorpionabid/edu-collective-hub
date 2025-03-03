@@ -1,0 +1,98 @@
+
+# Performance Optimization Setup Instructions
+
+## Redis Setup for Caching
+
+1. Set up a Redis instance (either using Upstash, Redis Labs, or self-hosted)
+2. Add the following secrets to your Supabase project:
+   - REDIS_URL: Your Redis instance URL
+   - REDIS_PASSWORD: Your Redis instance password
+
+## Edge Function Deployment
+
+Deploy the redis-cache edge function from the Supabase dashboard:
+
+```bash
+supabase functions deploy redis-cache
+```
+
+## Database Indexing
+
+Run the following SQL to optimize database queries:
+
+```sql
+-- Add index for form data queries
+CREATE INDEX IF NOT EXISTS idx_data_category_id ON data(category_id);
+CREATE INDEX IF NOT EXISTS idx_data_school_id ON data(school_id);
+CREATE INDEX IF NOT EXISTS idx_data_status ON data(status);
+CREATE INDEX IF NOT EXISTS idx_data_created_at ON data(created_at);
+
+-- Add index for sectors queries
+CREATE INDEX IF NOT EXISTS idx_sectors_region_id ON sectors(region_id);
+
+-- Add index for categories queries
+CREATE INDEX IF NOT EXISTS idx_categories_sector_id ON categories(sector_id);
+CREATE INDEX IF NOT EXISTS idx_categories_region_id ON categories(region_id);
+
+-- Add index for schools queries
+CREATE INDEX IF NOT EXISTS idx_schools_sector_id ON schools(sector_id);
+
+-- Add a materialized view for common report aggregations
+CREATE MATERIALIZED VIEW IF NOT EXISTS mv_form_data_summary AS
+SELECT 
+  d.category_id,
+  c.name as category_name,
+  d.school_id,
+  s.name as school_name,
+  d.status,
+  count(*) as entry_count,
+  max(d.updated_at) as last_updated
+FROM 
+  data d
+JOIN
+  categories c ON d.category_id = c.id
+JOIN
+  schools s ON d.school_id = s.id
+GROUP BY
+  d.category_id, c.name, d.school_id, s.name, d.status;
+
+-- Create function to refresh materialized view
+CREATE OR REPLACE FUNCTION refresh_form_data_summary()
+RETURNS TRIGGER AS $$
+BEGIN
+  REFRESH MATERIALIZED VIEW CONCURRENTLY mv_form_data_summary;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger to refresh the materialized view
+CREATE TRIGGER refresh_form_data_summary_trigger
+AFTER INSERT OR UPDATE OR DELETE ON data
+FOR EACH STATEMENT
+EXECUTE FUNCTION refresh_form_data_summary();
+```
+
+## CDN Setup (Cloudflare)
+
+1. Set up Cloudflare for your domain
+2. Enable caching for static assets
+3. Set the following cache rules:
+   - Cache all static assets (JS, CSS, images) for 1 year
+   - Use Cloudflare's Auto Minify feature for HTML, CSS, and JavaScript
+   - Enable Brotli compression
+
+## Server Configuration
+
+1. Enable response compression in your server
+2. Set appropriate cache-control headers for static assets
+3. Configure connection pooling for database connections
+
+## Environment Variables
+
+Add the following environment variables to your project:
+
+```
+REACT_APP_ENABLE_CACHE=true
+REACT_APP_DEFAULT_PAGE_SIZE=50
+REACT_APP_MAX_IMPORT_ROWS=100000
+```
