@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { 
   Table, 
@@ -220,7 +219,7 @@ const AuditLogTable: React.FC<AuditLogTableProps> = ({ logs }) => {
                     {log.recordId ? log.recordId.substring(0, 8) + '...' : '-'}
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
-                    {log.timestamp ? format(new Date(log.timestamp), 'yyyy-MM-dd HH:mm:ss') : '-'}
+                    {log.timestamp ? format(new Date(log.timestamp), 'yyyy-MM-dd HH:mm:ss') : 'N/A'}
                   </TableCell>
                   <TableCell className="font-mono text-xs">
                     {log.userId ? log.userId.substring(0, 8) + '...' : 'System'}

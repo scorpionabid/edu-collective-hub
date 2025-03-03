@@ -21,7 +21,8 @@ import {
   LogOut,
   FileText,
   Database,
-  User
+  User,
+  Activity as ActivityIcon
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Link, useLocation } from "react-router-dom";
@@ -48,7 +49,7 @@ export function AppSidebar() {
         { title: "Schools", icon: School, href: "/superadmin/schools" },
         { title: "Reports", icon: BookOpen, href: "/superadmin/reports" },
         { title: "Tables", icon: Table, href: "/superadmin/tables" },
-        { title: "Monitoring", icon: Activity, href: "/superadmin/monitoring" },
+        { title: "Monitoring", icon: ActivityIcon, href: "/superadmin/monitoring" },
         ...defaultItems
       ];
     }

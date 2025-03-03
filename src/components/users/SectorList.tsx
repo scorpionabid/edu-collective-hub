@@ -1,10 +1,9 @@
-
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Shield, Info, FileDown } from "lucide-react";
 import { AdminForm } from "./AdminForm";
-import { exportListToExcel } from "@/utils/excelExport";
+import { exportToExcel } from '@/utils/excelExport';
 import { toast } from "sonner";
 
 type AdminType = 'regionadmin' | 'sectoradmin' | 'schooladmin';
@@ -55,7 +54,7 @@ export const SectorList = ({
       'Admin': sector.adminName || 'Təyin edilməyib'
     }));
     
-    exportListToExcel(exportData, 'Sektorlar');
+    exportToExcel(exportData, 'Sektorlar');
     toast.success('Sektorlar uğurla export edildi');
   };
 

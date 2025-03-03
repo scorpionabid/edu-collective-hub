@@ -1,5 +1,5 @@
 
-import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { api } from '@/lib/api';
 import type { User, Session } from '@supabase/supabase-js';
@@ -8,7 +8,7 @@ import { logger } from '@/lib/monitoring/logger';
 import { setSentryUser, clearSentryUser } from '@/lib/monitoring/sentry';
 import { trackApiCall } from '@/lib/monitoring/apiMetrics';
 
-interface AuthContextType {
+export interface AuthContextType {
   user: UserProfile | null;
   session: Session | null;
   loading: boolean;

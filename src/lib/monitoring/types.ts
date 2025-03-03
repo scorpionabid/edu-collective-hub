@@ -68,6 +68,7 @@ export interface ApiMetric {
 }
 
 export interface AuditLogEntry {
+  id?: string;
   action: string;
   tableName: string;
   recordId?: string;

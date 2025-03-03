@@ -30,7 +30,6 @@ import AuditLogTable from './AuditLogTable';
 import { supabase } from '@/integrations/supabase/client';
 import { ErrorLog, PerformanceMetric, ApiMetric, AuditLogEntry } from '@/lib/monitoring/types';
 
-// Mock data
 const mockSystemMetrics = [
   { name: 'CPU Usage', value: 42, max: 100, unit: '%', color: '#6366f1' },
   { name: 'Memory', value: 3.7, max: 8, unit: 'GB', color: '#8b5cf6' },
@@ -45,7 +44,6 @@ const MonitoringDashboardImpl = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   
-  // Data states
   const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetric[]>([]);
   const [errorLogs, setErrorLogs] = useState<ErrorLog[]>([]);
   const [apiMetrics, setApiMetrics] = useState<ApiMetric[]>([]);
@@ -58,7 +56,6 @@ const MonitoringDashboardImpl = () => {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      // Calculate date range based on selected timeRange
       const now = new Date();
       let startDate;
       
@@ -80,7 +77,6 @@ const MonitoringDashboardImpl = () => {
           startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
       }
 
-      // Fetch performance metrics
       const { data: perfData, error: perfError } = await supabase
         .from('performance_metrics')
         .select('*')
@@ -88,8 +84,7 @@ const MonitoringDashboardImpl = () => {
         .order('timestamp', { ascending: false });
 
       if (perfError) throw perfError;
-      
-      // Map database fields to our TypeScript types
+
       const mappedPerfData: PerformanceMetric[] = (perfData || []).map(item => ({
         id: item.id,
         userId: item.user_id,
@@ -99,14 +94,13 @@ const MonitoringDashboardImpl = () => {
         lcpMs: item.lcp_ms,
         fidMs: item.fid_ms,
         clsScore: item.cls_score,
-        deviceInfo: item.device_info,
-        networkInfo: item.network_info,
+        deviceInfo: item.device_info as Record<string, any>,
+        networkInfo: item.network_info as Record<string, any>,
         timestamp: item.timestamp
       }));
-      
+
       setPerformanceMetrics(mappedPerfData);
 
-      // Fetch error logs
       const { data: errorData, error: errorError } = await supabase
         .from('error_logs')
         .select('*')
@@ -114,26 +108,24 @@ const MonitoringDashboardImpl = () => {
         .order('timestamp', { ascending: false });
 
       if (errorError) throw errorError;
-      
-      // Map error logs
+
       const mappedErrorData: ErrorLog[] = (errorData || []).map(item => ({
         id: item.id,
         userId: item.user_id,
         errorMessage: item.error_message,
         errorStack: item.error_stack,
-        errorContext: item.error_context,
+        errorContext: item.error_context as Record<string, any>,
         component: item.component,
         pagePath: item.page_path,
         severity: item.severity as 'low' | 'medium' | 'high' | 'critical',
-        browserInfo: item.browser_info,
+        browserInfo: item.browser_info as Record<string, any>,
         timestamp: item.timestamp,
         resolved: item.resolved,
         resolutionNotes: item.resolution_notes
       }));
-      
+
       setErrorLogs(mappedErrorData);
 
-      // Fetch API metrics
       const { data: apiData, error: apiError } = await supabase
         .from('api_metrics')
         .select('*')
@@ -141,8 +133,7 @@ const MonitoringDashboardImpl = () => {
         .order('timestamp', { ascending: false });
 
       if (apiError) throw apiError;
-      
-      // Map API metrics
+
       const mappedApiData: ApiMetric[] = (apiData || []).map(item => ({
         id: item.id,
         endpoint: item.endpoint,
@@ -153,13 +144,12 @@ const MonitoringDashboardImpl = () => {
         responseSize: item.response_size,
         userId: item.user_id,
         timestamp: item.timestamp,
-        requestParams: item.request_params,
-        responseSummary: item.response_summary
+        requestParams: item.request_params as Record<string, any>,
+        responseSummary: item.response_summary as Record<string, any>
       }));
-      
+
       setApiMetrics(mappedApiData);
 
-      // Fetch audit logs
       const { data: auditData, error: auditError } = await supabase
         .from('audit_logs')
         .select('*')
@@ -167,9 +157,9 @@ const MonitoringDashboardImpl = () => {
         .order('created_at', { ascending: false });
 
       if (auditError) throw auditError;
-      
-      // Map audit logs
+
       const mappedAuditData: AuditLogEntry[] = (auditData || []).map(item => ({
+        id: item.id,
         action: item.action,
         tableName: item.table_name,
         recordId: item.record_id,
@@ -181,10 +171,10 @@ const MonitoringDashboardImpl = () => {
         component: item.component,
         durationMs: item.duration_ms,
         success: item.success,
-        metadata: item.metadata,
+        metadata: item.metadata as Record<string, any>,
         timestamp: item.created_at
       }));
-      
+
       setAuditLogs(mappedAuditData);
 
     } catch (error) {
@@ -207,7 +197,6 @@ const MonitoringDashboardImpl = () => {
 
       if (error) throw error;
       
-      // Update the local state
       setErrorLogs(prev => prev.map(log => 
         log.id === id 
           ? { ...log, resolved: true, resolutionNotes: notes } 
@@ -259,7 +248,6 @@ const MonitoringDashboardImpl = () => {
           throw new Error('Invalid export type');
       }
       
-      // Create and download the file
       const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -461,7 +449,6 @@ const MonitoringDashboardImpl = () => {
                 <CardDescription>Average load time by page route</CardDescription>
               </CardHeader>
               <CardContent>
-                {/* This would be a specialized chart component showing page performance by route */}
                 <div className="h-64 flex items-center justify-center text-muted-foreground">
                   Route performance chart would go here
                 </div>
@@ -490,7 +477,6 @@ const MonitoringDashboardImpl = () => {
               <CardDescription>Number of API requests over time</CardDescription>
             </CardHeader>
             <CardContent>
-              {/* This would be a specialized chart component showing API request volume */}
               <div className="h-64 flex items-center justify-center text-muted-foreground">
                 API request volume chart would go here
               </div>
@@ -503,7 +489,6 @@ const MonitoringDashboardImpl = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Export Dialog */}
       <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
         <DialogContent>
           <DialogHeader>
