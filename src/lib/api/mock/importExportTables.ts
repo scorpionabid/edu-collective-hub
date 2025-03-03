@@ -1,73 +1,283 @@
 
-// Mock implementation for import/export tables
 import { supabase } from '@/integrations/supabase/client';
-import { ImportJob, ExportJob } from '@/lib/monitoring/types';
 
-// This is a mock implementation since the import_jobs and export_jobs tables
-// don't exist in the supabase schema
-const importJobs: Record<string, ImportJob> = {};
-const exportJobs: Record<string, ExportJob> = {};
+// Define types for import/export jobs
+export interface ImportJob {
+  id: string;
+  status: 'waiting' | 'processing' | 'complete' | 'error';
+  progress: number;
+  total_rows: number;
+  processed_rows: number;
+  file_name: string;
+  table_name: string;
+  with_upsert: boolean;
+  key_field?: string;
+  errors: Array<{ row: number; message: string }>;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
 
-// Mock the fetch function for import jobs
-const originalFrom = supabase.from.bind(supabase);
-supabase.from = (table: string) => {
-  if (table === 'import_jobs') {
+export interface ExportJob {
+  id: string;
+  status: 'waiting' | 'processing' | 'complete' | 'error';
+  progress: number;
+  total_rows: number;
+  processed_rows: number;
+  file_name: string;
+  query_params: any;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  file_url?: string;
+  error_message?: string;
+}
+
+// Mock implementation for import/export tables functionality
+// This is a temporary solution until proper tables are created in Supabase
+let mockImportJobs: ImportJob[] = [];
+let mockExportJobs: ExportJob[] = [];
+
+// Simulate accessing and querying the import_jobs table
+export const mockImportJobsTable = {
+  select: () => {
     return {
-      select: () => ({
-        eq: () => ({
-          single: async () => ({ data: null, error: null }),
-          order: () => ({
-            limit: async () => ({ data: Object.values(importJobs), error: null })
-          })
-        }),
-        order: () => ({
-          limit: async () => ({ data: Object.values(importJobs), error: null })
-        })
-      }),
-      insert: async (data: any) => {
-        const id = crypto.randomUUID();
-        const job = { ...data, id };
-        importJobs[id] = job as ImportJob;
-        return { data: job, error: null };
+      order: (_column: string, _options?: any) => {
+        return {
+          eq: (_column: string, _value: any) => {
+            return {
+              single: () => {
+                return Promise.resolve({ 
+                  data: mockImportJobs[0] || null,
+                  error: null
+                });
+              },
+              // Return all mock jobs
+              then: (callback: (result: { data: ImportJob[] | null, error: any }) => void) => {
+                callback({ data: mockImportJobs, error: null });
+                return {
+                  catch: () => {}
+                };
+              }
+            };
+          },
+          // Return all mock jobs
+          then: (callback: (result: { data: ImportJob[] | null, error: any }) => void) => {
+            callback({ data: mockImportJobs, error: null });
+            return {
+              catch: () => {}
+            };
+          }
+        };
       },
-      update: async (data: any) => {
-        if (data.id && importJobs[data.id]) {
-          importJobs[data.id] = { ...importJobs[data.id], ...data };
-          return { data: importJobs[data.id], error: null };
-        }
-        return { data: null, error: 'Job not found' };
+      eq: (_column: string, _value: any) => {
+        return {
+          single: () => {
+            return Promise.resolve({ 
+              data: mockImportJobs[0] || null,
+              error: null
+            });
+          },
+          // Return filtered mock jobs (simplified)
+          then: (callback: (result: { data: ImportJob[] | null, error: any }) => void) => {
+            callback({ data: mockImportJobs, error: null });
+            return {
+              catch: () => {}
+            };
+          }
+        };
+      },
+      // Default selection behavior
+      then: (callback: (result: { data: ImportJob[] | null, error: any }) => void) => {
+        callback({ data: mockImportJobs, error: null });
+        return {
+          catch: () => {}
+        };
       }
-    } as any;
-  } else if (table === 'export_jobs') {
+    };
+  },
+  insert: (newJob: Partial<ImportJob>) => {
+    const job: ImportJob = {
+      id: crypto.randomUUID(),
+      status: 'waiting',
+      progress: 0,
+      total_rows: 0,
+      processed_rows: 0,
+      file_name: newJob.file_name || '',
+      table_name: newJob.table_name || '',
+      with_upsert: newJob.with_upsert || false,
+      key_field: newJob.key_field,
+      errors: [],
+      created_by: newJob.created_by || '',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      ...newJob
+    };
+    
+    mockImportJobs.push(job);
+    
     return {
-      select: () => ({
-        eq: () => ({
-          single: async () => ({ data: null, error: null }),
-          order: () => ({
-            limit: async () => ({ data: Object.values(exportJobs), error: null })
-          })
-        }),
-        order: () => ({
-          limit: async () => ({ data: Object.values(exportJobs), error: null })
-        })
-      }),
-      insert: async (data: any) => {
-        const id = crypto.randomUUID();
-        const job = { ...data, id };
-        exportJobs[id] = job as ExportJob;
-        return { data: job, error: null };
-      },
-      update: async (data: any) => {
-        if (data.id && exportJobs[data.id]) {
-          exportJobs[data.id] = { ...exportJobs[data.id], ...data };
-          return { data: exportJobs[data.id], error: null };
-        }
-        return { data: null, error: 'Job not found' };
+      select: () => {
+        return {
+          single: () => {
+            return Promise.resolve({ data: job, error: null });
+          }
+        };
       }
-    } as any;
+    };
+  },
+  update: (updates: Partial<ImportJob>) => {
+    return {
+      eq: (column: string, value: any) => {
+        if (column === 'id') {
+          const index = mockImportJobs.findIndex(job => job.id === value);
+          if (index >= 0) {
+            mockImportJobs[index] = {
+              ...mockImportJobs[index],
+              ...updates,
+              updated_at: new Date().toISOString()
+            };
+          }
+        }
+        
+        return {
+          select: () => {
+            return {
+              single: () => {
+                const job = mockImportJobs.find(job => job.id === value);
+                return Promise.resolve({ 
+                  data: job || null,
+                  error: null
+                });
+              }
+            };
+          }
+        };
+      }
+    };
   }
-
-  return originalFrom(table);
 };
 
-console.log('Import/Export tables mock initialized');
+// Simulate accessing and querying the export_jobs table
+export const mockExportJobsTable = {
+  select: () => {
+    return {
+      order: (_column: string, _options?: any) => {
+        return {
+          eq: (_column: string, _value: any) => {
+            return {
+              single: () => {
+                return Promise.resolve({ 
+                  data: mockExportJobs[0] || null,
+                  error: null
+                });
+              },
+              then: (callback: (result: { data: ExportJob[] | null, error: any }) => void) => {
+                callback({ data: mockExportJobs, error: null });
+                return {
+                  catch: () => {}
+                };
+              }
+            };
+          },
+          then: (callback: (result: { data: ExportJob[] | null, error: any }) => void) => {
+            callback({ data: mockExportJobs, error: null });
+            return {
+              catch: () => {}
+            };
+          }
+        };
+      },
+      eq: (_column: string, _value: any) => {
+        return {
+          single: () => {
+            return Promise.resolve({ 
+              data: mockExportJobs[0] || null,
+              error: null
+            });
+          },
+          then: (callback: (result: { data: ExportJob[] | null, error: any }) => void) => {
+            callback({ data: mockExportJobs, error: null });
+            return {
+              catch: () => {}
+            };
+          }
+        };
+      },
+      then: (callback: (result: { data: ExportJob[] | null, error: any }) => void) => {
+        callback({ data: mockExportJobs, error: null });
+        return {
+          catch: () => {}
+        };
+      }
+    };
+  },
+  insert: (newJob: Partial<ExportJob>) => {
+    const job: ExportJob = {
+      id: crypto.randomUUID(),
+      status: 'waiting',
+      progress: 0,
+      total_rows: 0,
+      processed_rows: 0,
+      file_name: newJob.file_name || '',
+      query_params: newJob.query_params || {},
+      created_by: newJob.created_by || '',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      ...newJob
+    };
+    
+    mockExportJobs.push(job);
+    
+    return {
+      select: () => {
+        return {
+          single: () => {
+            return Promise.resolve({ data: job, error: null });
+          }
+        };
+      }
+    };
+  },
+  update: (updates: Partial<ExportJob>) => {
+    return {
+      eq: (column: string, value: any) => {
+        if (column === 'id') {
+          const index = mockExportJobs.findIndex(job => job.id === value);
+          if (index >= 0) {
+            mockExportJobs[index] = {
+              ...mockExportJobs[index],
+              ...updates,
+              updated_at: new Date().toISOString()
+            };
+          }
+        }
+        
+        return {
+          select: () => {
+            return {
+              single: () => {
+                const job = mockExportJobs.find(job => job.id === value);
+                return Promise.resolve({ 
+                  data: job || null,
+                  error: null
+                });
+              }
+            };
+          }
+        };
+      }
+    };
+  }
+};
+
+// Override supabase.from to handle mock tables
+const originalFrom = supabase.from;
+supabase.from = function(table: string) {
+  if (table === 'import_jobs') {
+    return mockImportJobsTable as any;
+  } else if (table === 'export_jobs') {
+    return mockExportJobsTable as any;
+  }
+  return originalFrom.call(this, table);
+};
