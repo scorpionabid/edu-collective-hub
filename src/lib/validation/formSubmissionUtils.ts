@@ -1,8 +1,16 @@
 
 import { z } from 'zod';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useState } from 'react';
+import { 
+  validateFormData, 
+  displayValidationErrors 
+} from './core/validateSubmission';
+import { 
+  submitToSupabase, 
+  updateSupabaseRecord 
+} from './core/formSubmission';
+import { getReadableErrorMessage } from './utils/errorFormatter';
+export { useFormSubmissionStatus } from './hooks/useFormStatus';
 
 interface SubmissionOptions {
   onSuccess?: (data: any) => void;
@@ -24,67 +32,17 @@ export async function validateAndSubmitForm<T>(
   tableName: string,
   options: SubmissionOptions = {}
 ): Promise<{ success: boolean; data?: any; error?: any }> {
-  try {
-    // Validate the form data against the schema
-    const validatedData = schema.parse(formData);
-    
-    // Add timestamps and track submission status
-    const dataToSubmit = {
-      ...validatedData,
-      updated_at: new Date().toISOString(),
-      status: validatedData.status || 'draft',
-      ...(validatedData.status === 'submitted' && { submitted_at: new Date().toISOString() })
-    };
-    
-    // Submit to Supabase with proper error handling
-    // Use a dynamic approach that will work with any table
-    const { data, error } = await supabase
-      .from(tableName as any)
-      .insert(dataToSubmit)
-      .select()
-      .single();
-    
-    if (error) {
-      // Log detailed error information
-      console.error(`Form submission error (${tableName}):`, error);
-      
-      // Show user-friendly error message
+  // Validate the form data
+  const validationResult = validateFormData(formData, schema);
+  
+  if (!validationResult.success) {
+    if (validationResult.error instanceof z.ZodError) {
       if (options.showToast !== false) {
-        toast.error(`Failed to submit form: ${getReadableErrorMessage(error)}`);
+        displayValidationErrors(validationResult.error);
       }
       
       if (options.onError) {
-        options.onError(error);
-      }
-      
-      return { success: false, error };
-    }
-    
-    // Handle successful submission
-    if (options.showToast !== false) {
-      toast.success('Form submitted successfully');
-    }
-    
-    if (options.onSuccess) {
-      options.onSuccess(data);
-    }
-    
-    return { success: true, data };
-  } catch (validationError) {
-    // Handle zod validation errors
-    console.error('Form validation error:', validationError);
-    
-    if (validationError instanceof z.ZodError) {
-      const formattedErrors = validationError.errors.map(err => 
-        `${err.path.join('.')} - ${err.message}`
-      ).join(', ');
-      
-      if (options.showToast !== false) {
-        toast.error(`Validation error: ${formattedErrors}`);
-      }
-      
-      if (options.onError) {
-        options.onError(validationError);
+        options.onError(validationResult.error);
       }
     } else {
       if (options.showToast !== false) {
@@ -92,12 +50,46 @@ export async function validateAndSubmitForm<T>(
       }
       
       if (options.onError) {
-        options.onError(validationError);
+        options.onError(validationResult.error);
       }
     }
     
-    return { success: false, error: validationError };
+    return { success: false, error: validationResult.error };
   }
+  
+  // Add timestamps and track submission status
+  const dataToSubmit = {
+    ...validationResult.validatedData,
+    updated_at: new Date().toISOString(),
+    status: validationResult.validatedData.status || 'draft',
+    ...(validationResult.validatedData.status === 'submitted' && { submitted_at: new Date().toISOString() })
+  };
+  
+  // Submit to Supabase
+  const submissionResult = await submitToSupabase(tableName, dataToSubmit);
+  
+  if (!submissionResult.success) {
+    if (options.showToast !== false) {
+      toast.error(`Failed to submit form: ${getReadableErrorMessage(submissionResult.error)}`);
+    }
+    
+    if (options.onError) {
+      options.onError(submissionResult.error);
+    }
+    
+    return { success: false, error: submissionResult.error };
+  }
+  
+  // Handle successful submission
+  if (options.showToast !== false) {
+    toast.success('Form submitted successfully');
+  }
+  
+  if (options.onSuccess) {
+    options.onSuccess(submissionResult.data);
+  }
+  
+  return { success: true, data: submissionResult.data };
 }
 
 /**
@@ -120,27 +112,19 @@ export async function updateFormSubmission<T>(
       ...(isSubmitting && { submitted_at: new Date().toISOString() })
     };
     
-    // Submit to Supabase with proper error handling
-    // Use a dynamic approach that will work with any table
-    const { data, error } = await supabase
-      .from(tableName as any)
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single();
+    // Update in Supabase
+    const updateResult = await updateSupabaseRecord(tableName, id, updateData);
     
-    if (error) {
-      console.error(`Form update error (${tableName}):`, error);
-      
+    if (!updateResult.success) {
       if (options.showToast !== false) {
-        toast.error(`Failed to update form: ${getReadableErrorMessage(error)}`);
+        toast.error(`Failed to update form: ${getReadableErrorMessage(updateResult.error)}`);
       }
       
       if (options.onError) {
-        options.onError(error);
+        options.onError(updateResult.error);
       }
       
-      return { success: false, error };
+      return { success: false, error: updateResult.error };
     }
     
     // Handle successful update
@@ -149,10 +133,10 @@ export async function updateFormSubmission<T>(
     }
     
     if (options.onSuccess) {
-      options.onSuccess(data);
+      options.onSuccess(updateResult.data);
     }
     
-    return { success: true, data };
+    return { success: true, data: updateResult.data };
   } catch (error) {
     console.error('Form update error:', error);
     
@@ -166,54 +150,4 @@ export async function updateFormSubmission<T>(
     
     return { success: false, error };
   }
-}
-
-/**
- * Convert database error messages to user-friendly text
- */
-function getReadableErrorMessage(error: any): string {
-  if (!error) return 'Unknown error';
-  
-  // Handle common Supabase/PostgreSQL errors
-  if (error.code === '23505') {
-    return 'This record already exists';
-  }
-  
-  if (error.code === '23503') {
-    return 'Referenced record does not exist';
-  }
-  
-  if (error.code === '42P01') {
-    return 'Database configuration error';
-  }
-  
-  if (error.code === '42703') {
-    return 'Invalid form field';
-  }
-  
-  // Default to the provided message or a generic one
-  return error.message || 'An unexpected error occurred';
-}
-
-// Create a hook for tracking form submission status
-export function useFormSubmissionStatus() {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [error, setError] = useState<any>(null);
-  
-  const reset = () => {
-    setIsSubmitting(false);
-    setIsSuccess(false);
-    setError(null);
-  };
-  
-  return {
-    isSubmitting,
-    setIsSubmitting,
-    isSuccess,
-    setIsSuccess,
-    error,
-    setError,
-    reset
-  };
 }
