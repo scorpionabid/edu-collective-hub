@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import * as z from 'zod';
@@ -65,15 +66,25 @@ export const getValidationSchema = async (categoryId: string): Promise<z.ZodType
         // of the schema, but we need to construct a real Zod schema
         const schemaObj = schemaData.schema_json;
         
+        // Make type-safe access to JSON properties
+        const jsonSchema = schemaObj as Record<string, any>;
+        
         // Simple approach: transform to a form data schema
-        const columns = schemaObj.fields?.map((field: any) => ({
+        const fields = jsonSchema.fields as Array<{
+          name: string;
+          type: string;
+          required: boolean;
+          options: any;
+        }> || [];
+        
+        const columns = fields.map((field) => ({
           name: field.name,
           type: field.type,
           required: field.required !== false,
           options: field.options,
-        })) || [];
+        }));
         
-        const rules = schemaObj.rules || [];
+        const rules = jsonSchema.rules as Array<any> || [];
         
         return createFormDataSchema(columns, rules);
       } catch (parseError) {

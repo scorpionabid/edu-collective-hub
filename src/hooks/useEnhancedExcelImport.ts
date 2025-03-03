@@ -1,159 +1,219 @@
 
-import { useState } from 'react';
-import { useProfile } from './useProfile';
-import { ImportJob } from '@/lib/api/types';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { getMockSupabase } from '@/lib/api/mock/importExportTables';
+import { useCallback, useState } from 'react';
+import { ImportJob, ImportError } from '@/lib/api/types';
+import { toast } from "sonner";
+import * as XLSX from 'xlsx';
+import { mockImportExportInterface } from '@/lib/api/mock/importExportTables';
 
-// Use the getMockSupabase helper to get a properly typed mock implementation
-const mockSupabase = getMockSupabase();
+interface UseEnhancedExcelImportOptions<T> {
+  tableName: string;
+  maxRows?: number;
+  batchSize?: number;
+  transformFn?: (row: Record<string, any>, index: number) => T;
+  validateFn?: (row: T) => boolean | string;
+  onComplete?: (data: T[]) => void;
+  withUpsert?: boolean;
+  keyField?: string;
+}
 
-export const useEnhancedExcelImport = () => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [importJobs, setImportJobs] = useState<ImportJob[]>([]);
-  const { profile } = useProfile();
+export function useEnhancedExcelImport<T>({
+  tableName,
+  maxRows = 10000,
+  batchSize = 1000,
+  transformFn,
+  validateFn,
+  onComplete,
+  withUpsert = false,
+  keyField
+}: UseEnhancedExcelImportOptions<T>) {
+  const [isImporting, setIsImporting] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [totalRows, setTotalRows] = useState(0);
+  const [processedRows, setProcessedRows] = useState(0);
+  const [errors, setErrors] = useState<ImportError[]>([]);
 
-  const fetchImportJobs = async (userId: string) => {
-    try {
-      setIsLoading(true);
-      
-      // Fetch import jobs from the mock implementation
-      const { data, error } = await mockSupabase
-        .from('import_jobs')
-        .select()
-        .eq('userId', userId)
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      
-      const formattedJobs = data as ImportJob[];
-      setImportJobs(formattedJobs);
-      
-      return formattedJobs;
-    } catch (error) {
-      console.error('Error fetching import jobs:', error);
-      toast.error('Failed to load import jobs');
-      return [];
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  const createImportJob = async (data: Partial<ImportJob>) => {
-    try {
-      setIsLoading(true);
-      
-      // Create a new import job using the mock implementation
-      const { data: job, error } = await mockSupabase
-        .from('import_jobs')
-        .insert(data)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      
-      toast.success('Import job created');
-      return job as ImportJob;
-    } catch (error) {
-      console.error('Error creating import job:', error);
-      toast.error('Failed to create import job');
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  const updateImportJobStatus = async (
-    id: string, 
-    status: 'pending' | 'processing' | 'completed' | 'failed', 
-    progress: number
-  ) => {
-    try {
-      // Update the import job status using the mock implementation
-      const { data, error } = await mockSupabase
-        .from('import_jobs')
-        .update({ 
-          status, 
-          progress 
-        })
-        .eq('id', id)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      
-      return data as ImportJob;
-    } catch (error) {
-      console.error('Error updating import job status:', error);
-      return null;
-    }
-  };
-  
-  // Enhanced Excel file processing with error handling and progress tracking
-  const processExcelFile = async (file: File, tableName: string) => {
-    try {
-      setIsLoading(true);
-      
-      // Create an import job to track progress
-      const importJob = await createImportJob({
-        userId: profile?.id || '',
-        tableName,
-        status: 'pending',
-        progress: 0,
-        total_rows: 0, // Will be updated once we read the file
-        processed_rows: 0,
-        failed_rows: 0,
-        file_name: file.name,
-        file_size: file.size,
-        start_time: new Date().toISOString()
-      });
-      
-      if (!importJob) {
-        throw new Error('Failed to create import job');
+  // Process Excel file
+  const processExcelFile = useCallback(
+    async (file: File) => {
+      // Create a new import job
+      try {
+        setIsImporting(true);
+        setErrors([]);
+        setProgress(0);
+        setProcessedRows(0);
+        
+        // Create import job record
+        const importJob = await mockImportExportInterface.createImportJob({
+          userId: 'current-user', // In a real app, this would be the actual user ID
+          tableName,
+          status: 'processing',
+          progress: 0,
+          total_rows: 0,
+          processed_rows: 0,
+          failed_rows: 0,
+          file_name: file.name,
+          file_size: file.size
+        });
+
+        // Read the file as array buffer
+        const fileData = await readFileAsArrayBuffer(file);
+        
+        // Parse the workbook
+        const workbook = XLSX.read(fileData, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        // Convert to JSON
+        const rawData = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet);
+        
+        if (rawData.length === 0) {
+          throw new Error('No data found in the file');
+        }
+        
+        if (rawData.length > maxRows) {
+          throw new Error(`File contains too many rows. Maximum allowed is ${maxRows}`);
+        }
+        
+        // Update import job with total rows
+        await mockImportExportInterface.updateImportJobStatus(
+          importJob.id, 
+          'processing',
+          0
+        );
+        
+        setTotalRows(rawData.length);
+        
+        // Process data in batches
+        const processedData: T[] = [];
+        const newErrors: ImportError[] = [];
+        
+        for (let i = 0; i < rawData.length; i += batchSize) {
+          const batch = rawData.slice(i, i + batchSize);
+          
+          // Process each row in the batch
+          const batchResults = batch.map((rawRow, batchIndex) => {
+            const rowIndex = i + batchIndex;
+            try {
+              // Transform the row if a transform function is provided
+              const transformedRow = transformFn ? transformFn(rawRow, rowIndex) : rawRow as unknown as T;
+              
+              // Validate the row if a validation function is provided
+              if (validateFn) {
+                const validationResult = validateFn(transformedRow);
+                if (validationResult !== true) {
+                  const errorMessage = typeof validationResult === 'string' 
+                    ? validationResult 
+                    : 'Validation failed';
+                  
+                  newErrors.push({ row: rowIndex + 1, message: errorMessage });
+                  return null;
+                }
+              }
+              
+              return transformedRow;
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : 'Processing error';
+              newErrors.push({ row: rowIndex + 1, message: errorMessage });
+              return null;
+            }
+          });
+          
+          // Filter out null results (validation failures)
+          const validBatchResults = batchResults.filter(
+            (result): result is T => result !== null
+          );
+          
+          // Add to processed data
+          processedData.push(...validBatchResults);
+          
+          // Update progress
+          const currentProcessed = Math.min(i + batch.length, rawData.length);
+          const currentProgress = Math.round((currentProcessed / rawData.length) * 100);
+          
+          setProcessedRows(currentProcessed);
+          setProgress(currentProgress);
+          
+          // Update import job progress
+          await mockImportExportInterface.updateImportJobStatus(
+            importJob.id,
+            'processing',
+            currentProgress
+          );
+          
+          // Allow UI to update
+          await new Promise(resolve => setTimeout(resolve, 1));
+        }
+        
+        // Set errors if any
+        if (newErrors.length > 0) {
+          setErrors(newErrors);
+        }
+        
+        // Complete the import job
+        const status = newErrors.length > 0 ? 'failed' : 'completed';
+        await mockImportExportInterface.updateImportJobStatus(
+          importJob.id,
+          status,
+          100
+        );
+        
+        setIsImporting(false);
+        
+        // Call the completion callback if provided
+        if (onComplete) {
+          onComplete(processedData);
+        }
+        
+        toast.success(`Import completed with ${processedData.length} records processed${newErrors.length > 0 ? ` and ${newErrors.length} errors` : ''}`);
+        
+        return processedData;
+      } catch (error) {
+        setIsImporting(false);
+        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+        setErrors([{ row: 0, message: errorMessage }]);
+        toast.error(`Import failed: ${errorMessage}`);
+        
+        throw error;
       }
+    },
+    [tableName, maxRows, batchSize, transformFn, validateFn, onComplete]
+  );
+
+  // Read file as array buffer
+  const readFileAsArrayBuffer = (file: File): Promise<ArrayBuffer> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
       
-      // Update job to processing state
-      await updateImportJobStatus(importJob.id, 'processing', 10);
+      reader.onload = (e) => {
+        if (e.target?.result instanceof ArrayBuffer) {
+          resolve(e.target.result);
+        } else {
+          reject(new Error('Failed to read file as array buffer'));
+        }
+      };
       
-      // Read the file (simulated)
-      toast.info('Reading file...');
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      reader.onerror = () => {
+        reject(new Error('File read error'));
+      };
       
-      // Update progress
-      await updateImportJobStatus(importJob.id, 'processing', 30);
-      
-      // Process rows (simulated)
-      toast.info('Processing data...');
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Update progress
-      await updateImportJobStatus(importJob.id, 'processing', 70);
-      
-      // Save to database (simulated)
-      toast.info('Saving to database...');
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Complete the job
-      await updateImportJobStatus(importJob.id, 'completed', 100);
-      
-      toast.success('File successfully imported!');
-      return importJob;
-    } catch (error) {
-      console.error('Error processing file:', error);
-      toast.error('Failed to process file');
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
+      reader.readAsArrayBuffer(file);
+    });
   };
-  
+
+  // Cancel import function
+  const cancelImport = useCallback(() => {
+    setIsImporting(false);
+    setProgress(0);
+    toast.info('Import cancelled');
+  }, []);
+
   return {
-    isLoading,
-    importJobs,
-    fetchImportJobs,
-    createImportJob,
-    updateImportJobStatus,
-    processExcelFile
+    isImporting,
+    progress,
+    totalRows,
+    processedRows,
+    errors,
+    processExcelFile,
+    cancelImport
   };
-};
+}

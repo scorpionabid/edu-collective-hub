@@ -1,9 +1,17 @@
 
-import { CacheOptions } from "@/lib/api/types";
 import { supabase } from "@/integrations/supabase/client";
 
 // Default cache duration (30 minutes)
 const DEFAULT_TTL = 30 * 60 * 1000;
+
+// Updated CacheOptions interface
+export interface CacheOptions {
+  ttl?: number;
+  key?: string;
+  invalidateOn?: string[];
+  enabled?: boolean;
+  invalidationTags?: string[];
+}
 
 /**
  * Wrapper function to add caching to any async function

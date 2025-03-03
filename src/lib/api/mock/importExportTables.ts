@@ -8,6 +8,22 @@ import { toast } from "sonner";
 const mockImportJobs: ImportJob[] = [];
 const mockExportJobs: ExportJob[] = [];
 
+// Create enhanced mock interfaces for import/export operations
+interface EnhancedImportJobInterface {
+  isImporting: boolean;
+  progress: number;
+  totalRows: number;
+  processedRows: number;
+  errors: { row: number; message: string }[];
+  importJobs: ImportJob[];
+  isLoading: boolean;
+  fetchImportJobs: (userId: string) => Promise<ImportJob[]>;
+  createImportJob: (data: Partial<ImportJob>) => Promise<ImportJob>;
+  updateImportJobStatus: (id: string, status: "pending" | "processing" | "completed" | "failed", progress: number) => Promise<ImportJob>;
+  processExcelFile: (file: File) => Promise<void>;
+  cancelImport: () => void;
+}
+
 // Store the original from method
 const originalFrom = supabase.from;
 
@@ -196,6 +212,64 @@ const createExportJobsMock = (): any => ({
   })
 });
 
+// Mock useEnhancedExcelImport hook functionality
+export const createMockImportExportInterface = (): EnhancedImportJobInterface => {
+  return {
+    isImporting: false,
+    progress: 0,
+    totalRows: 0,
+    processedRows: 0,
+    errors: [],
+    importJobs: [],
+    isLoading: false,
+    fetchImportJobs: async (userId: string) => {
+      return mockImportJobs.filter(job => job.userId === userId);
+    },
+    createImportJob: async (data: Partial<ImportJob>) => {
+      const job: ImportJob = {
+        id: crypto.randomUUID(),
+        userId: data.userId || '',
+        tableName: data.tableName || '',
+        status: data.status || 'pending',
+        progress: data.progress || 0,
+        total_rows: data.total_rows || 0,
+        processed_rows: data.processed_rows || 0,
+        failed_rows: data.failed_rows || 0,
+        start_time: data.start_time || new Date().toISOString(),
+        end_time: data.end_time,
+        error_message: data.error_message,
+        file_name: data.file_name || '',
+        file_size: data.file_size || 0,
+        created_at: new Date().toISOString()
+      };
+      mockImportJobs.push(job);
+      return job;
+    },
+    updateImportJobStatus: async (id: string, status: "pending" | "processing" | "completed" | "failed", progress: number) => {
+      const index = mockImportJobs.findIndex(job => job.id === id);
+      if (index !== -1) {
+        mockImportJobs[index] = { 
+          ...mockImportJobs[index], 
+          status, 
+          progress,
+          end_time: (status === 'completed' || status === 'failed') ? new Date().toISOString() : mockImportJobs[index].end_time
+        };
+        return mockImportJobs[index];
+      }
+      throw new Error('Job not found');
+    },
+    processExcelFile: async (file: File) => {
+      // Mock implementation
+      toast.success(`Processing file: ${file.name}`);
+      return Promise.resolve();
+    },
+    cancelImport: () => {
+      // Mock implementation
+      toast.info('Import cancelled');
+    }
+  };
+};
+
 // Override the from method for specific tables
 const originalFromFn = supabase.from;
 (supabase as any).from = function(table: string) {
@@ -211,5 +285,8 @@ const originalFromFn = supabase.from;
 
 // Export a helper function to get the correctly typed mock Supabase instance
 export const getMockSupabase = () => supabase;
+
+// Export the mock interface for direct use in components
+export const mockImportExportInterface = createMockImportExportInterface();
 
 console.log('Mock import/export tables initialized');
