@@ -1,138 +1,188 @@
 
-import { logger } from './logger';
-import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from './logger';
 import { ErrorLog } from './types';
+import { captureException, captureMessage } from '@sentry/react';
 
-// Define error severity levels
-export type ErrorSeverity = 'low' | 'medium' | 'high' | 'critical';
-
-interface ErrorHandlerOptions {
-  // If true, show a toast notification for the error
-  showToast?: boolean;
-  // Custom toast message (defaults to error.message)
-  toastMessage?: string;
-  // Error severity for logging
-  severity?: ErrorSeverity;
-  // Additional context to log with the error
-  context?: Record<string, any>;
-  // Component where the error occurred
+interface TrackErrorOptions {
+  errorMessage: string;
+  errorStack?: string;
+  errorContext?: Record<string, any>;
   component?: string;
-  // Path where the error occurred
   pagePath?: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  browserInfo?: Record<string, any>;
 }
 
-// Default options
-const defaultOptions: ErrorHandlerOptions = {
-  showToast: true,
-  severity: 'medium',
-};
-
-// Generic error handler function
-export const handleError = async (
-  error: Error | unknown,
-  options: ErrorHandlerOptions = {}
-): Promise<void> => {
-  const opts = { ...defaultOptions, ...options };
-  
-  // Make sure we have an Error object
-  const errorObj = error instanceof Error ? error : new Error(String(error));
-  
-  // Log the error with proper context
-  logger.error(errorObj, {
-    severity: opts.severity,
-    component: opts.component,
-    ...opts.context,
-  });
-  
-  // Show a toast notification if requested
-  if (opts.showToast) {
-    toast.error(opts.toastMessage || errorObj.message, {
-      description: 'An error occurred. Our team has been notified.',
-    });
-  }
-  
-  // Store error in the database for monitoring
-  await storeErrorLog(errorObj, opts);
-};
-
-// Store error in the database
-const storeErrorLog = async (error: Error, options: ErrorHandlerOptions): Promise<void> => {
+/**
+ * Tracks application errors
+ */
+export const trackError = async ({
+  errorMessage,
+  errorStack,
+  errorContext,
+  component,
+  pagePath,
+  severity,
+  browserInfo
+}: TrackErrorOptions): Promise<void> => {
   try {
-    // Get browser information
-    const browserInfo = {
-      userAgent: navigator.userAgent,
-      language: navigator.language,
-      platform: navigator.platform,
-      vendor: navigator.vendor,
-      url: window.location.href,
-    };
-    
-    // Get the current user if logged in
+    // Get user information if available
     const { data: { user } } = await supabase.auth.getUser();
+    const userId = user?.id;
     
-    // Create the error log entry
-    const errorLog: Omit<ErrorLog, 'id' | 'timestamp'> = {
-      errorMessage: error.message,
-      errorStack: error.stack,
-      errorContext: options.context || {},
-      component: options.component,
-      pagePath: options.pagePath || window.location.pathname,
-      severity: options.severity || 'medium',
-      browserInfo,
-      resolved: false,
-      userId: user?.id,
+    // Report to Sentry if it's a critical or high severity error
+    if (severity === 'critical' || severity === 'high') {
+      if (errorStack) {
+        captureException(new Error(errorMessage), {
+          extra: {
+            errorContext,
+            component,
+            pagePath,
+            browserInfo
+          }
+        });
+      } else {
+        captureMessage(errorMessage, {
+          level: 'error',
+          extra: {
+            errorContext,
+            component,
+            pagePath,
+            browserInfo
+          }
+        });
+      }
+    }
+    
+    // Create the error log object
+    const log = {
+      error_message: errorMessage,
+      error_stack: errorStack,
+      error_context: errorContext,
+      component,
+      page_path: pagePath,
+      severity,
+      browser_info: browserInfo,
+      user_id: userId,
+      resolved: false
     };
     
-    // Store the error log
-    const { error: dbError } = await supabase.from('error_logs').insert(errorLog);
+    // Store in the database
+    const { error } = await supabase.from('error_logs').insert(log);
     
-    if (dbError) {
-      console.error('Failed to store error log:', dbError);
+    if (error) {
+      logger.warn('Failed to store error log', { error, log });
     }
-  } catch (storeError) {
-    // Don't let error logging fail the application
-    console.error('Error storing error log:', storeError);
+  } catch (error) {
+    // Just log to console as a fallback
+    console.error('Error tracking error', error);
   }
 };
 
-// Higher-order function to wrap async functions with error handling
-export const withErrorHandling = <T extends (...args: any[]) => Promise<any>>(
+/**
+ * Creates an error boundary component with tracking
+ */
+export const withErrorTracking = (Component: React.ComponentType<any>, options: { componentName: string }) => {
+  return (props: any) => {
+    try {
+      return <Component {...props} />;
+    } catch (error) {
+      // Track the error
+      trackError({
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        errorContext: { props },
+        component: options.componentName,
+        pagePath: window.location.pathname,
+        severity: 'high',
+        browserInfo: {
+          userAgent: navigator.userAgent,
+          language: navigator.language,
+          platform: navigator.platform
+        }
+      });
+      
+      // Return a fallback UI
+      return (
+        <div className="error-boundary">
+          <h2>Something went wrong</h2>
+          <button onClick={() => window.location.reload()}>Refresh</button>
+        </div>
+      );
+    }
+  };
+};
+
+/**
+ * Higher-order function to track errors in async functions
+ */
+export const trackAsyncErrors = <T extends (...args: any[]) => Promise<any>>(
   fn: T,
-  options: ErrorHandlerOptions = {}
+  options: { componentName: string; severity?: 'low' | 'medium' | 'high' | 'critical' }
 ): ((...args: Parameters<T>) => Promise<ReturnType<T>>) => {
   return async (...args: Parameters<T>): Promise<ReturnType<T>> => {
     try {
       return await fn(...args);
     } catch (error) {
-      await handleError(error, options);
+      // Track the error
+      trackError({
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        errorContext: { args },
+        component: options.componentName,
+        pagePath: window.location.pathname,
+        severity: options.severity || 'medium',
+        browserInfo: {
+          userAgent: navigator.userAgent,
+          language: navigator.language,
+          platform: navigator.platform
+        }
+      });
+      
+      // Re-throw the error to allow proper error handling
       throw error;
     }
   };
 };
 
-// Function to wrap API fetch calls with error handling
-export const fetchWithErrorHandling = async <T>(
-  url: string,
-  options?: RequestInit,
-  errorOptions?: ErrorHandlerOptions
-): Promise<T> => {
-  try {
-    const response = await fetch(url, options);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`API Error (${response.status}): ${errorText}`);
-    }
-    
-    return await response.json() as T;
-  } catch (error) {
-    await handleError(error, {
-      component: 'API Fetch',
+/**
+ * Global error handler for uncaught errors
+ */
+export const setupGlobalErrorHandlers = () => {
+  // Handle unhandled promise rejections
+  window.addEventListener('unhandledrejection', (event) => {
+    trackError({
+      errorMessage: `Unhandled Promise Rejection: ${event.reason}`,
+      errorStack: event.reason?.stack,
+      errorContext: { reason: event.reason },
       pagePath: window.location.pathname,
-      context: { url, options },
-      ...errorOptions,
+      severity: 'high',
+      browserInfo: {
+        userAgent: navigator.userAgent,
+        language: navigator.language,
+        platform: navigator.platform
+      }
     });
-    throw error;
-  }
+  });
+  
+  // Handle global errors
+  window.addEventListener('error', (event) => {
+    trackError({
+      errorMessage: event.message,
+      errorStack: event.error?.stack,
+      errorContext: {
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno
+      },
+      pagePath: window.location.pathname,
+      severity: 'high',
+      browserInfo: {
+        userAgent: navigator.userAgent,
+        language: navigator.language,
+        platform: navigator.platform
+      }
+    });
+  });
 };

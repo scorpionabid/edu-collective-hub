@@ -14,6 +14,7 @@ export const useGroupMembers = () => {
     setError(null);
     
     try {
+      // Access the notifications.groups.getMembers method correctly
       const membersData = await api.notifications.groups.getMembers(groupId, memberType);
       setMembers(membersData);
     } catch (err: any) {
@@ -29,6 +30,7 @@ export const useGroupMembers = () => {
     setError(null);
     
     try {
+      // Access the notifications.groups.addMembers method correctly
       await api.notifications.groups.addMembers(data);
       // Refresh members list
       const membersData = await api.notifications.groups.getMembers(data.groupId);
@@ -48,6 +50,7 @@ export const useGroupMembers = () => {
     setError(null);
     
     try {
+      // Access the notifications.groups.removeMembers method correctly
       await api.notifications.groups.removeMembers(groupId, memberIds);
       // Refresh members list
       const membersData = await api.notifications.groups.getMembers(groupId);

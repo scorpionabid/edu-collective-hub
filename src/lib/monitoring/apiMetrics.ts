@@ -36,20 +36,20 @@ export const trackApiCall = async ({
     // Prepare a safe version of the response data (limit size and remove sensitive info)
     const responseSummary = responseData ? prepareResponseSummary(responseData) : undefined;
     
-    // Create the metric object
-    const metric: Omit<ApiMetric, 'id' | 'timestamp'> = {
+    // Create the metric object with required fields explicitly mapped
+    const metric = {
       endpoint,
       method,
-      statusCode,
-      durationMs,
-      requestSize,
-      responseSize,
-      userId,
-      requestParams: safeJsonify(requestParams),
-      responseSummary
+      duration_ms: durationMs,  // Use snake_case for direct DB insertion
+      status_code: statusCode,
+      request_size: requestSize,
+      response_size: responseSize,
+      user_id: userId,
+      request_params: safeJsonify(requestParams),
+      response_summary: responseSummary
     };
     
-    // Store in the database
+    // Store in the database with the proper column names
     const { error } = await supabase.from('api_metrics').insert(metric);
     
     if (error) {

@@ -1,94 +1,101 @@
 
+// This file contains utility functions for sanitizing input data
 import DOMPurify from 'dompurify';
 import { z } from 'zod';
 
-interface SanitizeHtmlOptions {
-  allowedTags?: string[];
-  allowedAttrs?: string[];
-  forbiddenTags?: string[];
-  forbiddenAttrs?: string[];
+/**
+ * Sanitizes HTML content to prevent XSS attacks.
+ */
+export function sanitizeHtml(html: string): string {
+  if (!html) return '';
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p', 'br'],
+    ALLOWED_ATTR: ['href', 'target', 'rel'],
+  });
 }
 
 /**
- * Sanitizes HTML content to prevent XSS attacks
+ * Sanitizes text to prevent injection attacks.
  */
-export function sanitizeHtml(html: string, options?: SanitizeHtmlOptions): string {
-  const config: DOMPurify.Config = {
-    USE_PROFILES: { html: true },
-    ALLOWED_TAGS: options?.allowedTags || [
-      'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'a', 
-      'ul', 'ol', 'li', 'b', 'i', 'strong', 'em', 'strike', 
-      'code', 'hr', 'table', 'thead', 'tbody', 'tr', 'th', 
-      'td', 'pre', 'blockquote', 'img', 'span'
-    ],
-    ALLOWED_ATTR: options?.allowedAttrs || [
-      'href', 'name', 'target', 'src', 'alt', 'class', 'id', 'style'
-    ],
-    FORBID_TAGS: options?.forbiddenTags || [
-      'script', 'iframe', 'object', 'embed', 'form', 'input', 'button'
-    ],
-    FORBID_ATTR: options?.forbiddenAttrs || [
-      'onerror', 'onload', 'onclick', 'onmouseover'
-    ],
-  };
-
-  // Convert TrustedHTML to string
-  return String(DOMPurify.sanitize(html, config));
+export function sanitizeText(text: string): string {
+  if (!text) return '';
+  // Basic text sanitization - removes HTML tags
+  return text.replace(/<\/?[^>]+(>|$)/g, '');
 }
 
 /**
- * Creates a schema for sanitized HTML content
+ * Creates a Zod schema that ensures HTML content is sanitized.
  */
-export function createSanitizedHtmlSchema(options?: {
-  required?: boolean;
-  minLength?: number;
-  maxLength?: number;
-  label?: string;
-  sanitizeOptions?: SanitizeHtmlOptions;
-}) {
-  const label = options?.label || 'HTML content';
-  let schema = z.string().transform(val => sanitizeHtml(val, options?.sanitizeOptions));
-  
-  if (options?.minLength) {
-    schema = schema.refine(
-      html => html.length >= (options.minLength || 0),
-      { message: `${label} must be at least ${options.minLength} characters` }
-    );
-  }
-  
-  if (options?.maxLength) {
-    schema = schema.refine(
-      html => html.length <= (options.maxLength || 0),
-      { message: `${label} must be no more than ${options.maxLength} characters` }
-    );
-  }
-  
-  if (options?.required !== false) {
-    schema = schema.refine(
-      html => html.trim().length > 0,
-      { message: `${label} is required` }
-    );
-  } else {
-    schema = schema.optional();
-  }
-  
-  return schema;
+export function safeHtml() {
+  return z.string().transform((val) => sanitizeHtml(val));
 }
 
 /**
- * Sanitize all HTML fields in an object
+ * Creates a Zod schema that ensures text content is sanitized.
  */
-export function sanitizeHtmlFields<T extends Record<string, any>>(
-  data: T,
-  htmlFields: Array<keyof T>
-): T {
-  const result = { ...data };
+export function safeText() {
+  return z.string().transform((val) => sanitizeText(val));
+}
+
+/**
+ * Creates a Zod schema for email validation and sanitization.
+ */
+export function safeEmail() {
+  return z.string().email().transform((val) => sanitizeText(val));
+}
+
+/**
+ * Creates a Zod schema for password validation.
+ */
+export function safePassword(minLength = 8) {
+  return z.string().min(minLength);
+}
+
+/**
+ * Creates a Zod schema for name validation and sanitization.
+ */
+export function safeName() {
+  return z.string().transform((val) => sanitizeText(val));
+}
+
+/**
+ * Sanitizes all string values in an object recursively.
+ */
+export function sanitizeObject<T extends Record<string, any>>(obj: T): T {
+  if (!obj) return obj;
   
-  for (const field of htmlFields) {
-    if (typeof result[field] === 'string') {
-      result[field] = sanitizeHtml(result[field] as string) as any;
+  const result = { ...obj };
+  
+  Object.keys(result).forEach((key) => {
+    const value = result[key];
+    
+    if (typeof value === 'string') {
+      result[key] = sanitizeText(value) as any;
+    } else if (typeof value === 'object' && value !== null) {
+      result[key] = sanitizeObject(value);
     }
-  }
+  });
   
   return result;
 }
+
+/**
+ * Creates customized Zod schemas for common form fields.
+ */
+export const safeFormFields = {
+  name: () => safeName().min(2).max(100),
+  email: () => safeEmail(),
+  password: (minLength = 8) => safePassword(minLength),
+  text: (options?: { min?: number; max?: number }) => {
+    let schema = safeText();
+    if (options?.min !== undefined) schema = schema as any;
+    if (options?.max !== undefined) schema = schema as any;
+    return schema;
+  },
+  html: () => safeHtml(),
+  optional: {
+    text: () => safeText().optional(),
+    html: () => safeHtml().optional(),
+    email: () => safeEmail().optional(),
+  }
+};

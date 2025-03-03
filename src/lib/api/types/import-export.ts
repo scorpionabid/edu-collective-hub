@@ -1,37 +1,44 @@
 
-export interface ImportError {
-  row: number;
-  column: string;
-  message: string;
-}
+import { FilterParams } from './common';
 
 export interface ImportJob {
   id: string;
-  userId: string;
-  tableName: string;
-  fileName: string;
-  fileSize: number;
+  status: 'waiting' | 'processing' | 'complete' | 'error';
+  progress: number;
   totalRows: number;
   processedRows: number;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  progress: number;
-  startedAt: string;
-  completedAt: string | null;
+  fileName: string;
+  tableName: string;
+  withUpsert: boolean;
+  keyField?: string;
+  errors: Array<{ row: number; message: string }>;
+  createdBy: string;
   createdAt: string;
-  errors: ImportError[];
+  updatedAt: string;
+  // Mapping properties for frontend-backend compatibility
+  created_at?: string;
+  processed_rows?: number;
+  total_rows?: number;
+  file_name?: string;
+  userId?: string;
 }
 
 export interface ExportJob {
   id: string;
-  userId: string;
-  tableName: string;
-  fileName: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
+  progress: number;
+  totalRows: number;
+  processedRows: number;
+  fileName: string;
+  queryParams: any;
+  createdBy: string;
   createdAt: string;
-  completedAt: string | null;
+  updatedAt: string;
+  fileUrl?: string;
+  errorMessage?: string;
+  tableName: string;
+  downloadUrl: string;
+  completedAt: string;
   filters: FilterParams;
-  downloadUrl?: string;
+  userId: string;
 }
-
-// Import the FilterParams type
-import { FilterParams } from './common';

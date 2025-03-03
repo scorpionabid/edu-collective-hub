@@ -14,6 +14,7 @@ export const useMassNotifications = () => {
     setError(null);
     
     try {
+      // Access the notifications.mass.getAll method correctly
       const notificationsData = await api.notifications.mass.getAll(params);
       setNotifications(notificationsData);
     } catch (err: any) {
@@ -29,6 +30,7 @@ export const useMassNotifications = () => {
     setError(null);
     
     try {
+      // Access the notifications.mass.create method correctly
       const newNotification = await api.notifications.mass.create(data);
       setNotifications((prevNotifications) => [newNotification, ...prevNotifications]);
       toast.success('Mass notification created successfully');
@@ -48,6 +50,7 @@ export const useMassNotifications = () => {
     setError(null);
     
     try {
+      // Access the notifications.mass.getStats method correctly
       const stats = await api.notifications.mass.getStats();
       return stats;
     } catch (err: any) {

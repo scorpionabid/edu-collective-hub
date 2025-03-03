@@ -24,6 +24,7 @@ export const useFormValidation = () => {
 
   const generateSchemaFromColumns = useCallback(async (categoryId: string) => {
     try {
+      // Using the getByCategoryId method that we added as an alias to getAll
       const columns = await api.columns.getByCategoryId(categoryId);
       
       if (!columns || columns.length === 0) {
@@ -46,6 +47,8 @@ export const useFormValidation = () => {
             fieldSchema = z.string();
             if (isRequired) {
               fieldSchema = fieldSchema.min(1, `${columnName} is required`);
+            } else {
+              fieldSchema = fieldSchema.optional();
             }
             break;
           
@@ -66,6 +69,8 @@ export const useFormValidation = () => {
             fieldSchema = z.boolean();
             if (isRequired) {
               fieldSchema = z.boolean({ required_error: `${columnName} is required` });
+            } else {
+              fieldSchema = z.boolean().optional();
             }
             break;
 
@@ -73,13 +78,17 @@ export const useFormValidation = () => {
             fieldSchema = z.string();
             if (isRequired) {
               fieldSchema = fieldSchema.min(1, `${columnName} is required`);
+            } else {
+              fieldSchema = fieldSchema.optional();
             }
             break;
             
           case 'select':
             // For select fields, check if options are available
             if (column.options && column.options.length > 0) {
-              fieldSchema = z.enum(column.options as [string, ...string[]]);
+              // Create a string enum from the options
+              const enumValues = column.options as [string, ...string[]];
+              fieldSchema = z.enum(enumValues);
               if (!isRequired) {
                 fieldSchema = fieldSchema.optional();
               }
@@ -87,6 +96,8 @@ export const useFormValidation = () => {
               fieldSchema = z.string();
               if (isRequired) {
                 fieldSchema = fieldSchema.min(1, `${columnName} is required`);
+              } else {
+                fieldSchema = fieldSchema.optional();
               }
             }
             break;
@@ -95,6 +106,8 @@ export const useFormValidation = () => {
             fieldSchema = z.string();
             if (isRequired) {
               fieldSchema = fieldSchema.min(1, `${columnName} is required`);
+            } else {
+              fieldSchema = fieldSchema.optional();
             }
         }
 

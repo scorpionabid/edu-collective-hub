@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Column } from "./types";
@@ -25,12 +24,20 @@ export const columns = {
         id: column.id,
         name: column.name,
         type: column.type,
-        categoryId: column.category_id
+        categoryId: column.category_id,
+        required: column.required,
+        options: column.options,
+        description: column.description
       })) : [];
     } catch (error) {
       console.error('Error in getAll columns:', error);
       return [];
     }
+  },
+  
+  // Alias for getAll to keep compatibility
+  getByCategoryId: async (categoryId: string) => {
+    return columns.getAll(categoryId);
   },
   
   create: async (column: Omit<Column, 'id'>) => {
@@ -55,7 +62,10 @@ export const columns = {
           id: data.id,
           name: data.name,
           type: data.type,
-          categoryId: data.category_id
+          categoryId: data.category_id,
+          required: data.required,
+          options: data.options,
+          description: data.description
         };
       }
       
@@ -63,7 +73,10 @@ export const columns = {
         id: "0",
         name: column.name,
         type: column.type,
-        categoryId: column.categoryId
+        categoryId: column.categoryId,
+        required: column.required,
+        options: column.options,
+        description: column.description
       };
     } catch (error) {
       console.error('Error in create column:', error);
@@ -72,7 +85,10 @@ export const columns = {
         id: "0",
         name: column.name,
         type: column.type,
-        categoryId: column.categoryId
+        categoryId: column.categoryId,
+        required: column.required,
+        options: column.options,
+        description: column.description
       };
     }
   },
@@ -83,6 +99,9 @@ export const columns = {
       const updateData: Record<string, any> = { column_id: id };
       if (column.name !== undefined) updateData.column_name = column.name;
       if (column.type !== undefined) updateData.column_type = column.type;
+      if (column.required !== undefined) updateData.required = column.required;
+      if (column.options !== undefined) updateData.options = column.options;
+      if (column.description !== undefined) updateData.description = column.description;
       
       const response = await supabase.rpc('update_column', updateData) as unknown as RPCResponse<any>;
       const { data, error } = response;
@@ -99,7 +118,10 @@ export const columns = {
           id: data.id,
           name: data.name,
           type: data.type,
-          categoryId: data.category_id
+          categoryId: data.category_id,
+          required: data.required,
+          options: data.options,
+          description: data.description
         };
       }
       
@@ -107,7 +129,10 @@ export const columns = {
         id,
         name: column.name || "Column",
         type: column.type || "text",
-        categoryId: column.categoryId || "0"
+        categoryId: column.categoryId || "0",
+        required: column.required,
+        options: column.options,
+        description: column.description
       };
     } catch (error) {
       console.error('Error in update column:', error);
@@ -116,7 +141,10 @@ export const columns = {
         id,
         name: column.name || "Column",
         type: column.type || "text",
-        categoryId: column.categoryId || "0"
+        categoryId: column.categoryId || "0",
+        required: column.required,
+        options: column.options,
+        description: column.description
       };
     }
   },

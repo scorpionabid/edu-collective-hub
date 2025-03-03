@@ -22,6 +22,7 @@ export const useNotificationRecipients = () => {
     setError(null);
     
     try {
+      // Access the notifications.mass.getRecipients method correctly
       const dbRecipients = await api.notifications.mass.getRecipients(notificationId);
       
       // Map DB format to frontend format

@@ -14,6 +14,7 @@ export const useNotificationGroups = () => {
     setError(null);
     
     try {
+      // Access the notifications.groups.getAll method correctly
       const groupsData = await api.notifications.groups.getAll();
       setGroups(groupsData);
     } catch (err: any) {
@@ -29,6 +30,7 @@ export const useNotificationGroups = () => {
     setError(null);
     
     try {
+      // Access the notifications.groups.create method correctly
       const newGroup = await api.notifications.groups.create(groupData);
       setGroups((prevGroups) => [...prevGroups, newGroup]);
       toast.success('Notification group created successfully');
@@ -47,6 +49,7 @@ export const useNotificationGroups = () => {
     setError(null);
     
     try {
+      // Access the notifications.groups.update method correctly
       const updatedGroup = await api.notifications.groups.update(id, groupData);
       setGroups((prevGroups) => 
         prevGroups.map((group) => group.id === id ? updatedGroup : group)
@@ -67,7 +70,8 @@ export const useNotificationGroups = () => {
     setError(null);
     
     try {
-      await api.notifications.groups.delete(id);
+      // Access the notifications.groups.delete method correctly
+      await api.notifications.groups.deleteGroup(id);
       setGroups((prevGroups) => prevGroups.filter((group) => group.id !== id));
       toast.success('Notification group deleted successfully');
     } catch (err: any) {
