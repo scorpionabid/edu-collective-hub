@@ -1,186 +1,174 @@
 
-import { supabase } from "@/integrations/supabase/client";
-import { ImportJob, ExportJob } from "../types";
 import { v4 as uuidv4 } from 'uuid';
+import { ImportJob, ExportJob, FilterParams } from '../types';
 
-// This file mocks the import/export tables functionality
-// It provides mock implementations for Supabase operations on import_jobs and export_jobs tables
-// which don't actually exist in the database
- 
-// Mock database for storing jobs 
-const mockDB = {
-  importJobs: [] as ImportJob[],
-  exportJobs: [] as ExportJob[]
+// Mock data for import/export operations
+const mockImportJobs: ImportJob[] = [];
+const mockExportJobs: ExportJob[] = [];
+
+// Mock implementations
+export const mockImportExportTables = {
+  // Import jobs
+  getImportJobs: async (): Promise<ImportJob[]> => {
+    return [...mockImportJobs];
+  },
+  
+  getImportJobById: async (id: string): Promise<ImportJob | null> => {
+    const job = mockImportJobs.find(job => job.id === id);
+    return job ? { ...job } : null;
+  },
+  
+  createImportJob: async (data: Omit<ImportJob, 'id' | 'createdAt' | 'status' | 'progress'>): Promise<ImportJob> => {
+    const newJob: ImportJob = {
+      id: uuidv4(),
+      userId: data.userId,
+      tableName: data.tableName,
+      fileName: data.fileName,
+      fileSize: data.fileSize,
+      totalRows: data.totalRows,
+      processedRows: 0,
+      status: 'pending',
+      progress: 0,
+      startedAt: new Date().toISOString(),
+      completedAt: null,
+      createdAt: new Date().toISOString(),
+      errors: []
+    };
+    
+    mockImportJobs.push(newJob);
+    return { ...newJob };
+  },
+  
+  updateImportJob: async (id: string, data: Partial<ImportJob>): Promise<ImportJob | null> => {
+    const index = mockImportJobs.findIndex(job => job.id === id);
+    if (index === -1) return null;
+    
+    const updatedJob = {
+      ...mockImportJobs[index],
+      ...data,
+      updatedAt: new Date().toISOString()
+    };
+    
+    mockImportJobs[index] = updatedJob;
+    return { ...updatedJob };
+  },
+  
+  // Export jobs
+  getExportJobs: async (): Promise<ExportJob[]> => {
+    return [...mockExportJobs];
+  },
+  
+  getExportJobById: async (id: string): Promise<ExportJob | null> => {
+    const job = mockExportJobs.find(job => job.id === id);
+    return job ? { ...job } : null;
+  },
+  
+  createExportJob: async (data: Omit<ExportJob, 'id' | 'createdAt' | 'status'>): Promise<ExportJob> => {
+    const newJob: ExportJob = {
+      id: uuidv4(),
+      userId: data.userId,
+      tableName: data.tableName,
+      fileName: data.fileName,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      completedAt: null,
+      filters: data.filters || {},
+      downloadUrl: data.downloadUrl
+    };
+    
+    mockExportJobs.push(newJob);
+    return { ...newJob };
+  },
+  
+  updateExportJob: async (id: string, data: Partial<ExportJob>): Promise<ExportJob | null> => {
+    const index = mockExportJobs.findIndex(job => job.id === id);
+    if (index === -1) return null;
+    
+    const updatedJob = {
+      ...mockExportJobs[index],
+      ...data
+    };
+    
+    mockExportJobs[index] = updatedJob;
+    return { ...updatedJob };
+  }
 };
 
-// Original from method to be preserved
-const originalFrom = supabase.from.bind(supabase);
-
-// Overriding the from method to handle our mock tables
-supabase.from = ((table: string) => {
-  // Handle the special case for mock tables
-  if (table === 'import_jobs') {
-    return createMockImportJobsQueryBuilder();
-  } else if (table === 'export_jobs') {
-    return createMockExportJobsQueryBuilder();
-  }
-  
-  // Use the original method for other tables
-  return originalFrom(table as any);
-}) as any;
-
-// Create a mock QueryBuilder for import_jobs table
-function createMockImportJobsQueryBuilder() {
+// Provide mock functions for Supabase RPC compatibility
+export const getMockSupabase = () => {
   return {
-    select: () => ({
-      eq: (column: string, value: any) => ({
-        order: (column: string, { ascending = true } = {}) => ({
-          limit: (limit: number) => ({
-            single: () => Promise.resolve({ 
-              data: mockDB.importJobs.find(job => job.id === value) || null, 
-              error: null 
+    from: (tableName: string) => {
+      if (tableName === 'import_jobs') {
+        return {
+          select: () => ({
+            eq: () => ({
+              single: async () => ({ data: mockImportJobs[0], error: null })
             }),
-            range: (start: number, end: number) => Promise.resolve({ 
-              data: mockDB.importJobs
-                .filter(job => job.id === value)
-                .slice(start, end + 1), 
-              error: null 
+            order: () => ({
+              data: mockImportJobs,
+              error: null
             })
           }),
-        }),
-      }),
-      range: (start: number, end: number) => Promise.resolve({ 
-        data: mockDB.importJobs.slice(start, end + 1), 
-        error: null 
-      }),
-    }),
-    insert: (data: Partial<ImportJob>) => ({
-      select: () => {
-        const newJob: ImportJob = {
-          id: uuidv4(),
-          userId: data.userId || 'unknown',
-          tableName: data.tableName || '',
-          fileName: data.fileName || '',
-          fileSize: data.fileSize || 0,
-          totalRows: data.totalRows || 0,
-          processedRows: data.processedRows || 0,
-          status: data.status || 'pending',
-          progress: data.progress || 0,
-          startedAt: data.startedAt || new Date().toISOString(),
-          completedAt: data.completedAt || null,
-          createdAt: new Date().toISOString(),
-          errors: data.errors || []
+          insert: (data: any) => {
+            const newJob = {
+              id: uuidv4(),
+              ...data,
+              created_at: new Date().toISOString()
+            };
+            mockImportJobs.push(newJob as unknown as ImportJob);
+            return { data: newJob, error: null };
+          },
+          update: (data: any) => {
+            const index = mockImportJobs.findIndex(job => job.id === data.id);
+            if (index !== -1) {
+              mockImportJobs[index] = { ...mockImportJobs[index], ...data } as ImportJob;
+              return { data: mockImportJobs[index], error: null };
+            }
+            return { data: null, error: { message: 'Job not found' } };
+          }
         };
-        mockDB.importJobs.push(newJob);
-        return Promise.resolve({ data: newJob, error: null });
-      }
-    }),
-    update: (data: Partial<ImportJob>) => ({
-      eq: (column: string, value: any) => {
-        const index = mockDB.importJobs.findIndex(job => job.id === value);
-        if (index >= 0) {
-          mockDB.importJobs[index] = { ...mockDB.importJobs[index], ...data };
-          return Promise.resolve({ 
-            data: mockDB.importJobs[index], 
-            error: null 
-          });
-        }
-        return Promise.resolve({ 
-          data: null, 
-          error: { message: 'Job not found' } 
-        });
-      }
-    }),
-    delete: () => ({
-      eq: (column: string, value: any) => {
-        const index = mockDB.importJobs.findIndex(job => job.id === value);
-        if (index >= 0) {
-          mockDB.importJobs.splice(index, 1);
-          return Promise.resolve({ data: null, error: null });
-        }
-        return Promise.resolve({ 
-          data: null, 
-          error: { message: 'Job not found' } 
-        });
-      }
-    })
-  };
-}
-
-// Create a mock QueryBuilder for export_jobs table
-function createMockExportJobsQueryBuilder() {
-  return {
-    select: () => ({
-      eq: (column: string, value: any) => ({
-        order: (column: string, { ascending = true } = {}) => ({
-          limit: (limit: number) => ({
-            single: () => Promise.resolve({ 
-              data: mockDB.exportJobs.find(job => job.id === value) || null, 
-              error: null 
+      } else if (tableName === 'export_jobs') {
+        return {
+          select: () => ({
+            eq: () => ({
+              single: async () => ({ data: mockExportJobs[0], error: null })
             }),
-            range: (start: number, end: number) => Promise.resolve({ 
-              data: mockDB.exportJobs
-                .filter(job => job.id === value)
-                .slice(start, end + 1), 
-              error: null 
+            order: () => ({
+              data: mockExportJobs,
+              error: null
             })
           }),
-        }),
-      }),
-      range: (start: number, end: number) => Promise.resolve({ 
-        data: mockDB.exportJobs.slice(start, end + 1), 
-        error: null 
-      }),
-    }),
-    insert: (data: Partial<ExportJob>) => ({
-      select: () => {
-        const newJob: ExportJob = {
-          id: uuidv4(),
-          userId: data.userId || 'unknown',
-          tableName: data.tableName || '',
-          fileName: data.fileName || '',
-          status: data.status || 'pending',
-          createdAt: new Date().toISOString(),
-          completedAt: data.completedAt || null,
-          filters: data.filters || {},
-          downloadUrl: data.downloadUrl
+          insert: (data: any) => {
+            const newJob = {
+              id: uuidv4(),
+              ...data,
+              created_at: new Date().toISOString()
+            };
+            mockExportJobs.push(newJob as unknown as ExportJob);
+            return { data: newJob, error: null };
+          },
+          update: (data: any) => {
+            const index = mockExportJobs.findIndex(job => job.id === data.id);
+            if (index !== -1) {
+              mockExportJobs[index] = { ...mockExportJobs[index], ...data } as ExportJob;
+              return { data: mockExportJobs[index], error: null };
+            }
+            return { data: null, error: { message: 'Job not found' } };
+          }
         };
-        mockDB.exportJobs.push(newJob);
-        return Promise.resolve({ data: newJob, error: null });
       }
-    }),
-    update: (data: Partial<ExportJob>) => ({
-      eq: (column: string, value: any) => {
-        const index = mockDB.exportJobs.findIndex(job => job.id === value);
-        if (index >= 0) {
-          mockDB.exportJobs[index] = { ...mockDB.exportJobs[index], ...data };
-          return Promise.resolve({ 
-            data: mockDB.exportJobs[index], 
-            error: null 
-          });
-        }
-        return Promise.resolve({ 
-          data: null, 
-          error: { message: 'Job not found' } 
-        });
+      return {
+        select: () => ({ data: [], error: null })
+      };
+    },
+    rpc: (functionName: string, params: any) => {
+      // Mock RPC functions related to import/export operations
+      if (functionName === 'get_import_jobs') {
+        return { data: mockImportJobs, error: null };
+      } else if (functionName === 'get_export_jobs') {
+        return { data: mockExportJobs, error: null };
       }
-    }),
-    delete: () => ({
-      eq: (column: string, value: any) => {
-        const index = mockDB.exportJobs.findIndex(job => job.id === value);
-        if (index >= 0) {
-          mockDB.exportJobs.splice(index, 1);
-          return Promise.resolve({ data: null, error: null });
-        }
-        return Promise.resolve({ 
-          data: null, 
-          error: { message: 'Job not found' } 
-        });
-      }
-    })
+      return { data: null, error: { message: 'RPC function not found' } };
+    }
   };
-}
-
-// Export utility function to use in tests
-export const getMockImportJobs = () => mockDB.importJobs;
-export const getMockExportJobs = () => mockDB.exportJobs;
+};

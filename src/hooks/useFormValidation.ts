@@ -1,217 +1,159 @@
 
-import { useState, useCallback } from 'react';
-import * as z from 'zod';
-import { categories } from '@/lib/api';
-import { ValidationRule, ValidationTextOptions } from '@/lib/api/types';
+import { useState, useEffect, useCallback } from 'react';
+import { z } from 'zod';
+import { api } from '@/lib/api';
+import { Column, ValidationRule } from '@/lib/api/types';
+import { createSanitizedStringSchema } from '@/lib/validation/sanitization';
 
-export interface ValidationSchema {
-  [key: string]: z.ZodType<any>;
-}
+type ValidationErrors = Record<string, string>;
+type ValidationResult = { isValid: boolean; errors: ValidationErrors };
 
-export interface ValidationErrors {
-  [key: string]: string;
-}
-
-export interface ValidationResult {
-  isValid: boolean;
-  errors: ValidationErrors;
-}
-
-export const useFormValidation = () => {
-  const [errors, setErrors] = useState<ValidationErrors>({});
+export function useFormValidation(categoryId: string) {
+  const [columns, setColumns] = useState<Column[]>([]);
+  const [validationRules, setValidationRules] = useState<ValidationRule[]>([]);
   const [isValid, setIsValid] = useState(true);
-  
-  // Function to generate a schema object from a category's columns
-  const generateSchemaFromCategory = async (categoryId: string) => {
-    try {
-      const category = await categories.getById(categoryId);
-      if (!category || !category.columns) {
-        throw new Error('Category or columns not found');
-      }
+  const [errors, setErrors] = useState<ValidationErrors>({});
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Fetch column and validation rules for the category
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!categoryId) return;
       
-      // Get columns from the category
-      const columns = await categories.getCategoryColumns(categoryId);
-      
-      // Create a schema object using Zod
-      const schemaObj: Record<string, z.ZodType<any>> = {};
-      
-      // Process each column and create appropriate validation rules
-      columns.forEach(column => {
-        let fieldSchema: z.ZodType<any>;
+      setIsLoading(true);
+      try {
+        // Fetch columns for the category
+        const categoryColumns = await api.categories.getCategoryColumns(categoryId);
+        setColumns(categoryColumns);
         
-        switch(column.type) {
-          case 'text':
-          case 'textarea':
-            fieldSchema = z.string().optional();
-            break;
-          case 'number':
-            fieldSchema = z.number().optional();
-            break;
-          case 'date':
-            fieldSchema = z.string().optional();
-            break;
-          case 'select':
-          case 'radio':
-            fieldSchema = z.string().optional();
-            break;
-          case 'checkbox':
-            fieldSchema = z.boolean().optional();
-            break;
-          default:
-            fieldSchema = z.any().optional();
+        // Fetch validation rules if they exist
+        if (api.categoryValidation) {
+          const rules = await api.categoryValidation.getCategoryValidationRules(categoryId);
+          setValidationRules(rules);
         }
-        
-        schemaObj[column.name] = fieldSchema;
-      });
-      
-      return z.object(schemaObj);
-    } catch (error) {
-      console.error('Error generating schema:', error);
-      return z.object({});
-    }
-  };
-  
-  // Validate text fields with various options
-  const validateTextField = (
-    value: string,
-    options: ValidationTextOptions = {}
-  ): ValidationResult => {
-    const { required = false, minLength, maxLength, errorMessage, label } = options;
+      } catch (error) {
+        console.error('Error fetching validation data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
     
-    try {
-      let schema = z.string();
-      
-      if (required) {
-        schema = schema.min(1, { message: errorMessage || `${label || 'Field'} is required` });
-      } else {
-        schema = schema.optional();
-      }
-      
-      if (minLength) {
-        schema = schema.min(minLength, {
-          message: `${label || 'Field'} must be at least ${minLength} characters`,
-        });
-      }
-      
-      if (maxLength) {
-        schema = schema.max(maxLength, {
-          message: `${label || 'Field'} must be at most ${maxLength} characters`,
-        });
-      }
-      
-      schema.parse(value);
-      return { isValid: true, errors: {} };
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const errorMessages = error.errors.reduce(
-          (acc, err) => ({
-            ...acc,
-            [err.path[0] || 'value']: err.message,
-          }),
-          {}
-        );
-        return { isValid: false, errors: errorMessages };
-      }
-      return {
-        isValid: false,
-        errors: { value: 'Invalid input' },
-      };
-    }
-  };
-  
-  // Validate email fields
-  const validateEmailField = (
-    value: string,
-    options: ValidationTextOptions = {}
-  ): ValidationResult => {
-    const { required = false, errorMessage, label } = options;
+    fetchData();
+  }, [categoryId]);
+
+  // Build a Zod schema based on column types and validation rules
+  const buildSchema = useCallback(() => {
+    const schemaMap: Record<string, z.ZodType<any>> = {};
     
-    try {
-      let schema = z.string().email({
-        message: errorMessage || `${label || 'Email'} must be a valid email address`,
-      });
+    // Process each column and create appropriate validators
+    columns.forEach(column => {
+      let fieldSchema;
       
-      if (!required) {
-        schema = schema.optional();
+      switch (column.type) {
+        case 'text':
+        case 'textarea':
+          fieldSchema = createSanitizedStringSchema({
+            required: column.required,
+            label: column.name
+          });
+          break;
+          
+        case 'number':
+          fieldSchema = z.preprocess(
+            (val) => (val === '' ? undefined : Number(val)),
+            z.number({
+              required_error: `${column.name} is required`,
+              invalid_type_error: `${column.name} must be a number`
+            }).optional().nullable()
+          );
+          
+          if (column.required) {
+            fieldSchema = fieldSchema.refine(val => val !== undefined && val !== null, {
+              message: `${column.name} is required`
+            });
+          }
+          break;
+          
+        case 'date':
+          fieldSchema = z.preprocess(
+            (val) => (val ? new Date(val as string) : undefined),
+            z.date({
+              required_error: `${column.name} is required`,
+              invalid_type_error: `${column.name} must be a valid date`
+            }).optional().nullable()
+          );
+          
+          if (column.required) {
+            fieldSchema = fieldSchema.refine(val => val !== undefined && val !== null, {
+              message: `${column.name} is required`
+            });
+          }
+          break;
+          
+        case 'select':
+          fieldSchema = createSanitizedStringSchema({
+            required: column.required,
+            label: column.name
+          });
+          
+          if (column.options && column.options.length > 0) {
+            fieldSchema = z.enum(column.options as [string, ...string[]]).optional();
+            
+            if (column.required) {
+              fieldSchema = fieldSchema.refine(val => val !== undefined, {
+                message: `${column.name} is required`
+              });
+            }
+          }
+          break;
+          
+        default:
+          fieldSchema = z.any();
       }
       
-      schema.parse(value);
-      return { isValid: true, errors: {} };
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return {
-          isValid: false,
-          errors: { email: error.errors[0]?.message || 'Invalid email' },
-        };
-      }
-      return {
-        isValid: false,
-        errors: { email: 'Invalid email format' },
-      };
-    }
-  };
-  
-  // Validate an entire form against a Zod schema
-  const validateForm = <SchemaType extends z.ZodType<any>>(
-    data: Record<string, any>,
-    schema: SchemaType
-  ): ValidationResult => {
-    try {
-      schema.parse(data);
-      return { isValid: true, errors: {} };
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const errorMessages = error.errors.reduce(
-          (acc, err) => ({
-            ...acc,
-            [err.path[0] || 'value']: err.message,
-          }),
-          {}
-        );
-        return { isValid: false, errors: errorMessages };
-      }
-      return {
-        isValid: false,
-        errors: { form: 'Form validation failed' },
-      };
-    }
-  };
-  
-  // Clear all validation errors
-  const clearErrors = useCallback(() => {
-    setErrors({});
-    setIsValid(true);
-  }, []);
-  
-  // Set a specific error
-  const setError = useCallback((field: string, message: string) => {
-    setErrors(prev => ({ ...prev, [field]: message }));
-    setIsValid(false);
-  }, []);
-  
-  // Remove a specific error
-  const removeError = useCallback((field: string) => {
-    setErrors(prev => {
-      const newErrors = { ...prev };
-      delete newErrors[field];
-      return newErrors;
+      schemaMap[column.name] = fieldSchema;
     });
     
-    // If no more errors, set isValid to true
-    setIsValid(Object.keys(errors).length === 0);
-  }, [errors]);
-  
+    // Create a schema object from our schema map
+    return z.object(schemaMap);
+  }, [columns]);
+
+  // Validate form data against our schema
+  const validateForm = useCallback(<SchemaType extends z.ZodType<any>>(
+    data: Record<string, any>,
+    schema?: SchemaType
+  ): ValidationResult => {
+    const validationSchema = schema || buildSchema();
+    const result = validationSchema.safeParse(data);
+    
+    if (!result.success) {
+      const formattedErrors: ValidationErrors = {};
+      
+      result.error.errors.forEach(err => {
+        const field = err.path.join('.');
+        formattedErrors[field] = err.message;
+      });
+      
+      setErrors(formattedErrors);
+      setIsValid(false);
+      
+      return { isValid: false, errors: formattedErrors };
+    }
+    
+    setErrors({});
+    setIsValid(true);
+    
+    return { isValid: true, errors: {} };
+  }, [buildSchema]);
+
   return {
     errors,
     isValid,
     validateForm,
-    validateTextField,
-    validateEmailField,
-    generateSchemaFromCategory,
-    clearErrors,
-    setError,
-    removeError,
     setErrors,
-    setIsValid
+    setIsValid,
+    isLoading,
+    columns,
+    validationRules
   };
-};
+}

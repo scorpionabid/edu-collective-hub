@@ -1,90 +1,111 @@
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { NotificationGroup, CreateNotificationGroupData, UpdateNotificationGroupData } from '@/lib/api/types';
+import { toast } from 'sonner';
 
-export function useNotificationGroups() {
-  const [groups, setGroups] = useState<NotificationGroup[]>([]);
-  const [loading, setLoading] = useState(false);
+export const useNotificationGroups = () => {
+  const queryClient = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
 
-  // Fetch notification groups
-  const fetchNotificationGroups = async () => {
-    setLoading(true);
-    try {
-      const data = await api.notifications.getNotificationGroups();
-      setGroups(data);
-    } catch (error) {
-      console.error('Error fetching notification groups:', error);
-    } finally {
-      setLoading(false);
+  // Get all notification groups
+  const {
+    data: groups,
+    isLoading,
+    isError,
+    refetch
+  } = useQuery({
+    queryKey: ['notification-groups'],
+    queryFn: async () => {
+      if (api.groups && api.groups.getNotificationGroups) {
+        return api.groups.getNotificationGroups();
+      }
+      setError('API method not available: getNotificationGroups');
+      return [];
     }
-  };
+  });
 
   // Create a new notification group
-  const createNotificationGroup = async (data: CreateNotificationGroupData) => {
-    setLoading(true);
-    try {
-      const result = await api.notifications.createNotificationGroup(data);
-      if (result) {
-        // Refresh groups list
-        await fetchNotificationGroups();
-        return result;
+  const createMutation = useMutation({
+    mutationFn: async (data: CreateNotificationGroupData) => {
+      if (api.groups && api.groups.createNotificationGroup) {
+        return api.groups.createNotificationGroup(data);
       }
-      return null;
-    } catch (error) {
-      console.error('Error creating notification group:', error);
-      return null;
-    } finally {
-      setLoading(false);
+      throw new Error('API method not available: createNotificationGroup');
+    },
+    onSuccess: () => {
+      toast.success('Notification group created successfully');
+      queryClient.invalidateQueries({ queryKey: ['notification-groups'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to create notification group');
+      setError(error.message || 'Failed to create notification group');
     }
-  };
+  });
 
   // Update an existing notification group
-  const updateNotificationGroup = async (data: UpdateNotificationGroupData) => {
-    setLoading(true);
-    try {
-      const result = await api.notifications.updateNotificationGroup(data.id, {
-        name: data.name,
-        description: data.description
-      });
-      if (result) {
-        // Refresh groups list
-        await fetchNotificationGroups();
-        return result;
+  const updateMutation = useMutation({
+    mutationFn: async (data: UpdateNotificationGroupData) => {
+      if (api.groups && api.groups.updateNotificationGroup) {
+        return api.groups.updateNotificationGroup(data.id, {
+          name: data.name,
+          description: data.description
+        });
       }
-      return null;
-    } catch (error) {
-      console.error('Error updating notification group:', error);
-      return null;
-    } finally {
-      setLoading(false);
+      throw new Error('API method not available: updateNotificationGroup');
+    },
+    onSuccess: () => {
+      toast.success('Notification group updated successfully');
+      queryClient.invalidateQueries({ queryKey: ['notification-groups'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to update notification group');
+      setError(error.message || 'Failed to update notification group');
     }
-  };
+  });
 
   // Delete a notification group
-  const deleteNotificationGroup = async (id: string) => {
-    setLoading(true);
-    try {
-      const success = await api.notifications.deleteNotificationGroup(id);
-      if (success) {
-        // Refresh groups list
-        await fetchNotificationGroups();
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      if (api.groups && api.groups.deleteNotificationGroup) {
+        return api.groups.deleteNotificationGroup(id);
       }
-      return success;
-    } catch (error) {
-      console.error('Error deleting notification group:', error);
-      return false;
-    } finally {
-      setLoading(false);
+      throw new Error('API method not available: deleteNotificationGroup');
+    },
+    onSuccess: () => {
+      toast.success('Notification group deleted successfully');
+      queryClient.invalidateQueries({ queryKey: ['notification-groups'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to delete notification group');
+      setError(error.message || 'Failed to delete notification group');
     }
-  };
+  });
+
+  // Create a new notification group
+  const createGroup = useCallback(async (data: CreateNotificationGroupData) => {
+    return createMutation.mutateAsync(data);
+  }, [createMutation]);
+
+  // Update an existing notification group
+  const updateGroup = useCallback(async (data: UpdateNotificationGroupData) => {
+    return updateMutation.mutateAsync(data);
+  }, [updateMutation]);
+
+  // Delete a notification group
+  const deleteGroup = useCallback(async (id: string) => {
+    return deleteMutation.mutateAsync(id);
+  }, [deleteMutation]);
 
   return {
     groups,
-    loading,
-    fetchNotificationGroups,
-    createNotificationGroup,
-    updateNotificationGroup,
-    deleteNotificationGroup
+    isLoading,
+    isError,
+    error,
+    createGroup,
+    updateGroup,
+    deleteGroup,
+    refetch
   };
-}
+};

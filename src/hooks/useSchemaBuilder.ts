@@ -1,186 +1,193 @@
 
-import { useState, useCallback } from 'react';
-import { toast } from 'sonner';
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api';
-import { useAuth } from '@/hooks/useAuth';
+import { Column, ValidationRule } from '@/lib/api/types';
+import { toast } from 'sonner';
 
-export type ColumnDefinition = {
-  name: string;
-  label: string;
-  type: 'text' | 'number' | 'date' | 'select' | 'boolean';
-  required: boolean;
-  options?: string[];
-  defaultValue?: any;
-  validations?: Array<{
-    type: string;
-    params?: any;
-    message?: string;
-  }>;
-};
+export interface ColumnWithRules extends Column {
+  validationRules: ValidationRule[];
+}
 
-export type ValidationRuleDefinition = {
-  name: string;
-  type: 'simple' | 'dependency' | 'complex' | 'custom';
-  targetField: string;
-  condition: string;
-  value?: any;
-  message: string;
-  sourceField?: string;
-  expression?: string;
-};
-
-export function useSchemaBuilder(categoryId: string) {
-  const { user } = useAuth();
+export const useSchemaBuilder = (categoryId: string) => {
+  const [columns, setColumns] = useState<ColumnWithRules[]>([]);
+  const [validationRules, setValidationRules] = useState<ValidationRule[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [columns, setColumns] = useState<ColumnDefinition[]>([]);
-  const [rules, setRules] = useState<ValidationRuleDefinition[]>([]);
+  const [schema, setSchema] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  
-  // Load existing column definitions and rules
-  const loadSchema = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+
+  // Fetch columns and validation rules
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!categoryId) return;
+      
+      setIsLoading(true);
+      try {
+        // Fetch columns
+        const cols = await api.categories.getCategoryColumns(categoryId);
+        
+        // Fetch validation rules
+        let rules: ValidationRule[] = [];
+        if (api.categoryValidation && typeof api.categoryValidation.getCategoryValidationRules === 'function') {
+          rules = await api.categoryValidation.getCategoryValidationRules(categoryId);
+        }
+        
+        setValidationRules(rules);
+        
+        // Combine columns with their rules
+        const columnsWithRules: ColumnWithRules[] = cols.map(col => ({
+          ...col,
+          validationRules: rules.filter(rule => rule.targetField === col.name)
+        }));
+        
+        setColumns(columnsWithRules);
+        
+        // Try to fetch existing schema
+        if (api.categoryValidation && typeof api.categoryValidation.getValidationSchema === 'function') {
+          const existingSchema = await api.categoryValidation.getValidationSchema(categoryId);
+          if (existingSchema) {
+            setSchema(existingSchema);
+          }
+        }
+      } catch (error: any) {
+        console.error('Error fetching schema data:', error);
+        setError(error.message || 'Failed to fetch schema data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
     
-    try {
-      // Load columns
-      const columnsData = await api.categories.getCategoryColumns(categoryId);
-      
-      const formattedColumns: ColumnDefinition[] = columnsData.map(col => ({
-        name: col.name,
-        label: col.name,
-        type: col.type as any,
-        required: col.required !== false,
-        options: col.options,
-        defaultValue: null,
-      }));
-      
-      setColumns(formattedColumns);
-      
-      // Load validation rules
-      const rulesData = await api.categories.getCategoryValidationRules(categoryId);
-      
-      const formattedRules: ValidationRuleDefinition[] = rulesData.map(rule => ({
-        name: rule.name,
-        type: rule.type as any,
-        targetField: rule.target_field,
-        condition: rule.condition,
-        value: rule.value,
-        message: rule.message,
-        sourceField: rule.source_field,
-        expression: rule.expression,
-      }));
-      
-      setRules(formattedRules);
-    } catch (error) {
-      console.error('Error loading schema data:', error);
-      setError('Failed to load schema data');
-      toast.error('Failed to load schema data');
-    } finally {
-      setIsLoading(false);
-    }
+    fetchData();
   }, [categoryId]);
-  
-  // Add a new column definition
-  const addColumn = useCallback((column: ColumnDefinition) => {
-    setColumns(prevColumns => [...prevColumns, column]);
-  }, []);
-  
-  // Update an existing column
-  const updateColumn = useCallback((index: number, column: Partial<ColumnDefinition>) => {
-    setColumns(prevColumns => 
-      prevColumns.map((col, i) => i === index ? { ...col, ...column } : col)
-    );
-  }, []);
-  
-  // Remove a column
-  const removeColumn = useCallback((index: number) => {
-    setColumns(prevColumns => prevColumns.filter((_, i) => i !== index));
-  }, []);
-  
-  // Add a new validation rule
-  const addRule = useCallback((rule: ValidationRuleDefinition) => {
-    setRules(prevRules => [...prevRules, rule]);
-  }, []);
-  
-  // Update an existing rule
-  const updateRule = useCallback((index: number, rule: Partial<ValidationRuleDefinition>) => {
-    setRules(prevRules => 
-      prevRules.map((r, i) => i === index ? { ...r, ...rule } : r)
-    );
-  }, []);
-  
-  // Remove a rule
-  const removeRule = useCallback((index: number) => {
-    setRules(prevRules => prevRules.filter((_, i) => i !== index));
-  }, []);
-  
-  // Save the schema to the database
-  const saveSchema = useCallback(async (name: string, description?: string) => {
-    setIsLoading(true);
-    setError(null);
+
+  // Add a validation rule
+  const addValidationRule = useCallback(async (rule: Omit<ValidationRule, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (!api.categoryValidation || typeof api.categoryValidation.createValidationRule !== 'function') {
+      setError('API method not available: createValidationRule');
+      return null;
+    }
     
     try {
-      // Convert local state to schema format
-      const schemaJson = {
-        name,
-        description,
-        fields: columns.map(col => ({
-          name: col.name,
-          label: col.label,
-          type: col.type,
-          required: col.required,
-          options: col.options,
-          defaultValue: col.defaultValue,
-          validations: col.validations,
-        })),
-        rules: rules.map(rule => ({
-          name: rule.name,
-          type: rule.type,
-          targetField: rule.targetField,
-          condition: rule.condition,
-          value: rule.value,
-          message: rule.message,
-          sourceField: rule.sourceField,
-          expression: rule.expression,
-        })),
-      };
+      const newRule = await api.categoryValidation.createValidationRule(rule);
       
-      const success = await api.categories.saveValidationSchema(
-        categoryId,
-        name,
-        schemaJson,
-        description
-      );
+      setValidationRules(prev => [...prev, newRule]);
       
-      if (success) {
-        toast.success('Schema saved successfully');
-      } else {
-        throw new Error('Failed to save schema');
+      // Update columns with rules
+      setColumns(prev => prev.map(col => {
+        if (col.name === rule.targetField) {
+          return {
+            ...col,
+            validationRules: [...col.validationRules, newRule]
+          };
+        }
+        return col;
+      }));
+      
+      toast.success('Validation rule added successfully');
+      return newRule;
+    } catch (error: any) {
+      console.error('Error adding validation rule:', error);
+      setError(error.message || 'Failed to add validation rule');
+      return null;
+    }
+  }, []);
+
+  // Update a validation rule
+  const updateValidationRule = useCallback(async (id: string, rule: Partial<Omit<ValidationRule, 'id' | 'createdAt' | 'updatedAt'>>) => {
+    if (!api.categoryValidation || typeof api.categoryValidation.updateValidationRule !== 'function') {
+      setError('API method not available: updateValidationRule');
+      return null;
+    }
+    
+    try {
+      const updatedRule = await api.categoryValidation.updateValidationRule(id, rule);
+      
+      setValidationRules(prev => prev.map(r => r.id === id ? updatedRule : r));
+      
+      // Update columns with rules
+      setColumns(prev => prev.map(col => {
+        const ruleIndex = col.validationRules.findIndex(r => r.id === id);
+        if (ruleIndex !== -1) {
+          const newRules = [...col.validationRules];
+          newRules[ruleIndex] = updatedRule;
+          return {
+            ...col,
+            validationRules: newRules
+          };
+        }
+        return col;
+      }));
+      
+      toast.success('Validation rule updated successfully');
+      return updatedRule;
+    } catch (error: any) {
+      console.error('Error updating validation rule:', error);
+      setError(error.message || 'Failed to update validation rule');
+      return null;
+    }
+  }, []);
+
+  // Delete a validation rule
+  const deleteValidationRule = useCallback(async (id: string) => {
+    if (!api.categoryValidation || typeof api.categoryValidation.deleteValidationRule !== 'function') {
+      setError('API method not available: deleteValidationRule');
+      return false;
+    }
+    
+    try {
+      const result = await api.categoryValidation.deleteValidationRule(id);
+      
+      if (result) {
+        setValidationRules(prev => prev.filter(r => r.id !== id));
+        
+        // Update columns with rules
+        setColumns(prev => prev.map(col => ({
+          ...col,
+          validationRules: col.validationRules.filter(r => r.id !== id)
+        })));
+        
+        toast.success('Validation rule deleted successfully');
       }
       
-      return success;
-    } catch (error) {
-      console.error('Error saving schema:', error);
-      setError('Failed to save schema');
-      toast.error('Failed to save schema');
+      return result;
+    } catch (error: any) {
+      console.error('Error deleting validation rule:', error);
+      setError(error.message || 'Failed to delete validation rule');
       return false;
-    } finally {
-      setIsLoading(false);
     }
-  }, [categoryId, columns, rules]);
-  
+  }, []);
+
+  // Save the entire schema
+  const saveSchema = useCallback(async (schemaData: any) => {
+    if (!api.categoryValidation || typeof api.categoryValidation.saveValidationSchema !== 'function') {
+      setError('API method not available: saveValidationSchema');
+      return false;
+    }
+    
+    try {
+      const result = await api.categoryValidation.saveValidationSchema(categoryId, schemaData);
+      
+      if (result) {
+        setSchema(schemaData);
+        toast.success('Schema saved successfully');
+      }
+      
+      return result;
+    } catch (error: any) {
+      console.error('Error saving schema:', error);
+      setError(error.message || 'Failed to save schema');
+      return false;
+    }
+  }, [categoryId]);
+
   return {
     columns,
-    rules,
+    validationRules,
     isLoading,
+    schema,
     error,
-    loadSchema,
-    addColumn,
-    updateColumn,
-    removeColumn,
-    addRule,
-    updateRule,
-    removeRule,
-    saveSchema,
+    addValidationRule,
+    updateValidationRule,
+    deleteValidationRule,
+    saveSchema
   };
-}
+};

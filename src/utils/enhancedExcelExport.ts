@@ -1,188 +1,138 @@
 
-import { ExportJob, FilterParams } from "@/lib/api/types";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { saveAs } from "file-saver";
-import Excel from "exceljs";
-import { getMockSupabase } from "@/lib/api/mock/importExportTables";
+import { saveAs } from 'file-saver';
+import * as XLSX from 'xlsx';
+import { mockImportExportTables } from '@/lib/api/mock/importExportTables';
+import { supabase } from '@/integrations/supabase/client';
+import { ExportJob, FilterParams } from '@/lib/api/types';
+import { toast } from 'sonner';
 
-// Use the getMockSupabase helper to get a properly typed mock implementation
-const mockSupabase = getMockSupabase();
-
-export interface ExportData {
-  sheets: {
-    name: string;
-    data: any[];
-  }[];
-}
-
-export const createExportJob = async (userId: string, tableName: string, filters?: FilterParams): Promise<ExportJob | null> => {
-  try {
-    const { data, error } = await mockSupabase
-      .from('export_jobs')
-      .insert({
-        userId,
-        tableName,
-        filters,
-        status: 'pending',
-        start_time: new Date().toISOString(),
-        file_name: `${tableName}_export_${new Date().toISOString().split('T')[0]}.xlsx`
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    
-    return data as ExportJob;
-  } catch (error) {
-    console.error('Error creating export job:', error);
-    toast.error('Failed to create export job');
-    return null;
-  }
+// Create a unique file name for the export
+const createFileName = (tableName: string): string => {
+  const date = new Date().toISOString().split('T')[0];
+  return `${tableName}_export_${date}.xlsx`;
 };
 
-export const updateExportJobStatus = async (
-  id: string, 
-  status: 'pending' | 'processing' | 'completed' | 'failed',
-  options?: {
-    download_url?: string;
-    file_size?: number;
-    error_message?: string;
-  }
-): Promise<ExportJob | null> => {
+// Export data to an Excel file
+export const exportToExcel = (data: any[], fileName: string): void => {
   try {
-    const updates: any = { status };
+    // Create a worksheet
+    const worksheet = XLSX.utils.json_to_sheet(data);
     
-    if (status === 'completed') {
-      updates.end_time = new Date().toISOString();
-      if (options?.download_url) updates.download_url = options.download_url;
-      if (options?.file_size) updates.file_size = options.file_size;
-    } else if (status === 'failed') {
-      updates.end_time = new Date().toISOString();
-      if (options?.error_message) updates.error_message = options.error_message;
-    }
-    
-    const { data, error } = await mockSupabase
-      .from('export_jobs')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    
-    return data as ExportJob;
-  } catch (error) {
-    console.error('Error updating export job status:', error);
-    return null;
-  }
-};
-
-export const exportToExcel = async (data: any[], fileName: string): Promise<Blob> => {
-  const workbook = new Excel.Workbook();
-  const worksheet = workbook.addWorksheet('Sheet 1');
-  
-  // Add headers if data exists
-  if (data.length > 0) {
-    const headers = Object.keys(data[0]);
-    worksheet.addRow(headers);
-  }
-  
-  // Add data rows
-  data.forEach(item => {
-    const values = Object.values(item);
-    worksheet.addRow(values);
-  });
-  
-  // Style the header row
-  const headerRow = worksheet.getRow(1);
-  headerRow.font = { bold: true };
-  headerRow.fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FFE0E0E0' }
-  };
-  
-  // Return as blob
-  return await workbook.xlsx.writeBuffer().then(buffer => {
-    return new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  });
-};
-
-export const enhancedExcelExport = async (data: ExportData, fileName: string, userId: string, tableName: string, filters?: FilterParams): Promise<string | null> => {
-  try {
-    // Create an export job
-    const exportJob = await createExportJob(userId, tableName, filters);
-    
-    if (!exportJob) {
-      throw new Error('Failed to create export job');
-    }
-    
-    // Update status to processing
-    await updateExportJobStatus(exportJob.id, 'processing');
+    // Create a workbook
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Data');
     
     // Generate Excel file
-    const workbook = new Excel.Workbook();
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     
-    // Create worksheets for each sheet in the data
-    data.sheets.forEach(sheet => {
-      const worksheet = workbook.addWorksheet(sheet.name);
-      
-      // Add headers if data exists
-      if (sheet.data.length > 0) {
-        const headers = Object.keys(sheet.data[0]);
-        worksheet.addRow(headers);
-        
-        // Style the header row
-        const headerRow = worksheet.getRow(1);
-        headerRow.font = { bold: true };
-        headerRow.fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: 'FFE0E0E0' }
-        };
-      }
-      
-      // Add data rows
-      sheet.data.forEach(item => {
-        const values = Object.values(item);
-        worksheet.addRow(values);
-      });
-      
-      // Auto-size columns
-      worksheet.columns.forEach(column => {
-        let maxLength = 0;
-        column.eachCell({ includeEmpty: true }, cell => {
-          const cellValue = cell.value?.toString() || '';
-          if (cellValue.length > maxLength) {
-            maxLength = cellValue.length;
-          }
-        });
-        column.width = maxLength < 10 ? 10 : maxLength + 2;
-      });
-    });
-    
-    // Generate excel file
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    
-    // Save file
+    // Save the file
+    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     saveAs(blob, fileName);
+  } catch (error) {
+    console.error('Error exporting to Excel:', error);
+    toast.error('Failed to export data to Excel');
+  }
+};
+
+// Enhanced export function that creates a job in the background
+export const enhancedExportToExcel = async (
+  tableName: string,
+  filters: FilterParams = {},
+  userId: string
+): Promise<ExportJob | null> => {
+  try {
+    // Create a job record
+    const fileName = createFileName(tableName);
     
-    // Update job status to completed
-    const fileSize = blob.size;
-    await updateExportJobStatus(exportJob.id, 'completed', {
-      file_size: fileSize,
-      download_url: fileName // In a real app, this would be a URL to download the file
+    // Use the mock implementation for now
+    const job = await mockImportExportTables.createExportJob({
+      userId,
+      tableName,
+      fileName,
+      filters,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      completedAt: null
     });
     
-    toast.success('Export completed successfully');
-    return fileName;
+    // In a real implementation, we would trigger a serverless function
+    // to process the export in the background
+    
+    // For now, simulate the process with a timeout
+    setTimeout(async () => {
+      try {
+        // Simulate processing
+        await mockImportExportTables.updateExportJob(job.id, {
+          status: 'processing'
+        });
+        
+        // Fetch data based on table name and filters
+        const { data, error } = await supabase
+          .from(tableName)
+          .select('*')
+          .eq('deleted', false);
+        
+        if (error) throw error;
+        
+        // Generate Excel file
+        const worksheet = XLSX.utils.json_to_sheet(data || []);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Data');
+        
+        // Convert to blob
+        const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        
+        // In a real implementation, we would upload the blob to storage
+        // and generate a download URL
+        
+        // Update the job as completed
+        await mockImportExportTables.updateExportJob(job.id, {
+          status: 'completed',
+          completedAt: new Date().toISOString(),
+          downloadUrl: 'https://example.com/download/' + fileName  // Mock URL
+        });
+      } catch (error) {
+        console.error('Error processing export job:', error);
+        
+        // Update the job as failed
+        await mockImportExportTables.updateExportJob(job.id, {
+          status: 'failed',
+          completedAt: new Date().toISOString()
+        });
+      }
+    }, 2000);
+    
+    return job;
   } catch (error) {
-    console.error('Export error:', error);
-    toast.error('Failed to export data');
+    console.error('Error creating export job:', error);
+    toast.error('Failed to start export job');
     return null;
   }
 };
 
-export default enhancedExcelExport;
+// Export multiple data sets as sheets in a single Excel file
+export const exportMultipleToExcel = (data: { 
+  sheets: Array<{ name: string; data: any[] }> 
+}, fileName: string): void => {
+  try {
+    // Create a workbook
+    const workbook = XLSX.utils.book_new();
+    
+    // Add each sheet
+    data.sheets.forEach(sheet => {
+      const worksheet = XLSX.utils.json_to_sheet(sheet.data);
+      XLSX.utils.book_append_sheet(workbook, worksheet, sheet.name);
+    });
+    
+    // Generate Excel file
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    
+    // Save the file
+    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(blob, fileName);
+  } catch (error) {
+    console.error('Error exporting to Excel:', error);
+    toast.error('Failed to export data to Excel');
+  }
+};

@@ -1,16 +1,16 @@
-import React, { useState, useEffect, useCallback } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { Category, Column, FormData } from '@/lib/api/types';
 import { useFormValidation } from '@/hooks/useFormValidation';
+import { useValidatedFormSubmission } from '@/hooks/useValidatedFormSubmission';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Calendar } from '@/components/ui/calendar';
 import {
   Popover,
   PopoverContent,
@@ -19,7 +19,7 @@ import {
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { CalendarIcon } from "lucide-react";
-import { useValidatedFormSubmission } from '@/hooks/useValidatedFormSubmission';
+import { Calendar } from "@/components/ui/calendar";
 
 interface FormSubmissionProps {
   onComplete?: (formData: FormData) => void;
@@ -34,11 +34,11 @@ const FormSubmission: React.FC<FormSubmissionProps> = ({ onComplete }) => {
     regionId: '',
     sectorId: '',
     schoolId: '',
-    columns: [],
     description: '',
     createdAt: '',
     updatedAt: '',
-    createdBy: ''
+    createdBy: '',
+    columns: []
   });
   const [columns, setColumns] = useState<Column[]>([]);
   const [formData, setFormData] = useState<FormData>({
@@ -53,20 +53,12 @@ const FormSubmission: React.FC<FormSubmissionProps> = ({ onComplete }) => {
   const [formValues, setFormValues] = useState<Record<string, any>>({});
   const [formAction, setFormAction] = useState<'draft' | 'submit'>('draft');
   const [showErrors, setShowErrors] = useState(false);
-  const { formErrors, setFormErrors, submitForm, submitting } = useValidatedFormSubmission(categoryId || '');
-  const { schema: categorySchema } = useFormValidation(categoryId || '');
   const [date, setDate] = useState<Date | undefined>(new Date());
-
-  useEffect(() => {
-    if (schema) {
-      // Initialize form values based on schema
-      const initialValues: Record<string, any> = {};
-      columns.forEach(column => {
-        initialValues[column.name] = ''; // Default value
-      });
-      setFormValues(initialValues);
-    }
-  }, [schema, columns]);
+  
+  // Use our hooks and define our own error state to avoid property conflicts
+  const { errors, isValid, validateForm } = useFormValidation(categoryId || '');
+  const { submitFormData, error, isSubmitting, clearError } = useValidatedFormSubmission(categoryId || '');
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (categoryId) {
@@ -86,34 +78,14 @@ const FormSubmission: React.FC<FormSubmissionProps> = ({ onComplete }) => {
   const fetchCategoryDetails = async () => {
     try {
       if (categoryId) {
-        const category = await api.categories.getById(categoryId);
-        // Add missing fields to match Category interface
-        const completeCategory: Category = {
-          ...category,
-          description: category.description || "",
-          createdAt: category.createdAt || new Date().toISOString(),
-          updatedAt: category.updatedAt || new Date().toISOString(),
-          createdBy: category.createdBy || ""
-        };
-        setCategory(completeCategory);
-        
-        // Also fetch columns for this category
-        const columnsData = await api.columns.getAll(categoryId);
-        
-        // Convert from snake_case to camelCase
-        const formattedColumns: Column[] = columnsData.map((col: any) => ({
-          id: col.id,
-          name: col.name,
-          type: col.type,
-          categoryId: col.category_id,
-          required: col.required,
-          options: col.options,
-          description: col.description || null,
-          createdAt: col.created_at,
-          updatedAt: col.updated_at
-        }));
-        
-        setColumns(formattedColumns);
+        const categoryData = await api.categories.getById(categoryId);
+        if (categoryData) {
+          setCategory(categoryData);
+          
+          // Also fetch columns for this category
+          const columnsData = await api.categories.getCategoryColumns(categoryId);
+          setColumns(columnsData);
+        }
       }
     } catch (error) {
       console.error('Error fetching category details:', error);
@@ -134,14 +106,19 @@ const FormSubmission: React.FC<FormSubmissionProps> = ({ onComplete }) => {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>, column: Column) => {
-    const { name, value, type, checked } = e.target;
+    const { name, value } = e.target;
+    
+    // Get the input type based on the element
+    const inputElement = e.target as HTMLInputElement;
+    const type = inputElement.type;
+    
+    let parsedValue: any = value;
 
-    let parsedValue = value;
-
+    // Handle different input types
     if (type === 'number') {
-      parsedValue = Number(value);
+      parsedValue = value ? Number(value) : '';
     } else if (type === 'checkbox') {
-      parsedValue = checked;
+      parsedValue = inputElement.checked;
     }
 
     setFormValues(prev => ({
@@ -150,55 +127,60 @@ const FormSubmission: React.FC<FormSubmissionProps> = ({ onComplete }) => {
     }));
   };
 
-  const handleFormElementChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target;
-    let newValue: any = value;
-    
-    // Handle checkbox inputs differently
-    if (type === 'checkbox') {
-      newValue = (e.target as HTMLInputElement).checked;
+  const handleDateChange = (name: string, date: Date | undefined) => {
+    if (date) {
+      setFormValues(prev => ({
+        ...prev,
+        [name]: date.toISOString(),
+      }));
     }
-    
-    // Handle number inputs
-    if (type === 'number') {
-      newValue = value === '' ? '' : String(parseFloat(value));
-    }
-    
-    // Update formData with the new value
-    setFormData({
-      ...formData,
-      [name]: newValue
-    });
+  };
+
+  const handleSelectChange = (name: string, value: string) => {
+    setFormValues(prev => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate form data
+    const validationResult = validateForm(formValues);
+    setValidationErrors(validationResult.errors);
+    
+    if (!validationResult.isValid) {
+      setShowErrors(true);
+      return;
+    }
+    
     try {
-      // Show validation errors
-      if (formErrors.length > 0) {
-        setShowErrors(true);
-        return;
-      }
-      
       const submissionData = {
-        ...formData,
+        categoryId: categoryId || '',
+        schoolId: formData.schoolId || '',
         data: formValues,
         status: formAction === 'submit' ? 'submitted' : 'draft',
-        submittedAt: formAction === 'submit' ? new Date().toISOString() : undefined
+        ...(formAction === 'submit' ? { submittedAt: new Date().toISOString() } : {})
       };
       
       let result;
       
       if (formDataId) {
-        // Use updateFormData instead of update
-        result = await api.formData.updateFormData(formDataId, submissionData);
+        // Update existing form
+        result = await submitFormData(
+          submissionData, 
+          { categoryId: categoryId || '', id: formDataId, isUpdate: true }
+        );
       } else {
-        // Use createFormData instead of create
-        result = await api.formData.createFormData(submissionData);
+        // Create new form
+        result = await submitFormData(
+          submissionData, 
+          { categoryId: categoryId || '' }
+        );
       }
       
-      if (result.success) {
+      if (result) {
         toast.success(
           formAction === 'submit'
             ? 'Form submitted successfully!'
@@ -206,10 +188,10 @@ const FormSubmission: React.FC<FormSubmissionProps> = ({ onComplete }) => {
         );
         
         if (onComplete) {
-          onComplete(result.data!);
+          onComplete(result);
+        } else {
+          navigate(-1);
         }
-      } else {
-        toast.error(result.error || 'Failed to save form data.');
       }
     } catch (error) {
       console.error('Form submission error:', error);
@@ -233,6 +215,7 @@ const FormSubmission: React.FC<FormSubmissionProps> = ({ onComplete }) => {
       {columns.map(column => (
         <div key={column.id} className="space-y-2">
           <Label htmlFor={column.name}>{column.name} {column.required && <span className="text-red-500">*</span>}</Label>
+          
           {column.type === 'text' && (
             <Input
               type="text"
@@ -241,7 +224,7 @@ const FormSubmission: React.FC<FormSubmissionProps> = ({ onComplete }) => {
               value={formValues[column.name] || ''}
               onChange={(e) => handleChange(e, column)}
               required={column.required}
-              aria-required={column.required}
+              aria-invalid={showErrors && validationErrors[column.name] ? 'true' : 'false'}
             />
           )}
 
@@ -253,7 +236,7 @@ const FormSubmission: React.FC<FormSubmissionProps> = ({ onComplete }) => {
               value={formValues[column.name] || ''}
               onChange={(e) => handleChange(e, column)}
               required={column.required}
-              aria-required={column.required}
+              aria-invalid={showErrors && validationErrors[column.name] ? 'true' : 'false'}
             />
           )}
 
@@ -268,17 +251,16 @@ const FormSubmission: React.FC<FormSubmissionProps> = ({ onComplete }) => {
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? format(date, "PPP") : <span>Pick a date</span>}
+                  {formValues[column.name] 
+                    ? format(new Date(formValues[column.name]), "PPP") 
+                    : <span>Pick a date</span>}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
                 <Calendar
                   mode="single"
-                  selected={date}
-                  onSelect={setDate}
-                  disabled={(date) =>
-                    date > new Date()
-                  }
+                  selected={formValues[column.name] ? new Date(formValues[column.name]) : undefined}
+                  onSelect={(date) => handleDateChange(column.name, date)}
                   initialFocus
                 />
               </PopoverContent>
@@ -286,9 +268,12 @@ const FormSubmission: React.FC<FormSubmissionProps> = ({ onComplete }) => {
           )}
 
           {column.type === 'select' && column.options && (
-            <Select>
-              <SelectTrigger className="w-[280px]">
-                <SelectValue placeholder="Select a fruit" />
+            <Select 
+              value={formValues[column.name] || ''} 
+              onValueChange={(value) => handleSelectChange(column.name, value)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select an option" />
               </SelectTrigger>
               <SelectContent>
                 {column.options.map(option => (
@@ -305,22 +290,28 @@ const FormSubmission: React.FC<FormSubmissionProps> = ({ onComplete }) => {
               value={formValues[column.name] || ''}
               onChange={(e) => handleChange(e, column)}
               required={column.required}
-              aria-required={column.required}
+              aria-invalid={showErrors && validationErrors[column.name] ? 'true' : 'false'}
             />
           )}
 
-          {showErrors && formErrors.find(error => error.field === column.name) && (
-            <p className="text-red-500 text-sm">{formErrors.find(error => error.field === column.name)?.message}</p>
+          {showErrors && validationErrors[column.name] && (
+            <p className="text-red-500 text-sm">{validationErrors[column.name]}</p>
           )}
         </div>
       ))}
 
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded">
+          {error}
+        </div>
+      )}
+
       <div className="flex justify-between">
-        <Button type="button" variant="secondary" onClick={handleSaveDraft} disabled={submitting}>
+        <Button type="button" variant="secondary" onClick={handleSaveDraft} disabled={isSubmitting}>
           Save as Draft
         </Button>
-        <Button type="submit" disabled={submitting} onClick={handleFinalSubmit}>
-          {submitting ? 'Submitting...' : 'Submit Form'}
+        <Button type="submit" disabled={isSubmitting} onClick={handleFinalSubmit}>
+          {isSubmitting ? 'Submitting...' : 'Submit Form'}
         </Button>
       </div>
     </form>

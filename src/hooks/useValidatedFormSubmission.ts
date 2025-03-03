@@ -1,75 +1,76 @@
 
 import { useState } from 'react';
-import { ZodType, ZodTypeDef } from 'zod';
-import { formData } from '@/lib/api';
-import * as sanitization from '@/lib/validation/sanitization';
+import { z, ZodType, ZodTypeDef } from 'zod';
+import { api } from '@/lib/api';
+import { FormData } from '@/lib/api/types';
+import { sanitizeText } from '@/lib/validation/sanitization';
 
-export const useValidatedFormSubmission = () => {
-  const [error, setError] = useState<string | null>(null);
+// Options for form submission
+interface SubmitOptions {
+  categoryId: string;
+  schoolId?: string;
+  id?: string;
+  isUpdate?: boolean;
+}
+
+// Hook for validated form submissions
+export function useValidatedFormSubmission(categoryId: string) {
+  const [error, setError] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Clear error state
-  const clearError = () => setError(null);
-
-  // Sanitize form data before submission to prevent XSS
-  const sanitizeFormData = <T extends Record<string, any>>(data: T): T => {
-    const sanitizedData = { ...data };
-    
-    for (const key in sanitizedData) {
-      // Only sanitize string values
-      if (typeof sanitizedData[key] === 'string') {
-        sanitizedData[key] = sanitization.sanitizeHTML(sanitizedData[key] as string);
-      }
-    }
-    
-    return sanitizedData;
-  };
-
-  // Submit form data with validation
+  // Generic function to submit form data with validation
   const submitFormData = async <T extends Record<string, any>>(
     data: T,
-    schema: ZodType<any, ZodTypeDef, any>,
-    options: {
-      categoryId: string;
-      schoolId?: string;
-      id?: string;
-      isUpdate?: boolean;
-    }
-  ) => {
-    setIsSubmitting(true);
-    setError(null);
-
+    options: SubmitOptions
+  ): Promise<FormData | null> => {
     try {
-      // Validate with Zod schema
-      const validationResult = schema.safeParse(data);
-      if (!validationResult.success) {
-        throw new Error('Validation failed: ' + JSON.stringify(validationResult.error));
-      }
+      setIsSubmitting(true);
+      setError('');
 
-      // Sanitize data to prevent XSS attacks
-      const sanitizedData = sanitizeFormData(data);
+      // Sanitize text fields to prevent XSS
+      const sanitizedData = { ...data };
+      Object.keys(sanitizedData).forEach(key => {
+        if (typeof sanitizedData[key] === 'string') {
+          sanitizedData[key] = sanitizeText(sanitizedData[key]);
+        }
+      });
 
-      // Prepare form data structure
-      const formDataPayload = {
-        categoryId: options.categoryId,
-        schoolId: options.schoolId || '',
-        data: sanitizedData,
-        status: 'draft'
-      };
+      let result: FormData | null = null;
 
-      // Update or create
+      // If we're updating an existing form
       if (options.isUpdate && options.id) {
-        return await formData.updateFormData(options.id, formDataPayload);
+        result = await api.formData.updateFormData(options.id, {
+          ...sanitizedData,
+          categoryId: options.categoryId,
+          schoolId: sanitizedData.schoolId || options.schoolId || '',
+        });
       } else {
-        return await formData.createFormData(formDataPayload);
+        // Creating a new form
+        const formDataToSubmit: Omit<FormData, 'id'> = {
+          categoryId: options.categoryId,
+          schoolId: sanitizedData.schoolId || options.schoolId || '',
+          data: sanitizedData.data || {},
+          status: sanitizedData.status || 'draft',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        
+        result = await api.formData.createFormData(formDataToSubmit);
       }
-    } catch (error) {
+
+      return result;
+    } catch (error: any) {
       console.error('Form submission error:', error);
-      setError(error instanceof Error ? error.message : 'An unknown error occurred');
-      throw error;
+      setError(error.message || 'An error occurred while submitting the form');
+      return null;
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Clear any errors
+  const clearError = () => {
+    setError('');
   };
 
   return {
@@ -78,4 +79,4 @@ export const useValidatedFormSubmission = () => {
     isSubmitting,
     clearError
   };
-};
+}
