@@ -1,17 +1,67 @@
+
+import { Json } from "@/integrations/supabase/types";
+
+// Core entity types
+export interface Category {
+  id: string;
+  name: string;
+  regionId?: string;
+  sectorId?: string;
+  schoolId?: string;
+  createdAt: string;
+  createdBy?: string;
+  description?: string;
+}
+
 export interface Column {
   id: string;
   name: string;
   type: string;
   categoryId: string;
+  required: boolean;
+  options?: string[];
+  description?: string;
 }
 
-export interface Category {
+export interface FormData {
+  id: string;
+  categoryId: string;
+  schoolId: string;
+  data: Record<string, any>;
+  status: 'draft' | 'submitted' | 'approved' | 'rejected';
+  submittedAt?: string;
+  approvedAt?: string;
+  approvedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: string;
+}
+
+export interface Region {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
+export interface Sector {
   id: string;
   name: string;
   regionId: string;
+  createdAt: string;
+  regionName?: string;
+  schoolCount?: number;
+}
+
+export interface School {
+  id: string;
+  name: string;
   sectorId: string;
-  schoolId: string;
-  columns: Column[];
+  address?: string;
+  email?: string;
+  phone?: string;
+  createdAt: string;
+  sectorName?: string;
+  regionName?: string;
 }
 
 export interface UserProfile {
@@ -24,98 +74,22 @@ export interface UserProfile {
   sectorId?: string;
   schoolId?: string;
   createdAt: string;
-  email?: string;
-  name?: string;
-  profile?: any;
+  name?: string; // Added to fix errors where the name property is accessed
 }
 
-// Redis cache related types
-export interface CacheConfig {
-  ttl: number; // Time to live in seconds
-}
-
-export interface CacheOptions {
-  enabled: boolean;
-  ttl?: number; // Time to live in seconds
-  invalidationTags?: string[];
-}
-
-export interface CacheManager {
-  get: <T>(key: string) => Promise<T | null>;
-  set: <T>(key: string, data: T, ttl?: number) => Promise<void>;
-  invalidate: (tags: string[]) => Promise<void>;
-}
-
-// Pagination related types
-export interface PaginationParams {
-  page: number;
-  pageSize: number;
-}
-
-export interface PaginatedResponse<T> {
-  data: T[];
-  metadata: {
-    total: number;
-    page: number;
-    pageSize: number;
-    pageCount: number;
-  };
-}
-
-export interface SortParams {
-  column: string;
-  direction: 'asc' | 'desc';
-}
-
-export interface FilterParams {
-  [key: string]: any;
-}
-
-export interface QueryOptions {
-  pagination?: PaginationParams;
-  sort?: SortParams;
-  filters?: FilterParams;
-  cache?: CacheOptions;
-}
-
-// Form data related types
-export interface FormData {
+export interface Profile {
   id: string;
-  categoryId: string;
-  schoolId: string;
-  data: any;
-  status: string;
-  submittedAt?: string;
-  approvedAt?: string;
-  approvedBy?: string;
-}
-
-// School related types
-export interface School {
-  id: string;
-  name: string;
-  address?: string;
-  email?: string;
-  phone?: string;
-  sectorId?: string;
-  createdAt?: string;
-  // Additional properties for UI display
-  sectorName?: string;
-  regionName?: string;
-}
-
-// Sector related types
-export interface Sector {
-  id: string;
-  name: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  role: string;
   regionId?: string;
-  createdAt?: string;
-  // Additional properties for UI display
-  regionName?: string;
-  schoolCount?: number;
+  sectorId?: string;
+  schoolId?: string;
+  createdAt: string;
 }
 
-// Versioning related types
+// Versioning types
 export interface TableVersion {
   id: string;
   tableId: string;
@@ -125,7 +99,7 @@ export interface TableVersion {
   startedAt: string;
   endedAt?: string;
   createdAt: string;
-  createdBy: string;
+  createdBy?: string;
 }
 
 export interface FormEntryVersion {
@@ -135,7 +109,7 @@ export interface FormEntryVersion {
   data: any;
   tableVersionId?: string;
   createdAt: string;
-  createdBy: string;
+  createdBy?: string;
 }
 
 export interface VersionDiff {
@@ -144,7 +118,20 @@ export interface VersionDiff {
   modified: string[];
 }
 
-// Notification related types
+// Notifications
+export interface Notification {
+  id: string;
+  userId: string;
+  title: string;
+  body: string;
+  notificationType: string;
+  actionUrl?: string;
+  isRead: boolean;
+  readAt?: string;
+  createdAt: string;
+  data?: any;
+}
+
 export interface NotificationGroup {
   id: string;
   name: string;
@@ -154,59 +141,30 @@ export interface NotificationGroup {
   updatedAt?: string;
 }
 
-export interface CreateNotificationGroupData {
-  name: string;
-  description?: string;
-}
-
-export interface UpdateNotificationGroupData {
-  name?: string;
-  description?: string;
-}
-
-export interface NotificationGroupMember {
+export interface GroupMember {
   id: string;
   groupId: string;
   memberId: string;
-  memberType: 'school' | 'sector' | 'region' | 'user';
+  memberType: 'user' | 'role' | 'school' | 'sector' | 'region';
   createdAt: string;
-}
-
-export interface AddGroupMemberData {
-  groupId: string;
-  memberId: string;
-  memberType: 'school' | 'sector' | 'region' | 'user';
 }
 
 export interface MassNotification {
   id: string;
   title: string;
   message: string;
-  notificationType: 'email' | 'sms' | 'push' | 'in-app';
-  deliveryStatus: 'pending' | 'sending' | 'completed' | 'failed';
-  sentCount?: number;
+  notificationType: string;
+  deliveryStatus: 'pending' | 'in_progress' | 'completed' | 'failed';
+  sentCount: number;
   createdBy?: string;
   createdAt: string;
 }
 
-export interface CreateMassNotificationData {
-  title: string;
-  message: string;
-  notificationType: 'email' | 'sms' | 'push' | 'in-app';
-  recipients: {
-    groupIds?: string[];
-    schoolIds?: string[];
-    sectorIds?: string[];
-    regionIds?: string[];
-    userIds?: string[];
-  };
-}
-
-export interface MassNotificationRecipient {
+export interface NotificationRecipient {
   id: string;
   notificationId: string;
   recipientId: string;
-  recipientType: 'user' | 'school' | 'sector' | 'region';
+  recipientType: 'user' | 'role' | 'school' | 'sector' | 'region';
   status: 'pending' | 'sent' | 'failed' | 'read';
   sentAt?: string;
   readAt?: string;
@@ -214,60 +172,63 @@ export interface MassNotificationRecipient {
 }
 
 export interface NotificationStats {
+  total: number;
+  pending: number;
+  sent: number;
+  failed: number;
+  read: number;
   totalSent: number;
   delivered: number;
-  read: number;
-  failed: number;
-  pending: number;
 }
 
-export interface GetMassNotificationsParams {
-  page?: number;
-  limit?: number;
-  fromDate?: string;
-  toDate?: string;
-  status?: string;
-  type?: string;
+// Response types
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
-// Fix import/export jobs
+// Import/Export types
 export interface ImportJob {
   id: string;
-  status: 'waiting' | 'processing' | 'complete' | 'error';
+  userId: string;
+  tableName: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
   progress: number;
   total_rows: number;
   processed_rows: number;
+  failed_rows: number;
+  start_time: string;
+  end_time?: string;
+  error_message?: string;
   file_name: string;
-  table_name: string;
-  with_upsert: boolean;
-  key_field?: string;
-  errors: Array<{ row: number; message: string }>;
-  created_by: string;
+  file_size: number;
   created_at: string;
-  updated_at: string;
 }
 
 export interface ExportJob {
   id: string;
-  status: 'waiting' | 'processing' | 'complete' | 'error';
-  progress: number;
-  total_rows: number;
-  processed_rows: number;
-  file_name: string;
-  query_params: any;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-  file_url?: string;
+  userId: string;
+  tableName: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  filters?: Record<string, any>;
+  start_time: string;
+  end_time?: string;
   error_message?: string;
+  file_name: string;
+  file_size?: number;
+  download_url?: string;
+  created_at: string;
 }
 
-// Export options
-export interface ExportOptions {
-  fileName?: string;
-  sheetName?: string;
-  dateFormat?: string;
-  includeHeaders?: boolean;
-  headerStyle?: any;
-  cellStyle?: any;
+// Column definitions 
+export interface ColumnDefinition {
+  name: string;
+  label: string;
+  type: string;
+  required: boolean;
+  options: string[];
+  defaultValue?: any;
 }

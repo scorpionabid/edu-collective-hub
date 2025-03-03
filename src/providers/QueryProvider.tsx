@@ -1,3 +1,4 @@
+
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { useState, useEffect } from 'react';
@@ -8,7 +9,8 @@ interface QueryProviderProps {
 }
 
 export const QueryProvider = ({ children }: QueryProviderProps) => {
-  const { user, role } = useAuth();
+  const { user } = useAuth();
+  const userRole = user?.role;
   
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
@@ -50,7 +52,7 @@ export const QueryProvider = ({ children }: QueryProviderProps) => {
   }, [user, queryClient]);
   
   useEffect(() => {
-    if (role) {
+    if (userRole) {
       queryClient.invalidateQueries({
         predicate: (query) => {
           return query.queryKey[0] === 'schools' || 
@@ -60,7 +62,7 @@ export const QueryProvider = ({ children }: QueryProviderProps) => {
         }
       });
     }
-  }, [role, queryClient]);
+  }, [userRole, queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>

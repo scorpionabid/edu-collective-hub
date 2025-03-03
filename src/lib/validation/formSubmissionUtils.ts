@@ -1,3 +1,4 @@
+
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -36,8 +37,9 @@ export async function validateAndSubmitForm<T>(
     };
     
     // Submit to Supabase with proper error handling
+    // Use a dynamic approach that will work with any table
     const { data, error } = await supabase
-      .from(tableName)
+      .from(tableName as any)
       .insert(dataToSubmit)
       .select()
       .single();
@@ -108,16 +110,20 @@ export async function updateFormSubmission<T>(
   options: SubmissionOptions = {}
 ): Promise<{ success: boolean; data?: any; error?: any }> {
   try {
+    // Check if status is being updated to 'submitted'
+    const isSubmitting = (formData as any)?.status === 'submitted';
+    
     // Prepare the update data
     const updateData = {
       ...formData,
       updated_at: new Date().toISOString(),
-      ...(formData.status === 'submitted' && { submitted_at: new Date().toISOString() })
+      ...(isSubmitting && { submitted_at: new Date().toISOString() })
     };
     
     // Submit to Supabase with proper error handling
+    // Use a dynamic approach that will work with any table
     const { data, error } = await supabase
-      .from(tableName)
+      .from(tableName as any)
       .update(updateData)
       .eq('id', id)
       .select()

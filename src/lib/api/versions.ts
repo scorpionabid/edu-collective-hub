@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { TableVersion, FormEntryVersion, VersionDiff } from "./types";
@@ -24,15 +25,7 @@ export const versions = {
         startedAt: item.started_at,
         endedAt: item.ended_at,
         createdAt: item.created_at,
-        createdBy: item.created_by,
-        // Keep the original fields too for compatibility
-        table_id: item.table_id,
-        version_number: item.version_number,
-        is_active: item.is_active,
-        started_at: item.started_at,
-        ended_at: item.ended_at,
-        created_at: item.created_at,
-        created_by: item.created_by
+        createdBy: item.created_by
       }));
     } catch (error) {
       console.error('Error fetching table versions:', error);
@@ -61,15 +54,7 @@ export const versions = {
         startedAt: data.started_at,
         endedAt: data.ended_at,
         createdAt: data.created_at,
-        createdBy: data.created_by,
-        // Keep the original fields too for compatibility
-        table_id: data.table_id,
-        version_number: data.version_number,
-        is_active: data.is_active,
-        started_at: data.started_at,
-        ended_at: data.ended_at,
-        created_at: data.created_at,
-        created_by: data.created_by
+        createdBy: data.created_by
       };
     } catch (error) {
       console.error('Error fetching active table version:', error);
@@ -127,15 +112,7 @@ export const versions = {
         startedAt: data.started_at,
         endedAt: data.ended_at,
         createdAt: data.created_at,
-        createdBy: data.created_by,
-        // Keep the original fields too for compatibility
-        table_id: data.table_id,
-        version_number: data.version_number,
-        is_active: data.is_active,
-        started_at: data.started_at,
-        ended_at: data.ended_at,
-        created_at: data.created_at,
-        created_by: data.created_by
+        createdBy: data.created_by
       };
     } catch (error) {
       console.error('Error creating table version:', error);
@@ -201,13 +178,7 @@ export const versions = {
         data: item.data,
         tableVersionId: item.table_version_id,
         createdAt: item.created_at,
-        createdBy: item.created_by,
-        // Keep the original fields too for compatibility
-        form_entry_id: item.form_entry_id,
-        version_number: item.version_number,
-        table_version_id: item.table_version_id,
-        created_at: item.created_at,
-        created_by: item.created_by
+        createdBy: item.created_by
       }));
     } catch (error) {
       console.error('Error fetching form entry versions:', error);
@@ -234,13 +205,7 @@ export const versions = {
         data: data.data,
         tableVersionId: data.table_version_id,
         createdAt: data.created_at,
-        createdBy: data.created_by,
-        // Keep the original fields too for compatibility
-        form_entry_id: data.form_entry_id,
-        version_number: data.version_number,
-        table_version_id: data.table_version_id,
-        created_at: data.created_at,
-        created_by: data.created_by
+        createdBy: data.created_by
       };
     } catch (error) {
       console.error('Error fetching form entry version:', error);
@@ -288,13 +253,7 @@ export const versions = {
         data: newVersion.data,
         tableVersionId: newVersion.table_version_id,
         createdAt: newVersion.created_at,
-        createdBy: newVersion.created_by,
-        // Keep the original fields too for compatibility
-        form_entry_id: newVersion.form_entry_id,
-        version_number: newVersion.version_number,
-        table_version_id: newVersion.table_version_id,
-        created_at: newVersion.created_at,
-        created_by: newVersion.created_by
+        createdBy: newVersion.created_by
       };
     } catch (error) {
       console.error('Error creating form entry version:', error);
