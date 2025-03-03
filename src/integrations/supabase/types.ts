@@ -9,6 +9,211 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      cache_entries: {
+        Row: {
+          cache_key: string
+          cache_value: Json
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          cache_key: string
+          cache_value: Json
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Update: {
+          cache_key?: string
+          cache_value?: Json
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      form_entry_versions: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          data: Json
+          form_entry_id: string
+          id: string
+          table_version_id: string | null
+          version_number: number
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          data: Json
+          form_entry_id: string
+          id?: string
+          table_version_id?: string | null
+          version_number: number
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          data?: Json
+          form_entry_id?: string
+          id?: string
+          table_version_id?: string | null
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_form_entry_versions_table_version_id"
+            columns: ["table_version_id"]
+            isOneToOne: false
+            referencedRelation: "table_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_entry_versions_table_version_id_fkey"
+            columns: ["table_version_id"]
+            isOneToOne: false
+            referencedRelation: "table_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mass_notification_recipients: {
+        Row: {
+          created_at: string | null
+          id: string
+          notification_id: string | null
+          read_at: string | null
+          recipient_id: string
+          recipient_type: string
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          notification_id?: string | null
+          read_at?: string | null
+          recipient_id: string
+          recipient_type: string
+          sent_at?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          notification_id?: string | null
+          read_at?: string | null
+          recipient_id?: string
+          recipient_type?: string
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mass_notification_recipients_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "mass_notifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mass_notifications: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          delivery_status: string
+          id: string
+          message: string
+          notification_type: string
+          sent_count: number | null
+          title: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          delivery_status?: string
+          id?: string
+          message: string
+          notification_type: string
+          sent_count?: number | null
+          title: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          delivery_status?: string
+          id?: string
+          message?: string
+          notification_type?: string
+          sent_count?: number | null
+          title?: string
+        }
+        Relationships: []
+      }
+      notification_group_members: {
+        Row: {
+          created_at: string | null
+          group_id: string | null
+          id: string
+          member_id: string
+          member_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          group_id?: string | null
+          id?: string
+          member_id: string
+          member_type: string
+        }
+        Update: {
+          created_at?: string | null
+          group_id?: string | null
+          id?: string
+          member_id?: string
+          member_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "notification_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_groups: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string | null
@@ -75,6 +280,83 @@ export type Database = {
         }
         Relationships: []
       }
+      reminder_recipients: {
+        Row: {
+          created_at: string | null
+          id: string
+          recipient_id: string
+          recipient_type: string
+          reminder_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          recipient_id: string
+          recipient_type: string
+          reminder_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          recipient_id?: string
+          recipient_type?: string
+          reminder_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reminder_recipients_reminder_id_fkey"
+            columns: ["reminder_id"]
+            isOneToOne: false
+            referencedRelation: "reminders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reminders: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          days_offset: number | null
+          entity_id: string
+          entity_type: string
+          id: string
+          is_active: boolean | null
+          message: string
+          recurring_pattern: Json | null
+          reminder_type: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          days_offset?: number | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          is_active?: boolean | null
+          message: string
+          recurring_pattern?: Json | null
+          reminder_type: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          days_offset?: number | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          is_active?: boolean | null
+          message?: string
+          recurring_pattern?: Json | null
+          reminder_type?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       schools: {
         Row: {
           address: string | null
@@ -135,6 +417,89 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "sectors_region_id_fkey"
+            columns: ["region_id"]
+            isOneToOne: false
+            referencedRelation: "regions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      table_versions: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          ended_at: string | null
+          id: string
+          is_active: boolean | null
+          schema: Json
+          started_at: string | null
+          table_id: string
+          version_number: number
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          ended_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          schema: Json
+          started_at?: string | null
+          table_id: string
+          version_number: number
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          ended_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          schema?: Json
+          started_at?: string | null
+          table_id?: string
+          version_number?: number
+        }
+        Relationships: []
+      }
+      templates: {
+        Row: {
+          content: Json
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_public: boolean | null
+          name: string
+          region_id: string | null
+          type: string
+          updated_at: string | null
+        }
+        Insert: {
+          content: Json
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          name: string
+          region_id?: string | null
+          type: string
+          updated_at?: string | null
+        }
+        Update: {
+          content?: Json
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          name?: string
+          region_id?: string | null
+          type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "templates_region_id_fkey"
             columns: ["region_id"]
             isOneToOne: false
             referencedRelation: "regions"

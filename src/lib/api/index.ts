@@ -8,6 +8,7 @@ import { sectors } from './sectors';
 import { schools } from './schools';
 import { profiles } from './profiles';
 import { realtime } from './realtime';
+import { versions } from './versions';
 
 // Export all API modules as a unified API object
 export const api = {
@@ -19,7 +20,8 @@ export const api = {
   sectors,
   schools,
   profiles,
-  realtime
+  realtime,
+  versions
 };
 
 // Re-export types for convenience
